@@ -6,7 +6,9 @@ import {
   HiUsers, HiGlobeAlt, HiFlag, HiUserGroup, HiOutlineCube, HiOutlineLibrary,
   HiCurrencyDollar, HiOutlineCreditCard, HiChartSquareBar, HiReceiptTax,
   HiPuzzle, HiViewGrid, HiUser, HiDocumentText, HiOutlineOfficeBuilding,
-  HiCube, HiShoppingCart, HiCog, HiMenu, HiX, HiHome
+  HiCube, HiShoppingCart, HiCog, HiMenu, HiX, HiHome, HiClipboardList,
+  HiTruck, HiCurrencyRupee, HiInformationCircle, HiDocumentReport, HiCash,
+  HiOfficeBuilding, HiLocationMarker, HiMail
 } from "react-icons/hi";
 import { GiStockpiles } from "react-icons/gi";
 import { SiCivicrm } from "react-icons/si";
@@ -152,7 +154,6 @@ const MODULE_ROUTE_MAP = {
 
 
   // ── Inventory / Stock ──────────────────────────────
-  // ✅ ADDED: These match the actual DB keys from JWT logs
   "Inventory": [
     { label: "Inventory View",    path: "/admin/InventoryView",               needsView: true },
     { label: "Inventory Entry",   path: "/admin/InventoryEntry",              needsCreate: true },
@@ -243,8 +244,6 @@ const MODULE_ROUTE_MAP = {
   "Payment": [
     { label: "Payment Form",      path: "/admin/Payment",                     needsCreate: true },
   ],
-
-  // ✅ ADDED: These match actual DB keys from JWT logs
   "Payment Entry": [
     { label: "Payment Form",      path: "/admin/Payment",                     needsCreate: true },
   ],
@@ -391,17 +390,16 @@ export default function Layout({ children }) {
         <div className="h-16 flex items-center justify-between px-4 lg:px-6 bg-[#0f172a] border-b border-gray-700 shrink-0">
           <span className="font-bold text-base lg:text-lg flex items-center gap-2 tracking-wider">
             <HiHome className="text-blue-400 shrink-0" />
-            {/* <span className="truncate">ERP SYSTEM</span> */}
             <Link href="/admin" className="truncate">ERP SYSTEM</Link>
           </span>
           {isSidebarOpen && (
-  <button
-    onClick={closeSidebar}
-    className="p-2 rounded hover:bg-gray-700 transition-colors"
-  >
-    <HiX size={24} />
-  </button>
-)}
+            <button
+              onClick={closeSidebar}
+              className="p-2 rounded hover:bg-gray-700 transition-colors"
+            >
+              <HiX size={24} />
+            </button>
+          )}
         </div>
 
         {/* Nav */}
@@ -427,24 +425,27 @@ export default function Layout({ children }) {
                 <Item href="/admin/customer-view"          icon={<HiUsers />}             label="Customer View"                onClick={closeSidebar} isActive={isActive("/admin/customer-view")} />
                 <Item href="/admin/supplier"               icon={<HiUserGroup />}         label="Supplier View"                onClick={closeSidebar} isActive={isActive("/admin/supplier")} />
                 <Item href="/admin/item"                   icon={<HiCube />}              label="Item View"                    onClick={closeSidebar} isActive={isActive("/admin/item")} />
-                <Item href="/admin/account-bankhead"      icon={<HiOutlineLibrary />}    label="Account Head View"            onClick={closeSidebar} isActive={isActive("/admin/account-bankhead")} />
-                <Item href="/admin/bank-head-details" icon={<HiCurrencyDollar />}    label="General Ledger View"          onClick={closeSidebar} isActive={isActive("/admin/bank-head-details")} />
+                <Item href="/admin/account-head-view"      icon={<HiOutlineLibrary />}    label="Account Head View"            onClick={closeSidebar} isActive={isActive("/admin/account-head-view")} />
+                <Item href="/admin/bank-head-details-view" icon={<HiCurrencyDollar />}    label="General Ledger View"          onClick={closeSidebar} isActive={isActive("/admin/bank-head-details-view")} />
                 <Item href="/admin/email-templates"        icon={<HiDocumentText />}      label="Email Templates"              onClick={closeSidebar} isActive={isActive("/admin/email-templates")} />
                 <Item href="/admin/email-masters"          icon={<HiOutlineCreditCard />} label="Email & App Password Master"  onClick={closeSidebar} isActive={isActive("/admin/email-masters")} />
                 <Item href="/admin/price-list"             icon={<HiOutlineOfficeBuilding />} label="Price List"               onClick={closeSidebar} isActive={isActive("/admin/price-list")} />
+                <Item href="/admin/branches"               icon={<HiOfficeBuilding />}    label="Branches"                     onClick={closeSidebar} isActive={isActive("/admin/branches")} />
+                <Item href="/admin/districts"              icon={<HiLocationMarker />}    label="Districts"                    onClick={closeSidebar} isActive={isActive("/admin/districts")} />
+                <Item href="/admin/pincodes"               icon={<HiMail />}              label="Pincodes"                     onClick={closeSidebar} isActive={isActive("/admin/pincodes")} />
+                <Item href="/admin/vehicles"               icon={<HiTruck />}             label="vehicles"                     onClick={closeSidebar} isActive={isActive("/admin/vehicels")} />
+                <Item href="/admin/transport-price-list"   icon={<HiCurrencyRupee />}     label="Transport Price List"         onClick={closeSidebar} isActive={isActive("/admin/transport-price-list")} />
               </Section>
 
               <Section title="Transactions View" icon={<HiOutlineCreditCard />} isOpen={openMenu === "transactionsView"} onToggle={() => toggleMenu("transactionsView")}>
                 <Submenu isOpen={!!openSubmenus["tvSales"]} onToggle={() => toggleSubmenu("tvSales")} icon={<HiShoppingCart />} label="Sales">
-                  <Item href="/admin/sales-quotation-view" icon={<SiCivicrm />}           label="Quotation View"  onClick={closeSidebar} isActive={isActive("/admin/sales-quotation-view")} />
-                  <Item href="/admin/sales-order-view"     icon={<HiPuzzle />}            label="Order View"      onClick={closeSidebar} isActive={isActive("/admin/sales-order-view")} />
-                  <Item href="/admin/pos"                  icon={<HiCube />}              label="POS Invoice"     onClick={closeSidebar} isActive={isActive("/admin/pos")} />
-                  <Item href="/admin/delivery-view"        icon={<HiOutlineCube />}       label="Delivery View"   onClick={closeSidebar} isActive={isActive("/admin/delivery-view")} />
-                  <Item href="/admin/sales-invoice-view"   icon={<HiOutlineCreditCard />} label="Invoice View"    onClick={closeSidebar} isActive={isActive("/admin/sales-invoice-view")} />
-                  <Item href="/admin/credit-memo-veiw"     icon={<HiReceiptTax />}        label="Credit Memo"     onClick={closeSidebar} isActive={isActive("/admin/credit-memo-veiw")} />
-                  <Item href="/admin/sales-report"         icon={<HiChartSquareBar />}    label="Report"          onClick={closeSidebar} isActive={isActive("/admin/sales-report")} />
-                  <Item href="/admin/pos/reports"          icon={<HiChartSquareBar />}    label="POS Report"      onClick={closeSidebar} isActive={isActive("/admin/pos/reports")} />
-                  <Item href="/admin/sales-board"          icon={<HiChartSquareBar />}    label="Sales Board"     onClick={closeSidebar} isActive={isActive("/admin/sales-board")} />
+                  <Item href="/admin/order-panel" icon={<HiClipboardList />} label="Order Panel" onClick={closeSidebar} isActive={isActive("/admin/order-panel")} />
+                  <Item href="/admin/vehicle-negotiation" icon={<HiTruck />} label="Vehicle Negotiation" onClick={closeSidebar} isActive={isActive("/admin/vehicle-negotiation")} />
+                  <Item href="/admin/pricing-panel" icon={<HiCurrencyRupee />} label="Pricing Panel" onClick={closeSidebar} isActive={isActive("/admin/pricing-panel")} />
+                  <Item href="/admin/Loading-Info" icon={<HiInformationCircle />} label="Loading Info" onClick={closeSidebar} isActive={isActive("/admin/Loading-Info")} />
+                  <Item href="/admin/Purchase-Panel" icon={<HiShoppingCart />} label="Purchase Panel" onClick={closeSidebar} isActive={isActive("/admin/Purchase-Panel")} />
+                  <Item href="/admin/Consignment-Note" icon={<HiDocumentText />} label="Consignment Note" onClick={closeSidebar} isActive={isActive("/admin/Consignment-Note")} />
+                  <Item href="/admin/Advance-Payment" icon={<HiCash />} label="Advance Payment" onClick={closeSidebar} isActive={isActive("/admin/Advance-Payment")} />
                 </Submenu>
 
                 <Submenu isOpen={!!openSubmenus["tvPurchase"]} onToggle={() => toggleSubmenu("tvPurchase")} icon={<GiStockpiles />} label="Purchase">
@@ -471,7 +472,6 @@ export default function Layout({ children }) {
                 <Item href="/admin/opportunities"  icon={<HiPuzzle />}    label="Opportunity"     onClick={closeSidebar} isActive={isActive("/admin/opportunities")} />
                 <Item href="/admin/crm/campaign"   icon={<HiPuzzle />}    label="Campaign"        onClick={closeSidebar} isActive={isActive("/admin/crm/campaign")} />
                 <Item href="/admin/crm/calls"      icon={<HiPuzzle />}    label="Calls"           onClick={closeSidebar} isActive={isActive("/admin/crm/calls")} />
-                
               </Section>
 
               <Section title="Stock" icon={<HiOutlineCube />} isOpen={openMenu === "Stock"} onToggle={() => toggleMenu("Stock")}>
@@ -561,6 +561,14 @@ export default function Layout({ children }) {
                 <Item href="/admin/helpdesk/feedback/analytics" icon={<HiChartSquareBar />} label="Feedback Analysis" onClick={closeSidebar} isActive={isActive("/admin/helpdesk/feedback/analytics")} />
                 <Item href="/admin/helpdesk/report"             icon={<HiChartSquareBar />} label="Report"            onClick={closeSidebar} isActive={isActive("/admin/helpdesk/report")} />
               </Section>
+
+              {/* ===== NEW REPORTS SECTION ===== */}
+              <Section title="Reports" icon={<HiDocumentReport />} isOpen={openMenu === "reports"} onToggle={() => toggleMenu("reports")}>
+                <Item href="/admin/OrderPanel-Report" icon={<HiDocumentReport />} label="Order Panel Report" onClick={closeSidebar} isActive={isActive("/admin/OrderPanel-Report")} />
+                <Item href="/admin/vehiclenegotiation-Report" icon={<HiDocumentReport />} label="Vehicle Negotiation Report" onClick={closeSidebar} isActive={isActive("/admin/vehiclenegotiation-Report")} />
+                <Item href="/admin/Pricingpanel-Report" icon={<HiDocumentReport />} label="Pricing Panel Report" onClick={closeSidebar} isActive={isActive("/admin/Pricingpanel-Report")} />
+                <Item href="/admin/LoadingPanel-Report" icon={<HiDocumentReport />} label="Loading Panel Report" onClick={closeSidebar} isActive={isActive("/admin/LoadingPanel-Report")} />
+              </Section>
             </>
           )}
 
@@ -574,7 +582,6 @@ export default function Layout({ children }) {
 
               const permissions = data?.permissions || {};
 
-              // ✅ Permissions ke hisaab se routes filter karo
               const visibleRoutes = moduleRoutes.filter((route) => {
                 if (route.needsCreate && !permissions.create) return false;
                 if (route.needsView && !permissions.view) return false;
@@ -613,58 +620,54 @@ export default function Layout({ children }) {
       </aside>
 
       {/* CONTENT AREA */}
-   <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-  <header className="sticky top-0 z-50 w-full bg-black border-b border-gray-800 shadow-lg shrink-0">
-    
-    {/* Safe area (mobile notch ke liye) */}
-    <div className="h-[env(safe-area-inset-top,24px)] w-full bg-black" />
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <header className="sticky top-0 z-50 w-full bg-black border-b border-gray-800 shadow-lg shrink-0">
+          {/* Safe area (mobile notch ke liye) */}
+          <div className="h-[env(safe-area-inset-top,24px)] w-full bg-black" />
 
-    {/* Main Header Content */}
-    <div className="flex items-center justify-between px-4 h-14">
-      
-      {/* Left Section */}
-      <div className="flex items-center gap-3 min-w-0">
-       <button
-  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-  className="md:hidden p-2 -ml-2 text-gray-400 hover:text-white transition-colors"
->
-  {isSidebarOpen ? <HiX size={24} /> : <HiMenu size={24} />}
-</button>
+          {/* Main Header Content */}
+          <div className="flex items-center justify-between px-4 h-14">
+            {/* Left Section */}
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="md:hidden p-2 -ml-2 text-gray-400 hover:text-white transition-colors"
+              >
+                {isSidebarOpen ? <HiX size={24} /> : <HiMenu size={24} />}
+              </button>
 
-        <h1 className="text-sm md:text-base font-bold text-white truncate tracking-tight">
-          {isCompany
-            ? "Company Administrator"
-            : isAdmin
-            ? "Admin Dashboard"
-            : "Dashboard"}
-        </h1>
+              <h1 className="text-sm md:text-base font-bold text-white truncate tracking-tight">
+                {isCompany
+                  ? "Company Administrator"
+                  : isAdmin
+                  ? "Admin Dashboard"
+                  : "Dashboard"}
+              </h1>
+            </div>
+
+            {/* Right Section */}
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="hidden md:flex items-center gap-3 text-sm text-gray-300">
+                <span>{session.name || session.email}</span>
+              </div>
+
+              <div
+                className="h-9 w-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold border-2 border-white/10 shadow-inner"
+                title={session.email}
+              >
+                {session.email?.charAt(0).toUpperCase()}
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto bg-[#f8fafc]">
+          {children}
+        </main>
       </div>
-
-      {/* Right Section */}
-      <div className="flex items-center gap-3 shrink-0">
-        <div className="hidden md:flex items-center gap-3 text-sm text-gray-300">
-          <span>{session.name || session.email}</span>
-        </div>
-
-        <div
-          className="h-9 w-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold border-2 border-white/10 shadow-inner"
-          title={session.email}
-        >
-          {session.email?.charAt(0).toUpperCase()}
-        </div>
-      </div>
-
-    </div>
-  </header>
-
-  <main className="flex-1 overflow-y-auto bg-[#f8fafc]">
-    {children}
-  </main>
-</div>
     </div>
   );
 }
-
 // "use client";
 
 // import { useState } from "react";

@@ -1,723 +1,407 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-/* =========================
-  CONSTANTS
-========================= */
-const DELIVERY_TYPES = ["Urgent", "Normal"];
-const ORDER_TYPES = ["Sales", "STO Order", "Export", "Import"];
-const BILLING_TYPES = ["Single - Order", "Multi - Order"];
+export default function PricingPanelList() {
+  const router = useRouter();
+  const [panels, setPanels] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(null);
+  const [filters, setFilters] = useState({
+    search: "",
+    pricingStatus: "",
+    approvalStatus: "",
+    fromDate: "",
+    toDate: ""
+  });
 
-const PRICE_LISTS = ["", "INDORAMA GDM MULTI P", "SQM GDM MULTI P", "Nil Price list"];
-const PRICING_STATUS = ["Pending", "Completed"];
-const APPROVAL_STATUS = ["Pending", "Approved", "Rejected", "Completed"];
+  useEffect(() => {
+    fetchPanels();
+  }, []);
 
-const RATE_APPROVAL_TYPES = ["Contract Rates", "Mail Approval Rate"];
-
-function uid() {
-  return Math.random().toString(36).slice(2, 10);
-}
-function num(v) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-function fmtDDMMYYYY(dateStr) {
-  if (!dateStr) return "";
-  const [y, m, d] = dateStr.split("-");
-  return `${d}/${m}/${y}`;
-}
-
-
-
-/* =========================
-  EMPTY ROW
-========================= */
-function emptyOrderRow() {
-  return {
-    _id: uid(),
-    orderNo: "",
-    partyName: "",
-    plantCode: "",
-    orderType: "Sales",
-    pinCode: "",
-    state: "",
-    district: "",
-    from: "",
-    to: "",
-    locationRate: "",
-    priceList: "",
-    weight: "",
-    rate: "",
+  const fetchPanels = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      
+      const params = new URLSearchParams({ format: 'table' });
+      if (filters.search) params.append('search', filters.search);
+      if (filters.pricingStatus) params.append('pricingStatus', filters.pricingStatus);
+      if (filters.approvalStatus) params.append('approvalStatus', filters.approvalStatus);
+      if (filters.fromDate) params.append('fromDate', filters.fromDate);
+      if (filters.toDate) params.append('toDate', filters.toDate);
+      
+      const res = await fetch(`/api/pricing-panel?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        // Group by Pricing Serial Number to show each panel once
+        const grouped = {};
+        data.data.forEach(item => {
+          if (!grouped[item.panelId]) {
+            grouped[item.panelId] = {
+              panelId: item.panelId,
+              pricingSerialNo: item.pricingSerialNo,
+              date: item.date,
+              partyName: item.partyName,
+              from: item.from,
+              to: item.to,
+              weight: item.weight,
+              pricing: item.pricing || 'Pending',
+              approval: item.approval || 'Pending',
+              orderCount: 1,
+              vnnNumbers: item.vnn ? [item.vnn] : []
+            };
+          } else {
+            grouped[item.panelId].orderCount += 1;
+            if (item.vnn && !grouped[item.panelId].vnnNumbers.includes(item.vnn)) {
+              grouped[item.panelId].vnnNumbers.push(item.vnn);
+            }
+          }
+        });
+        setPanels(Object.values(grouped));
+      } else {
+        setPanels([]);
+        setError(data.message || 'Failed to fetch pricing panels');
+      }
+    } catch (err) {
+      console.error('Error fetching pricing panels:', err);
+      setError('Failed to load pricing panels');
+    } finally {
+      setLoading(false);
+    }
   };
-}
 
-/* =========================
-  UI COMPONENTS
-========================= */
-function Btn({ children, onClick, variant = "primary", className = "", disabled }) {
-  const styles = {
-    primary: "bg-sky-600 text-white hover:bg-sky-700",
-    green: "bg-emerald-600 text-white hover:bg-emerald-700",
-    red: "bg-red-600 text-white hover:bg-red-700",
-    outline: "bg-white border border-slate-200 hover:bg-slate-50",
-    dark: "bg-slate-900 text-white hover:bg-black",
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
   };
-  return (
-    <button
-      disabled={disabled}
-      onClick={onClick}
-      className={`rounded-xl px-4 py-2 text-sm font-extrabold transition active:scale-[0.99] disabled:opacity-50 ${styles[variant]} ${className}`}
-    >
-      {children}
-    </button>
-  );
-}
 
-function Card({ title, right, children }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div className="px-4 py-3 border-b bg-slate-50 flex items-center justify-between">
-        <div className="text-sm font-extrabold text-slate-900">{title}</div>
-        {right || null}
-      </div>
-      <div className="p-4">{children}</div>
-    </div>
-  );
-}
-
-function SectionBar({ title, tone = "yellow" }) {
-  const map = {
-    yellow: "bg-yellow-300 text-black",
-    blue: "bg-sky-600 text-white",
-    green: "bg-green-500 text-black",
+  const applyFilters = () => {
+    fetchPanels();
   };
-  return (
-    <div className={`w-full border border-slate-200 ${map[tone]}`}>
-      <div className="mx-auto max-w-[1700px] px-4 py-3 text-center font-extrabold text-lg">
-        {title}
-      </div>
-    </div>
-  );
-}
 
-function Input({ label, value, onChange, type = "text", col = "", placeholder = "" }) {
-  return (
-    <div className={col}>
-      <div className="text-xs font-bold text-slate-600">{label}</div>
-      <input
-        type={type}
-        value={value || ""}
-        placeholder={placeholder}
-        onChange={(e) => onChange?.(e.target.value)}
-        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-      />
-    </div>
-  );
-}
+  const clearFilters = () => {
+    setFilters({
+      search: "",
+      pricingStatus: "",
+      approvalStatus: "",
+      fromDate: "",
+      toDate: ""
+    });
+    setTimeout(() => fetchPanels(), 100);
+  };
 
-function Select({ label, value, onChange, options = [], col = "" }) {
-  return (
-    <div className={col}>
-      <div className="text-xs font-bold text-slate-600">{label}</div>
-      <select
-        value={value || ""}
-        onChange={(e) => onChange?.(e.target.value)}
-        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-      >
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o === "" ? "Select" : o}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
+  const handleDelete = async (panelId, pricingSerialNo) => {
+    if (!confirm(`Are you sure you want to delete Pricing Panel ${pricingSerialNo}?`)) {
+      return;
+    }
 
-/* =========================
-  ORDERS TABLE (Responsive)
-========================= */
-function OrdersTable({ rows, onChange, onRemove }) {
-  // mobile = cards
-  // desktop = table
-  return (
-    <>
-      {/* MOBILE */}
-      <div className="grid grid-cols-1 gap-3 md:hidden">
-        {rows.length === 0 ? (
-          <div className="text-center py-10 text-slate-400 font-extrabold">
-            No orders added.
+    setDeleteLoading(panelId);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/pricing-panel?id=${panelId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setPanels(panels.filter(item => item.panelId !== panelId));
+        alert('Pricing Panel deleted successfully!');
+      } else {
+        alert(data.message || 'Failed to delete pricing panel');
+      }
+    } catch (err) {
+      console.error('Error deleting pricing panel:', err);
+      alert('Failed to delete pricing panel');
+    } finally {
+      setDeleteLoading(null);
+    }
+  };
+
+  const handleEdit = (panelId) => {
+    router.push(`/admin/pricing-panel/${panelId}`);
+  };
+
+  const handleApprove = (panelId) => {
+    router.push(`/admin/pricing-panel/approve/${panelId}`);
+  };
+
+  const handleCreateNew = () => {
+    router.push('/admin/pricing-panel/create');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto"></div>
+            <p className="mt-4 text-slate-600">Loading pricing panels...</p>
           </div>
-        ) : null}
-
-        {rows.map((r) => {
-          const total = num(r.weight) * num(r.rate);
-          return (
-            <div key={r._id} className="rounded-2xl border border-slate-200 bg-white p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-xs text-slate-500 font-bold">Order</div>
-                  <div className="font-extrabold text-slate-900">{r.orderNo || "—"}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-slate-500 font-bold">Total</div>
-                  <div className="font-extrabold text-emerald-700">{total}</div>
-                </div>
-              </div>
-
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <Input label="Party Name" value={r.partyName} onChange={(v) => onChange(r._id, "partyName", v)} />
-                <Input label="Plant Code" value={r.plantCode} onChange={(v) => onChange(r._id, "plantCode", v)} />
-                <Select label="Order Type" value={r.orderType} onChange={(v) => onChange(r._id, "orderType", v)} options={ORDER_TYPES} />
-                <Input label="Pin Code" value={r.pinCode} onChange={(v) => onChange(r._id, "pinCode", v)} />
-                <Input label="State" value={r.state} onChange={(v) => onChange(r._id, "state", v)} />
-                <Input label="District" value={r.district} onChange={(v) => onChange(r._id, "district", v)} />
-                <Input label="From" value={r.from} onChange={(v) => onChange(r._id, "from", v)} />
-                <Input label="To" value={r.to} onChange={(v) => onChange(r._id, "to", v)} />
-                <Input label="Location Rate" value={r.locationRate} onChange={(v) => onChange(r._id, "locationRate", v)} />
-                <Select label="Price List" value={r.priceList} onChange={(v) => onChange(r._id, "priceList", v)} options={PRICE_LISTS} />
-                <Input label="Weight" value={r.weight} onChange={(v) => onChange(r._id, "weight", v)} />
-                <Input label="Rate" value={r.rate} onChange={(v) => onChange(r._id, "rate", v)} />
-              </div>
-
-              <div className="mt-4">
-                <Btn variant="red" className="w-full" onClick={() => onRemove(r._id)}>
-                  Remove
-                </Btn>
-              </div>
-            </div>
-          );
-        })}
+        </div>
       </div>
-
-      {/* DESKTOP */}
-      <div className="hidden md:block rounded-2xl border border-slate-200 overflow-auto">
-        <table className="min-w-[1600px] w-full text-sm">
-          <thead className="sticky top-0 bg-slate-900 text-white">
-            <tr>
-              {[
-                "Order No",
-                "Party Name",
-                "Plant Code",
-                "Order Type",
-                "Pin Code",
-                "State",
-                "District",
-                "From",
-                "To",
-                "Location Rate",
-                "Price List",
-                "Weight",
-                "Rate",
-                "Total Amount",
-                "Action",
-              ].map((h) => (
-                <th key={h} className="px-3 py-3 text-left text-xs font-extrabold uppercase">
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-
-          <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={15} className="px-4 py-12 text-center text-slate-400 font-extrabold">
-                  No order rows added.
-                </td>
-              </tr>
-            ) : null}
-
-            {rows.map((r) => {
-              const total = num(r.weight) * num(r.rate);
-              return (
-                <tr key={r._id} className="border-t hover:bg-slate-50">
-                  <td className="px-2 py-2">
-                    <input
-                      value={r.orderNo}
-                      onChange={(e) => onChange(r._id, "orderNo", e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 px-2 py-2"
-                    />
-                  </td>
-                  <td className="px-2 py-2">
-                    <input
-                      value={r.partyName}
-                      onChange={(e) => onChange(r._id, "partyName", e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 px-2 py-2"
-                    />
-                  </td>
-                  <td className="px-2 py-2">
-                    <input
-                      value={r.plantCode}
-                      onChange={(e) => onChange(r._id, "plantCode", e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 px-2 py-2"
-                    />
-                  </td>
-                  <td className="px-2 py-2">
-                    <select
-                      value={r.orderType}
-                      onChange={(e) => onChange(r._id, "orderType", e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 px-2 py-2"
-                    >
-                      {ORDER_TYPES.map((o) => (
-                        <option key={o} value={o}>
-                          {o}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-
-                  <td className="px-2 py-2">
-                    <input
-                      value={r.pinCode}
-                      onChange={(e) => onChange(r._id, "pinCode", e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 px-2 py-2"
-                    />
-                  </td>
-                  <td className="px-2 py-2">
-                    <input value={r.state} onChange={(e) => onChange(r._id, "state", e.target.value)} className="w-full rounded-lg border border-slate-200 px-2 py-2" />
-                  </td>
-                  <td className="px-2 py-2">
-                    <input value={r.district} onChange={(e) => onChange(r._id, "district", e.target.value)} className="w-full rounded-lg border border-slate-200 px-2 py-2" />
-                  </td>
-                  <td className="px-2 py-2">
-                    <input value={r.from} onChange={(e) => onChange(r._id, "from", e.target.value)} className="w-full rounded-lg border border-slate-200 px-2 py-2" />
-                  </td>
-                  <td className="px-2 py-2">
-                    <input value={r.to} onChange={(e) => onChange(r._id, "to", e.target.value)} className="w-full rounded-lg border border-slate-200 px-2 py-2" />
-                  </td>
-                  <td className="px-2 py-2">
-                    <input value={r.locationRate} onChange={(e) => onChange(r._id, "locationRate", e.target.value)} className="w-full rounded-lg border border-slate-200 px-2 py-2" />
-                  </td>
-                  <td className="px-2 py-2">
-                    <select
-                      value={r.priceList}
-                      onChange={(e) => onChange(r._id, "priceList", e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 px-2 py-2"
-                    >
-                      {PRICE_LISTS.map((p) => (
-                        <option key={p} value={p}>
-                          {p === "" ? "Select" : p}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-2 py-2">
-                    <input value={r.weight} onChange={(e) => onChange(r._id, "weight", e.target.value)} className="w-full rounded-lg border border-slate-200 px-2 py-2" />
-                  </td>
-                  <td className="px-2 py-2">
-                    <input value={r.rate} onChange={(e) => onChange(r._id, "rate", e.target.value)} className="w-full rounded-lg border border-slate-200 px-2 py-2" />
-                  </td>
-
-                  <td className="px-2 py-2 font-extrabold text-emerald-700">{total}</td>
-
-                  <td className="px-2 py-2">
-                    <Btn variant="red" onClick={() => onRemove(r._id)}>
-                      Remove
-                    </Btn>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </>
-  );
-}
-
-/* =========================
-  PAGE
-========================= */
-export default function PricingPanelPage() {
-  /* ===== TOP META (COMMON) ===== */
-  const [meta, setMeta] = useState({
-    pricingSerialNo: "",
-    branch: "",
-    delivery: "Urgent",
-    date: "",
-  });
-
-  /* ===== SINGLE ORDER ===== */
-  const [single, setSingle] = useState({
-    billingType: "Single - Order",
-    loadingPoints: "",
-    dropPoints: "",
-    collectionCharges: "",
-    cancellationCharges: "",
-    loadingCharges: "",
-    otherCharges: "",
-  });
-  const [singleRows, setSingleRows] = useState([]);
-
-  /* ===== MULTI ORDER ===== */
-  const [multi, setMulti] = useState({
-    billingType: "Multi - Order",
-    loadingPoints: "",
-    dropPoints: "",
-    collectionCharges: "",
-    cancellationCharges: "",
-    loadingCharges: "",
-    otherCharges: "",
-  });
-  const [multiRows, setMultiRows] = useState([]);
-
-  /* ===== Rate Approval ===== */
-  const [rateApprovalType, setRateApprovalType] = useState("Contract Rates");
-  const [rateUploadFile, setRateUploadFile] = useState(null);
-  const [approvalDecision, setApprovalDecision] = useState("Pending");
-
-  /* ===== Notes & Rules ===== */
-  const NOTE1 =
-    "Pincode is Compulsary for Sales Orders and Pincode - 000000 is only allowed for Stock Transfer Orders.";
-  const NOTE2 =
-    "The 2nd Order Type needs to fetch the details of SO / STO automatically from 1st Order Type Entry.";
-  const NIL_PRICE_NOTE =
-    "Note: Nil Price List - If Nil Price List used for a an order then the approval will be required from Owner / Auditor";
-
-  /* ===== Total calcs ===== */
-  const singleTotalAmount = useMemo(
-    () => singleRows.reduce((acc, r) => acc + num(r.weight) * num(r.rate), 0),
-    [singleRows]
-  );
-
-  const multiTotalAmount = useMemo(
-    () => multiRows.reduce((acc, r) => acc + num(r.weight) * num(r.rate), 0),
-    [multiRows]
-  );
-
-  /* ===== Pricing Panel Report ===== */
-  const pricingReportRows = useMemo(() => {
-    const combined = [...singleRows, ...multiRows];
-    return combined.map((r) => ({
-      date: meta.date,
-      pricingSerialNo: meta.pricingSerialNo,
-      order: r.orderNo,
-      partyName: r.partyName,
-      plantCode: r.plantCode,
-      orderType: r.orderType,
-      pinCode: r.pinCode,
-      state: r.state,
-      district: r.district,
-      from: r.from,
-      to: r.to,
-      weight: r.weight,
-      pricing: PRICING_STATUS[0], // default
-      approval: approvalDecision,
-    }));
-  }, [singleRows, multiRows, meta.date, meta.pricingSerialNo, approvalDecision]);
-
-  /* ===== CRUD ===== */
-  const addSingleRow = () => setSingleRows((p) => [...p, emptyOrderRow()]);
-  const removeSingleRow = (id) => setSingleRows((p) => p.filter((x) => x._id !== id));
-  const updateSingleRow = (id, key, value) =>
-    setSingleRows((p) => p.map((r) => (r._id === id ? { ...r, [key]: value } : r)));
-
-  const addMultiRow = () => setMultiRows((p) => [...p, emptyOrderRow()]);
-  const removeMultiRow = (id) => setMultiRows((p) => p.filter((x) => x._id !== id));
-  const updateMultiRow = (id, key, value) =>
-    setMultiRows((p) => p.map((r) => (r._id === id ? { ...r, [key]: value } : r)));
-
-  /* ===== Save ===== */
-  const handleSave = () => {
-    const payload = {
-      meta,
-      single: { ...single, rows: singleRows, totalAmount: singleTotalAmount },
-      multi: { ...multi, rows: multiRows, totalAmount: multiTotalAmount },
-      rateApproval: { type: rateApprovalType, file: rateUploadFile?.name || "", decision: approvalDecision },
-      pricingReportRows,
-    };
-    console.log("✅ PRICING PANEL SAVE:", payload);
-    alert("✅ Saved! payload console me check karo");
-  };
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white">
-      {/* TOP HEADER */}
-      <div className="sticky top-0 z-40 border-b bg-white/85 backdrop-blur">
-        <div className="mx-auto max-w-[1700px] px-4 py-3 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+      {/* Top Bar */}
+      <div className="sticky top-0 z-40 border-b bg-white/80 backdrop-blur">
+        <div className="mx-auto max-w-full px-6 py-4 flex items-center justify-between">
           <div>
-            <div className="text-lg font-extrabold text-slate-900">Pricing Panel</div>
-            <div className="text-xs text-slate-500">
-              Single + Multi Order • Rate Approval • Pricing Report • Fully Responsive
+            <h1 className="text-2xl font-extrabold text-slate-900">
+              Pricing Panel Management
+            </h1>
+            <p className="text-sm text-slate-600 mt-1">
+              Manage all pricing panels in one place
+            </p>
+          </div>
+
+          <button
+            onClick={handleCreateNew}
+            className="rounded-xl bg-yellow-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-yellow-700 transition flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Create New Pricing Panel
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="mx-auto max-w-full p-6">
+        {error && (
+          <div className="mb-6 rounded-xl bg-red-50 border border-red-200 p-4 text-red-700">
+            {error}
+          </div>
+        )}
+
+        {/* Filters */}
+        <div className="mb-6 bg-white rounded-xl border border-slate-200 p-4">
+          <h2 className="text-sm font-bold text-slate-700 mb-3">Filter Pricing Panels</h2>
+          <div className="grid grid-cols-12 gap-3">
+            <div className="col-span-12 md:col-span-3">
+              <input
+                type="text"
+                placeholder="Search by PSN, VNN, Party..."
+                value={filters.search}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
+              />
+            </div>
+            <div className="col-span-12 md:col-span-2">
+              <select
+                value={filters.pricingStatus}
+                onChange={(e) => handleFilterChange('pricingStatus', e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
+              >
+                <option value="">All Pricing Status</option>
+                <option value="Pending">Pending</option>
+                <option value="Completed">Completed</option>
+              </select>
+            </div>
+            <div className="col-span-12 md:col-span-2">
+              <select
+                value={filters.approvalStatus}
+                onChange={(e) => handleFilterChange('approvalStatus', e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
+              >
+                <option value="">All Approval</option>
+                <option value="Pending">Pending</option>
+                <option value="Approved">Approved</option>
+                <option value="Rejected">Rejected</option>
+                <option value="Completed">Completed</option>
+              </select>
+            </div>
+            <div className="col-span-12 md:col-span-2">
+              <input
+                type="date"
+                value={filters.fromDate}
+                onChange={(e) => handleFilterChange('fromDate', e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
+                placeholder="From Date"
+              />
+            </div>
+            <div className="col-span-12 md:col-span-2">
+              <input
+                type="date"
+                value={filters.toDate}
+                onChange={(e) => handleFilterChange('toDate', e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
+                placeholder="To Date"
+              />
+            </div>
+            <div className="col-span-12 md:col-span-1 flex gap-2">
+              <button
+                onClick={applyFilters}
+                className="flex-1 rounded-xl bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-700 transition"
+              >
+                Filter
+              </button>
+              <button
+                onClick={clearFilters}
+                className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 transition"
+                title="Clear Filters"
+              >
+                ✕
+              </button>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Btn variant="green" onClick={handleSave}>
-              Save
-            </Btn>
-          </div>
-        </div>
-      </div>
-
-      {/* META */}
-      <div className="mx-auto max-w-[1700px] p-4 space-y-4">
-        <Card title="Common Header">
-          <div className="grid grid-cols-12 gap-3">
-            <Input col="col-span-12 md:col-span-4" label="Pricing Serial No" value={meta.pricingSerialNo} onChange={(v) => setMeta((p) => ({ ...p, pricingSerialNo: v }))} placeholder="PSN-001" />
-            <Input col="col-span-12 md:col-span-4" label="Branch" value={meta.branch} onChange={(v) => setMeta((p) => ({ ...p, branch: v }))} placeholder="Kandla" />
-            <Select col="col-span-12 md:col-span-2" label="Delivery" value={meta.delivery} onChange={(v) => setMeta((p) => ({ ...p, delivery: v }))} options={DELIVERY_TYPES} />
-            <Input col="col-span-12 md:col-span-2" type="date" label="Date" value={meta.date} onChange={(v) => setMeta((p) => ({ ...p, date: v }))} />
-          </div>
-        </Card>
-      </div>
-
-      {/* SINGLE ORDER */}
-      <SectionBar title="Single - Order" tone="yellow" />
-      <div className="mx-auto max-w-[1700px] p-4 space-y-4">
-        <Card
-          title="Billing Type / Charges"
-          right={<Btn variant="primary" onClick={addSingleRow}>+ Add Row</Btn>}
-        >
-          <div className="grid grid-cols-12 gap-3">
-            <Select col="col-span-12 md:col-span-4" label="Billing Type" value={single.billingType} onChange={(v) => setSingle((p) => ({ ...p, billingType: v }))} options={BILLING_TYPES} />
-            <Input col="col-span-6 md:col-span-2" label="No. of Loading Points" value={single.loadingPoints} onChange={(v) => setSingle((p) => ({ ...p, loadingPoints: v }))} />
-            <Input col="col-span-6 md:col-span-2" label="No. of Droping Point" value={single.dropPoints} onChange={(v) => setSingle((p) => ({ ...p, dropPoints: v }))} />
-            <Input col="col-span-6 md:col-span-2" label="Collection Charges" value={single.collectionCharges} onChange={(v) => setSingle((p) => ({ ...p, collectionCharges: v }))} />
-            <Input col="col-span-6 md:col-span-2" label="Cancellation Charges" value={single.cancellationCharges} onChange={(v) => setSingle((p) => ({ ...p, cancellationCharges: v }))} />
-            <Input col="col-span-6 md:col-span-2" label="Loading Charges" value={single.loadingCharges} onChange={(v) => setSingle((p) => ({ ...p, loadingCharges: v }))} />
-            <Input col="col-span-6 md:col-span-2" label="Other Charges" value={single.otherCharges} onChange={(v) => setSingle((p) => ({ ...p, otherCharges: v }))} />
-          </div>
-        </Card>
-
-        {/* Note + rules */}
-        <div className="grid grid-cols-12 gap-4">
-          <div className="col-span-12 lg:col-span-8">
-            <Card title="Single Order Rows">
-              <OrdersTable rows={singleRows} onChange={updateSingleRow} onRemove={removeSingleRow} />
-              <div className="mt-4 flex justify-end text-sm font-extrabold text-emerald-700">
-                Total Amount: {singleTotalAmount}
-              </div>
-            </Card>
-          </div>
-
-          <div className="col-span-12 lg:col-span-4 space-y-4">
-            <Card title="Note">
-              <div className="space-y-2 text-sm text-slate-700">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">{NOTE1}</div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">{NOTE2}</div>
-              </div>
-            </Card>
-
-            <Card title="Rules">
-              <div className="rounded-xl border border-slate-200 overflow-hidden">
-                <div className="grid grid-cols-2">
-                  <div className="bg-green-500 text-white font-extrabold text-center py-2 text-sm">Green/Yellow</div>
-                  <div className="bg-white text-slate-900 font-bold text-center py-2 text-sm border-l">Data Entry</div>
-
-                  <div className="bg-red-600 text-white font-extrabold text-center py-2 text-sm">Can't Skip</div>
-                  <div className="bg-white text-slate-900 font-bold text-center py-2 text-sm border-l border-t">
-                    Without Data Entry Further entry is not Permitted.
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-3 rounded-xl border border-slate-200 bg-yellow-50 p-3 text-xs font-bold text-slate-700">
-                {NIL_PRICE_NOTE}
-              </div>
-            </Card>
-          </div>
         </div>
 
-        {/* bottom boxes */}
-        <div className="grid grid-cols-12 gap-4">
-          <div className="col-span-12 md:col-span-4">
-            <Card title="Client Rate Working Rules">
-              <div className="rounded-xl border border-slate-200 bg-green-50 p-4 text-center font-extrabold">
-                Client Rate Working Rules will be Visiable for the Rate Settlements
-              </div>
-            </Card>
-          </div>
-          <div className="col-span-12 md:col-span-4">
-            <Card title="Pricing Report">
-              <div className="rounded-xl border border-slate-200 bg-white p-4 text-center font-extrabold">
-                Pricing Report for mail approval rates
-              </div>
-            </Card>
-          </div>
-        </div>
-      </div>
-
-      {/* MULTI ORDER */}
-      {/* <SectionBar title="Multi - Order" tone="yellow" /> */}
-      {/* <div className="mx-auto max-w-[1700px] p-4 space-y-4">
-        <Card
-          title="Multi Order Billing / Charges"
-          right={<Btn variant="primary" onClick={addMultiRow}>+ Add Row</Btn>}
-        >
-          <div className="grid grid-cols-12 gap-3">
-            <Select col="col-span-12 md:col-span-4" label="Billing Type" value={multi.billingType} onChange={(v) => setMulti((p) => ({ ...p, billingType: v }))} options={BILLING_TYPES} />
-            <Input col="col-span-6 md:col-span-2" label="No. of Loading Points" value={multi.loadingPoints} onChange={(v) => setMulti((p) => ({ ...p, loadingPoints: v }))} />
-            <Input col="col-span-6 md:col-span-2" label="No. of Droping Point" value={multi.dropPoints} onChange={(v) => setMulti((p) => ({ ...p, dropPoints: v }))} />
-            <Input col="col-span-6 md:col-span-2" label="Collection Charges" value={multi.collectionCharges} onChange={(v) => setMulti((p) => ({ ...p, collectionCharges: v }))} />
-            <Input col="col-span-6 md:col-span-2" label="Cancellation Charges" value={multi.cancellationCharges} onChange={(v) => setMulti((p) => ({ ...p, cancellationCharges: v }))} />
-            <Input col="col-span-6 md:col-span-2" label="Loading Charges" value={multi.loadingCharges} onChange={(v) => setMulti((p) => ({ ...p, loadingCharges: v }))} />
-            <Input col="col-span-6 md:col-span-2" label="Other Charges" value={multi.otherCharges} onChange={(v) => setMulti((p) => ({ ...p, otherCharges: v }))} />
-          </div>
-        </Card>
-
-        <div className="grid grid-cols-12 gap-4">
-          <div className="col-span-12 lg:col-span-8">
-            <Card title="Multi Order Rows">
-              <OrdersTable rows={multiRows} onChange={updateMultiRow} onRemove={removeMultiRow} />
-              <div className="mt-4 flex justify-end text-sm font-extrabold text-emerald-700">
-                Total Amount: {multiTotalAmount}
-              </div>
-            </Card>
-          </div>
-
-          <div className="col-span-12 lg:col-span-4 space-y-4">
-            <Card title="Note">
-              <div className="space-y-2 text-sm text-slate-700">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">{NOTE1}</div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">{NOTE2}</div>
-              </div>
-            </Card>
-
-            <Card title="Roles / Rules (Multi)">
-              <div className="rounded-xl border border-slate-200 overflow-hidden">
-                <div className="grid grid-cols-2">
-                  <div className="bg-green-500 text-white font-extrabold text-center py-2 text-sm">Green/Yellow</div>
-                  <div className="bg-white text-slate-900 font-bold text-center py-2 text-sm border-l">
-                    Data Entry
-                  </div>
-
-                  <div className="bg-red-600 text-white font-extrabold text-center py-2 text-sm">Can't Skip</div>
-                  <div className="bg-white text-slate-900 font-bold text-center py-2 text-sm border-l border-t">
-                    Without Data Entry Further entry is not Permitted.
-                  </div>
-
-                  <div className="bg-blue-600 text-white font-extrabold text-center py-2 text-sm">Auditor</div>
-                  <div className="bg-white text-slate-900 font-bold text-center py-2 text-sm border-l border-t">
-                    Right to Edit or Change Only for limited time.
-                  </div>
-
-                  <div className="bg-orange-500 text-white font-extrabold text-center py-2 text-sm">Owner</div>
-                  <div className="bg-white text-slate-900 font-bold text-center py-2 text-sm border-l border-t">
-                    Full Access with No time Limit.
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-        </div>
-      </div> */}
-
-      {/* RATE APPROVAL */}
-      <SectionBar title="Rate - Approval" tone="green" />
-      <div className="mx-auto max-w-[1700px] p-4 space-y-4">
-        <div className="grid grid-cols-12 gap-4">
-          <div className="col-span-12 md:col-span-4">
-            <Card title="Rate Approval Type">
-              <Select
-                label="Select Type"
-                value={rateApprovalType}
-                onChange={setRateApprovalType}
-                options={RATE_APPROVAL_TYPES}
-              />
-            </Card>
-          </div>
-
-          <div className="col-span-12 md:col-span-4">
-            <Card title="Rate Approval Upload">
-              <input
-                type="file"
-                accept=".pdf,.png,.jpg,.jpeg"
-                onChange={(e) => setRateUploadFile(e.target.files?.[0] || null)}
-              />
-              <div className="mt-3 text-sm font-extrabold text-slate-700">
-                {rateUploadFile ? `Uploaded: ${rateUploadFile.name}` : "No file uploaded"}
-              </div>
-            </Card>
-          </div>
-
-          <div className="col-span-12 md:col-span-4">
-            <Card title="Approval / Rejection">
-              <Select
-                label="Approval Status"
-                value={approvalDecision}
-                onChange={setApprovalDecision}
-                options={APPROVAL_STATUS}
-              />
-              <div className="mt-3">
-                <Btn variant="green" className="w-full" onClick={handleSave}>
-                  Save Approval
-                </Btn>
-              </div>
-            </Card>
-          </div>
-        </div>
-      </div>
-
-      {/* PRICING PANEL REPORT */}
-      <SectionBar title="Pricing - Panel" tone="blue" />
-      <div className="mx-auto max-w-[1700px] p-4">
-        <Card title="Pricing Panel Report">
-          <div className="rounded-2xl border border-slate-200 overflow-auto">
-            <table className="min-w-[1400px] w-full text-sm">
-              <thead className="sticky top-0 bg-slate-900 text-white">
+        {/* Pricing Panels Table */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-yellow-400 border-b border-yellow-500">
                 <tr>
-                  {[
-                    "Date",
-                    "Pricing Serial No",
-                    "Order",
-                    "Party Name",
-                    "Plant Code",
-                    "Order Type",
-                    "Pin Code",
-                    "State",
-                    "District",
-                    "From",
-                    "To",
-                    "Weight",
-                    "Pricing",
-                    "Approval",
-                  ].map((h) => (
-                    <th key={h} className="px-3 py-3 text-left text-xs font-extrabold uppercase">
-                      {h}
-                    </th>
-                  ))}
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">S.No</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">PSN</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">VNN Numbers</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">Party Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">From → To</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">Total Weight</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">Orders</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">Pricing</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">Approval</th>
+                  <th className="px-4 py-3 text-center text-xs font-extrabold text-slate-900 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-
-              <tbody>
-                {pricingReportRows.length === 0 ? (
+              <tbody className="divide-y divide-slate-200">
+                {panels.length > 0 ? (
+                  panels.map((item, index) => (
+                    <tr key={item.panelId} className="hover:bg-yellow-50 transition">
+                      <td className="px-4 py-3 text-slate-600">{index + 1}</td>
+                      <td className="px-4 py-3 text-slate-600">{item.date}</td>
+                      <td className="px-4 py-3 font-medium text-slate-900">{item.pricingSerialNo}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {item.vnnNumbers && item.vnnNumbers.length > 0 ? (
+                            item.vnnNumbers.map((vnn, idx) => (
+                              <span key={idx} className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                                {vnn}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-slate-800">{item.partyName}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-sm">
+                          <span>{item.from || '-'}</span>
+                          <span className="mx-1 text-slate-400">→</span>
+                          <span>{item.to || '-'}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-medium">{item.weight} kg</td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
+                          {item.orderCount} order{item.orderCount !== 1 ? 's' : ''}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          item.pricing === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {item.pricing}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          item.approval === 'Approved' ? 'bg-green-100 text-green-800' :
+                          item.approval === 'Rejected' ? 'bg-red-100 text-red-800' :
+                          item.approval === 'Completed' ? 'bg-blue-100 text-blue-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {item.approval}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center gap-2">
+                          {/* Edit Button */}
+                          <button
+                            onClick={() => handleEdit(item.panelId)}
+                            className="p-2 bg-sky-100 text-sky-700 rounded-lg hover:bg-sky-200 transition"
+                            title="Edit Pricing Panel"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          
+                          {/* Approve Button */}
+                          <button
+                            onClick={() => handleApprove(item.panelId)}
+                            className="p-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition"
+                            title="Approve/Review Pricing Panel"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </button>
+                          
+                          {/* Delete Button */}
+                          <button
+                            onClick={() => handleDelete(item.panelId, item.pricingSerialNo)}
+                            disabled={deleteLoading === item.panelId}
+                            className="p-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition disabled:opacity-50"
+                            title="Delete Pricing Panel"
+                          >
+                            {deleteLoading === item.panelId ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-700"></div>
+                            ) : (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
                   <tr>
-                    <td colSpan={14} className="px-4 py-12 text-center text-slate-400 font-extrabold">
-                      Report will generate after adding Single/Multi order rows.
+                    <td colSpan="11" className="px-4 py-12 text-center text-slate-500">
+                      <div className="flex flex-col items-center">
+                        <svg className="w-16 h-16 text-slate-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                        <p className="text-lg font-medium mb-2">No pricing panels found</p>
+                        <p className="text-sm mb-4">Get started by creating your first pricing panel</p>
+                        <button
+                          onClick={handleCreateNew}
+                          className="px-4 py-2 bg-yellow-600 text-white rounded-xl hover:bg-yellow-700 transition text-sm font-bold"
+                        >
+                          Create New Pricing Panel
+                        </button>
+                      </div>
                     </td>
                   </tr>
-                ) : null}
-
-                {pricingReportRows.map((r, idx) => (
-                  <tr key={idx} className="border-t hover:bg-slate-50">
-                    <td className="px-3 py-3">{r.date ? fmtDDMMYYYY(r.date) : ""}</td>
-                    <td className="px-3 py-3">{r.pricingSerialNo}</td>
-                    <td className="px-3 py-3 font-bold">{r.order}</td>
-                    <td className="px-3 py-3">{r.partyName}</td>
-                    <td className="px-3 py-3">{r.plantCode}</td>
-                    <td className="px-3 py-3">{r.orderType}</td>
-                    <td className="px-3 py-3">{r.pinCode}</td>
-                    <td className="px-3 py-3">{r.state}</td>
-                    <td className="px-3 py-3">{r.district}</td>
-                    <td className="px-3 py-3">{r.from}</td>
-                    <td className="px-3 py-3">{r.to}</td>
-                    <td className="px-3 py-3 font-extrabold">{r.weight}</td>
-                    <td className="px-3 py-3">{r.pricing}</td>
-                    <td className="px-3 py-3 font-extrabold">{r.approval}</td>
-                  </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
 
-          <div className="mt-4 flex justify-end">
-            <Btn variant="green" className="px-10 py-4 text-lg" onClick={handleSave}>
-              Save All
-            </Btn>
-          </div>
-        </Card>
+          {/* Table Footer */}
+          {panels.length > 0 && (
+            <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 text-sm text-slate-600">
+              Total {panels.length} pricing panel{panels.length !== 1 ? 's' : ''} found
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
