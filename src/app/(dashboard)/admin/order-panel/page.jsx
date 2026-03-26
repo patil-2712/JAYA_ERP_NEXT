@@ -93,7 +93,7 @@ export default function OrderPanelList() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white p-6">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500 mx-auto"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto"></div>
             <p className="mt-4 text-slate-600">Loading orders...</p>
           </div>
         </div>
@@ -117,7 +117,7 @@ export default function OrderPanelList() {
 
           <button
             onClick={handleCreateNew}
-            className="rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 transition flex items-center gap-2"
+            className="rounded-xl bg-yellow-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-yellow-700 transition flex items-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -139,26 +139,26 @@ export default function OrderPanelList() {
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-200">
+              <thead className="bg-yellow-400 border-b border-yellow-500">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-600 uppercase tracking-wider">S.No</th>
-                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-600 uppercase tracking-wider">Order No</th>
-                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-600 uppercase tracking-wider">Date</th>
-                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-600 uppercase tracking-wider">Branch</th>
-                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-600 uppercase tracking-wider">Party Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-600 uppercase tracking-wider">Plant</th>
-                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-600 uppercase tracking-wider">Order Type</th>
-                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-600 uppercase tracking-wider">From → To</th>
-                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-600 uppercase tracking-wider">Weight</th>
-                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-600 uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-600 uppercase tracking-wider">Delivery</th>
-                  <th className="px-4 py-3 text-center text-xs font-extrabold text-slate-600 uppercase tracking-wider">Actions</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">S.No</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">Order No</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">Branch</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">Party Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">Plant</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">Order Type</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">From → To</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">Weight</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">Delivery</th>
+                  <th className="px-4 py-3 text-center text-xs font-extrabold text-slate-900 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {orders.length > 0 ? (
                   orders.map((order, index) => (
-                    <tr key={order._id} className="hover:bg-slate-50 transition">
+                    <tr key={order._id} className="hover:bg-yellow-50 transition">
                       <td className="px-4 py-3 text-slate-600">{index + 1}</td>
                       <td className="px-4 py-3 font-medium text-slate-900">{order.orderNo}</td>
                       <td className="px-4 py-3 text-slate-600">{formatDate(order.date)}</td>
@@ -253,7 +253,7 @@ export default function OrderPanelList() {
                         <p className="text-sm mb-4">Get started by creating your first order</p>
                         <button
                           onClick={handleCreateNew}
-                          className="px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition text-sm font-bold"
+                          className="px-4 py-2 bg-yellow-600 text-white rounded-xl hover:bg-yellow-700 transition text-sm font-bold"
                         >
                           Create New Order
                         </button>

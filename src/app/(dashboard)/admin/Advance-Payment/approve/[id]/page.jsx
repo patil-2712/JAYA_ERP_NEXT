@@ -51,7 +51,7 @@ function Input({ label, value, col = "", type = "text", readOnly = false }) {
         value={value || ""}
         readOnly={readOnly}
         className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none ${
-          readOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200'
+          readOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200'
         }`}
       />
     </div>
@@ -67,7 +67,7 @@ function Select({ label, value, onChange, options = [], col = "", readOnly = fal
         onChange={(e) => onChange?.(e.target.value)}
         disabled={readOnly}
         className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none ${
-          readOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200'
+          readOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200'
         }`}
       >
         <option value="">Select {label}</option>
@@ -105,14 +105,14 @@ function OrdersTable({ rows }) {
   ];
 
   return (
-    <div className="overflow-auto rounded-xl border border-emerald-300">
+    <div className="overflow-auto rounded-xl border border-yellow-300">
       <table className="min-w-full w-full text-sm">
-        <thead className="sticky top-0 bg-emerald-400">
+        <thead className="sticky top-0 bg-yellow-400">
           <tr>
             {columns.map((col) => (
               <th
                 key={col.key}
-                className="border border-emerald-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
+                className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
               >
                 {col.label}
               </th>
@@ -123,21 +123,21 @@ function OrdersTable({ rows }) {
         <tbody>
           {rows.length > 0 ? (
             rows.map((row, index) => (
-              <tr key={row._id || index} className="hover:bg-emerald-50 even:bg-slate-50">
-                <td className="border border-emerald-300 px-2 py-2 text-slate-700">{row.orderNo || '-'}</td>
-                <td className="border border-emerald-300 px-2 py-2 text-slate-700">{row.partyName || '-'}</td>
-                <td className="border border-emerald-300 px-2 py-2 text-slate-700">{row.plantName || '-'}</td>
-                <td className="border border-emerald-300 px-2 py-2 text-slate-700">{row.orderType || '-'}</td>
-                <td className="border border-emerald-300 px-2 py-2 text-slate-700">{row.from || '-'}</td>
-                <td className="border border-emerald-300 px-2 py-2 text-slate-700">{row.to || '-'}</td>
-                <td className="border border-emerald-300 px-2 py-2 text-slate-700 text-right">{row.weight || '0'}</td>
-                <td className="border border-emerald-300 px-2 py-2 text-slate-700 text-right">₹{row.rate || '0'}</td>
-                <td className="border border-emerald-300 px-2 py-2 text-slate-700 text-right font-medium">₹{row.totalAmount || '0'}</td>
+              <tr key={row._id || index} className="hover:bg-yellow-50 even:bg-slate-50">
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.orderNo || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.partyName || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.plantName || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.orderType || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.from || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.to || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-right">{row.weight || '0'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-right">₹{row.rate || '0'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-right font-medium">₹{row.totalAmount || '0'}</td>
               </tr>
             ))
           ) : (
             <tr>
-              <td colSpan={columns.length} className="border border-emerald-300 px-4 py-8 text-center text-slate-400">
+              <td colSpan={columns.length} className="border border-yellow-300 px-4 py-8 text-center text-slate-400">
                 No orders added.
               </td>
             </tr>
@@ -434,7 +434,7 @@ export default function ApproveAdvancePayment() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white p-6">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto"></div>
             <p className="mt-4 text-slate-600">Loading advance payment...</p>
           </div>
         </div>
@@ -451,7 +451,7 @@ export default function ApproveAdvancePayment() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => router.push('/admin/Advance-Payment')}
-                className="text-emerald-600 hover:text-emerald-800 font-medium text-sm flex items-center gap-1"
+                className="text-yellow-600 hover:text-yellow-800 font-medium text-sm flex items-center gap-1"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -462,7 +462,7 @@ export default function ApproveAdvancePayment() {
                 Approve Advance Payment: {paymentNo}
               </div>
             </div>
-            <div className="text-xs text-emerald-600 mt-1 font-medium">
+            <div className="text-xs text-yellow-600 mt-1 font-medium">
               ⓘ Only Payment Status and Queue Status are editable. All other fields are read-only.
             </div>
             <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
@@ -483,7 +483,7 @@ export default function ApproveAdvancePayment() {
               className={`rounded-xl px-5 py-2 text-sm font-bold text-white transition ${
                 saving
                   ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-emerald-600 hover:bg-emerald-700'
+                  : 'bg-yellow-600 hover:bg-yellow-700'
               }`}
             >
               {saving ? (
@@ -531,9 +531,9 @@ export default function ApproveAdvancePayment() {
         <Card title="Order Details (Read Only)">
           <OrdersTable rows={orderRows} />
           <div className="flex justify-end mt-4">
-            <div className="flex items-center gap-3 border border-emerald-300 px-6 py-3 bg-emerald-50 rounded-xl">
+            <div className="flex items-center gap-3 border border-yellow-300 px-6 py-3 bg-yellow-50 rounded-xl">
               <div className="text-sm font-extrabold text-slate-900">Total Order Amount:</div>
-              <div className="text-xl font-extrabold text-emerald-700">₹{calculateTotalOrderAmount().toLocaleString()}</div>
+              <div className="text-xl font-extrabold text-yellow-700">₹{calculateTotalOrderAmount().toLocaleString()}</div>
             </div>
           </div>
         </Card>
@@ -672,7 +672,7 @@ export default function ApproveAdvancePayment() {
               <select
                 value={paymentStatus}
                 onChange={(e) => setPaymentStatus(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
               >
                 {ADVANCE_STATUS_OPTIONS.map((opt) => (
                   <option key={opt} value={opt}>{opt}</option>
@@ -690,7 +690,7 @@ export default function ApproveAdvancePayment() {
               <select
                 value={queueStatus}
                 onChange={(e) => setQueueStatus(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
               >
                 {QUEUE_STATUS_OPTIONS.map((opt) => (
                   <option key={opt} value={opt}>{opt}</option>

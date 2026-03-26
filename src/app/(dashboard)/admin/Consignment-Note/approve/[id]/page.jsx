@@ -43,7 +43,7 @@ function Input({ label, value, col = "", type = "text", readOnly = false }) {
         value={value || ""}
         readOnly={readOnly}
         className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none ${
-          readOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white focus:border-purple-500 focus:ring-2 focus:ring-purple-200'
+          readOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200'
         }`}
       />
     </div>
@@ -59,7 +59,7 @@ function Select({ label, value, onChange, options = [], col = "", readOnly = fal
         onChange={(e) => onChange?.(e.target.value)}
         disabled={readOnly}
         className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none ${
-          readOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white focus:border-purple-500 focus:ring-2 focus:ring-purple-200'
+          readOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200'
         }`}
       >
         <option value="">Select {label}</option>
@@ -97,14 +97,14 @@ function ProductsTable({ rows }) {
   ];
 
   return (
-    <div className="overflow-auto rounded-xl border border-purple-300">
+    <div className="overflow-auto rounded-xl border border-yellow-300">
       <table className="min-w-full w-full text-sm">
-        <thead className="sticky top-0 bg-purple-400">
+        <thead className="sticky top-0 bg-yellow-400">
           <tr>
             {columns.map((col) => (
               <th
                 key={col.key}
-                className="border border-purple-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
+                className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
               >
                 {col.label}
               </th>
@@ -115,21 +115,21 @@ function ProductsTable({ rows }) {
         <tbody>
           {rows.length > 0 ? (
             rows.map((row, index) => (
-              <tr key={row._id || index} className="hover:bg-purple-50 even:bg-slate-50">
-                <td className="border border-purple-300 px-2 py-2 text-slate-700 text-center">{row.totalPkgs || '-'}</td>
-                <td className="border border-purple-300 px-2 py-2 text-slate-700 text-center">{row.pkgsType || '-'}</td>
-                <td className="border border-purple-300 px-2 py-2 text-slate-700 text-center">{row.uom || '-'}</td>
-                <td className="border border-purple-300 px-2 py-2 text-slate-700 text-center">{row.packSize || '-'}</td>
-                <td className="border border-purple-300 px-2 py-2 text-slate-700 text-center">{row.skuSize || '-'}</td>
-                <td className="border border-purple-300 px-2 py-2 text-slate-700">{row.productName || '-'}</td>
-                <td className="border border-purple-300 px-2 py-2 text-slate-700 text-right">{row.actualWt || '0'}</td>
-                <td className="border border-purple-300 px-2 py-2 text-slate-700 text-right">{row.chargedWt || '0'}</td>
-                <td className="border border-purple-300 px-2 py-2 text-slate-700 text-center">{row.wtUom || 'MT'}</td>
+              <tr key={row._id || index} className="hover:bg-yellow-50 even:bg-slate-50">
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.totalPkgs || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.pkgsType || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.uom || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.packSize || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.skuSize || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.productName || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-right">{row.actualWt || '0'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-right">{row.chargedWt || '0'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.wtUom || 'MT'}</td>
               </tr>
             ))
           ) : (
             <tr>
-              <td colSpan={columns.length} className="border border-purple-300 px-4 py-8 text-center text-slate-400">
+              <td colSpan={columns.length} className="border border-yellow-300 px-4 py-8 text-center text-slate-400">
                 No products added.
               </td>
             </tr>
@@ -366,7 +366,7 @@ export default function ApproveConsignmentNote() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white p-6">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto"></div>
             <p className="mt-4 text-slate-600">Loading consignment note...</p>
           </div>
         </div>
@@ -383,7 +383,7 @@ export default function ApproveConsignmentNote() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => router.push('/admin/Consignment-Note')}
-                className="text-purple-600 hover:text-purple-800 font-medium text-sm flex items-center gap-1"
+                className="text-yellow-600 hover:text-yellow-800 font-medium text-sm flex items-center gap-1"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -394,7 +394,7 @@ export default function ApproveConsignmentNote() {
                 Approve Consignment Note: {header.lrNo}
               </div>
             </div>
-            <div className="text-xs text-purple-600 mt-1 font-medium">
+            <div className="text-xs text-yellow-600 mt-1 font-medium">
               ⓘ Only Status field is editable. All other fields are read-only.
             </div>
             <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
@@ -419,7 +419,7 @@ export default function ApproveConsignmentNote() {
               className={`rounded-xl px-5 py-2 text-sm font-bold text-white transition ${
                 saving
                   ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-purple-600 hover:bg-purple-700'
+                  : 'bg-yellow-600 hover:bg-yellow-700'
               }`}
             >
               {saving ? (
@@ -475,7 +475,7 @@ export default function ApproveConsignmentNote() {
               <select
                 value={header.status}
                 onChange={(e) => setHeader({ ...header, status: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
               >
                 {STATUS_OPTIONS.map((opt) => (
                   <option key={opt} value={opt}>{opt}</option>
@@ -539,9 +539,9 @@ export default function ApproveConsignmentNote() {
         <Card title="Product Details - Read Only">
           <ProductsTable rows={productRows} />
           <div className="flex justify-end mt-4">
-            <div className="flex items-center gap-3 border border-purple-300 px-6 py-3 bg-purple-50 rounded-xl">
+            <div className="flex items-center gap-3 border border-yellow-300 px-6 py-3 bg-yellow-50 rounded-xl">
               <div className="text-sm font-extrabold text-slate-900">Total Actual Weight:</div>
-              <div className="text-xl font-extrabold text-purple-700">
+              <div className="text-xl font-extrabold text-yellow-700">
                 {totalWeight.toFixed(2)} {header.unit}
               </div>
             </div>

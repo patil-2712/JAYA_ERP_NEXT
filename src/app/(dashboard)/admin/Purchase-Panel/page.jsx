@@ -118,15 +118,17 @@ export default function PurchasePanelList() {
       default: return 'bg-slate-100 text-slate-800';
     }
   };
-const handleApprove = (purchaseId) => {
-  router.push(`/admin/Purchase-Panel/approve/${purchaseId}`);
-};
+  
+  const handleApprove = (purchaseId) => {
+    router.push(`/admin/Purchase-Panel/approve/${purchaseId}`);
+  };
+  
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white p-6">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto"></div>
             <p className="mt-4 text-slate-600">Loading purchases...</p>
           </div>
         </div>
@@ -150,7 +152,7 @@ const handleApprove = (purchaseId) => {
 
           <button
             onClick={handleCreateNew}
-            className="rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 transition flex items-center gap-2"
+            className="rounded-xl bg-yellow-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-yellow-700 transition flex items-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -178,7 +180,7 @@ const handleApprove = (purchaseId) => {
                 placeholder="Search by Purchase No, Vendor, Vehicle..."
                 value={filters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
               />
             </div>
             <div className="col-span-12 md:col-span-2">
@@ -186,7 +188,7 @@ const handleApprove = (purchaseId) => {
                 type="date"
                 value={filters.fromDate}
                 onChange={(e) => handleFilterChange('fromDate', e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
                 placeholder="From Date"
               />
             </div>
@@ -195,7 +197,7 @@ const handleApprove = (purchaseId) => {
                 type="date"
                 value={filters.toDate}
                 onChange={(e) => handleFilterChange('toDate', e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
                 placeholder="To Date"
               />
             </div>
@@ -203,7 +205,7 @@ const handleApprove = (purchaseId) => {
               <select
                 value={filters.status}
                 onChange={(e) => handleFilterChange('status', e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
               >
                 <option value="">All Status</option>
                 <option value="Draft">Draft</option>
@@ -216,7 +218,7 @@ const handleApprove = (purchaseId) => {
             <div className="col-span-12 md:col-span-3 flex gap-2">
               <button
                 onClick={applyFilters}
-                className="flex-1 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 transition"
+                className="flex-1 rounded-xl bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-700 transition"
               >
                 Filter
               </button>
@@ -235,7 +237,7 @@ const handleApprove = (purchaseId) => {
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-emerald-400 border-b border-emerald-500">
+              <thead className="bg-yellow-400 border-b border-yellow-500">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">S.No</th>
                   <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">Date</th>
@@ -252,7 +254,7 @@ const handleApprove = (purchaseId) => {
               <tbody className="divide-y divide-slate-200">
                 {purchases.length > 0 ? (
                   purchases.map((item, index) => (
-                    <tr key={item._id} className="hover:bg-emerald-50 transition">
+                    <tr key={item._id} className="hover:bg-yellow-50 transition">
                       <td className="px-4 py-3 text-slate-600">{index + 1}</td>
                       <td className="px-4 py-3 text-slate-600">{item.date}</td>
                       <td className="px-4 py-3 font-medium text-slate-900">{item.purchaseNo}</td>
@@ -273,7 +275,6 @@ const handleApprove = (purchaseId) => {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-2">
-                         
                           <button
                             onClick={() => handleEdit(item._id)}
                             className="p-2 bg-sky-100 text-sky-700 rounded-lg hover:bg-sky-200 transition"
@@ -283,16 +284,17 @@ const handleApprove = (purchaseId) => {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                           </button>
-						
-<button
-  onClick={() => handleApprove(item._id)}
-  className="p-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition"
-  title="Approve Purchase"
->
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-  </svg>
-</button>
+                          
+                          <button
+                            onClick={() => handleApprove(item._id)}
+                            className="p-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition"
+                            title="Approve Purchase"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </button>
+                          
                           <button
                             onClick={() => handleDelete(item._id, item.purchaseNo)}
                             disabled={deleteLoading === item._id}
@@ -322,7 +324,7 @@ const handleApprove = (purchaseId) => {
                         <p className="text-sm mb-4">Get started by creating your first purchase entry</p>
                         <button
                           onClick={handleCreateNew}
-                          className="px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition text-sm font-bold"
+                          className="px-4 py-2 bg-yellow-600 text-white rounded-xl hover:bg-yellow-700 transition text-sm font-bold"
                         >
                           Create New Purchase
                         </button>

@@ -134,7 +134,7 @@ export default function LoadingPanelList() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white p-6">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto"></div>
             <p className="mt-4 text-slate-600">Loading loading panels...</p>
           </div>
         </div>
@@ -158,7 +158,7 @@ export default function LoadingPanelList() {
 
           <button
             onClick={handleCreateNew}
-            className="rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 transition flex items-center gap-2"
+            className="rounded-xl bg-yellow-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-yellow-700 transition flex items-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -186,7 +186,7 @@ export default function LoadingPanelList() {
                 placeholder="Search by Vehicle No, Driver, Arrival No..."
                 value={filters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
               />
             </div>
             <div className="col-span-12 md:col-span-3">
@@ -194,7 +194,7 @@ export default function LoadingPanelList() {
                 type="date"
                 value={filters.fromDate}
                 onChange={(e) => handleFilterChange('fromDate', e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
                 placeholder="From Date"
               />
             </div>
@@ -203,14 +203,14 @@ export default function LoadingPanelList() {
                 type="date"
                 value={filters.toDate}
                 onChange={(e) => handleFilterChange('toDate', e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
                 placeholder="To Date"
               />
             </div>
             <div className="col-span-12 md:col-span-2 flex gap-2">
               <button
                 onClick={applyFilters}
-                className="flex-1 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 transition"
+                className="flex-1 rounded-xl bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-700 transition"
               >
                 Filter
               </button>
@@ -229,7 +229,7 @@ export default function LoadingPanelList() {
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-emerald-400 border-b border-emerald-500">
+              <thead className="bg-yellow-400 border-b border-yellow-500">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">S.No</th>
                   <th className="px-4 py-3 text-left text-xs font-extrabold text-slate-900 uppercase tracking-wider">Date</th>
@@ -248,7 +248,7 @@ export default function LoadingPanelList() {
               <tbody className="divide-y divide-slate-200">
                 {panels.length > 0 ? (
                   panels.map((item, index) => (
-                    <tr key={item._id} className="hover:bg-emerald-50 transition">
+                    <tr key={item._id} className="hover:bg-yellow-50 transition">
                       <td className="px-4 py-3 text-slate-600">{index + 1}</td>
                       <td className="px-4 py-3 text-slate-600">{item.date}</td>
                       <td className="px-4 py-3 font-medium text-slate-900">{item.vehicleArrivalNo}</td>
@@ -337,7 +337,7 @@ export default function LoadingPanelList() {
                         <p className="text-sm mb-4">Get started by creating your first loading entry</p>
                         <button
                           onClick={handleCreateNew}
-                          className="px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition text-sm font-bold"
+                          className="px-4 py-2 bg-yellow-600 text-white rounded-xl hover:bg-yellow-700 transition text-sm font-bold"
                         >
                           Create New Loading Entry
                         </button>

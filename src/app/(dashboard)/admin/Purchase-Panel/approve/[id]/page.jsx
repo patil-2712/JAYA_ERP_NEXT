@@ -38,7 +38,7 @@ function Input({ label, value, col = "", type = "text", readOnly = false }) {
         value={value || ""}
         readOnly={readOnly}
         className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none ${
-          readOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200'
+          readOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200'
         }`}
       />
     </div>
@@ -54,7 +54,7 @@ function Select({ label, value, onChange, options = [], col = "", readOnly = fal
         onChange={(e) => onChange?.(e.target.value)}
         disabled={readOnly}
         className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none ${
-          readOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200'
+          readOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200'
         }`}
       >
         <option value="">Select {label}</option>
@@ -92,14 +92,14 @@ function OrdersTable({ rows }) {
   ];
 
   return (
-    <div className="overflow-auto rounded-xl border border-emerald-300">
+    <div className="overflow-auto rounded-xl border border-yellow-300">
       <table className="min-w-full w-full text-sm">
-        <thead className="sticky top-0 bg-emerald-400">
+        <thead className="sticky top-0 bg-yellow-400">
           <tr>
             {columns.map((col) => (
               <th
                 key={col.key}
-                className="border border-emerald-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
+                className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
               >
                 {col.label}
               </th>
@@ -110,21 +110,21 @@ function OrdersTable({ rows }) {
         <tbody>
           {rows.length > 0 ? (
             rows.map((row, index) => (
-              <tr key={row._id || index} className="hover:bg-emerald-50 even:bg-slate-50">
-                <td className="border border-emerald-300 px-2 py-2 text-slate-700">{row.orderNo || '-'}</td>
-                <td className="border border-emerald-300 px-2 py-2 text-slate-700">{row.partyName || '-'}</td>
-                <td className="border border-emerald-300 px-2 py-2 text-slate-700">{row.plantName || '-'}</td>
-                <td className="border border-emerald-300 px-2 py-2 text-slate-700">{row.orderType || '-'}</td>
-                <td className="border border-emerald-300 px-2 py-2 text-slate-700">{row.from || '-'}</td>
-                <td className="border border-emerald-300 px-2 py-2 text-slate-700">{row.to || '-'}</td>
-                <td className="border border-emerald-300 px-2 py-2 text-slate-700">{row.weight || '0'}</td>
-                <td className="border border-emerald-300 px-2 py-2 text-slate-700">₹{row.rate || '0'}</td>
-                <td className="border border-emerald-300 px-2 py-2 text-slate-700 font-medium">₹{row.totalAmount || '0'}</td>
+              <tr key={row._id || index} className="hover:bg-yellow-50 even:bg-slate-50">
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.orderNo || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.partyName || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.plantName || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.orderType || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.from || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.to || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.weight || '0'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">₹{row.rate || '0'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700 font-medium">₹{row.totalAmount || '0'}</td>
               </tr>
             ))
           ) : (
             <tr>
-              <td colSpan={columns.length} className="border border-emerald-300 px-4 py-8 text-center text-slate-400">
+              <td colSpan={columns.length} className="border border-yellow-300 px-4 py-8 text-center text-slate-400">
                 No orders added.
               </td>
             </tr>
@@ -143,7 +143,7 @@ function ChargesTable({ rows, type }) {
   const bgColor = isAddition ? 'green' : 'red';
   
   return (
-    <div className="overflow-auto rounded-xl border border-${bgColor}-300">
+    <div className={`overflow-auto rounded-xl border border-${bgColor}-300`}>
       <table className="min-w-full w-full text-sm">
         <thead className={`sticky top-0 bg-${bgColor}-100`}>
           <tr>
@@ -480,7 +480,7 @@ export default function ApprovePurchasePanel() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white p-6">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto"></div>
             <p className="mt-4 text-slate-600">Loading purchase data...</p>
           </div>
         </div>
@@ -497,7 +497,7 @@ export default function ApprovePurchasePanel() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => router.push('/admin/Purchase-Panel')}
-                className="text-emerald-600 hover:text-emerald-800 font-medium text-sm flex items-center gap-1"
+                className="text-yellow-600 hover:text-yellow-800 font-medium text-sm flex items-center gap-1"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -508,7 +508,7 @@ export default function ApprovePurchasePanel() {
                 Approve Purchase: {header.purchaseNo}
               </div>
             </div>
-            <div className="text-xs text-emerald-600 mt-1 font-medium">
+            <div className="text-xs text-yellow-600 mt-1 font-medium">
               ⓘ Only Approval section is editable. All other sections are read-only.
             </div>
           </div>
@@ -520,7 +520,7 @@ export default function ApprovePurchasePanel() {
               className={`rounded-xl px-5 py-2 text-sm font-bold text-white transition ${
                 saving || uploading
                   ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-emerald-600 hover:bg-emerald-700'
+                  : 'bg-yellow-600 hover:bg-yellow-700'
               }`}
             >
               {saving || uploading ? (
@@ -569,9 +569,9 @@ export default function ApprovePurchasePanel() {
         <Card title="Order Details (Read Only)">
           <OrdersTable rows={orderRows} />
           <div className="flex justify-end mt-4">
-            <div className="flex items-center gap-3 border border-emerald-300 px-6 py-3 bg-emerald-50 rounded-xl">
+            <div className="flex items-center gap-3 border border-yellow-300 px-6 py-3 bg-yellow-50 rounded-xl">
               <div className="text-sm font-extrabold text-slate-900">Total Order Amount:</div>
-              <div className="text-xl font-extrabold text-emerald-700">₹{totalOrderAmount.toLocaleString()}</div>
+              <div className="text-xl font-extrabold text-yellow-700">₹{totalOrderAmount.toLocaleString()}</div>
             </div>
           </div>
         </Card>
@@ -616,7 +616,7 @@ export default function ApprovePurchasePanel() {
                       type="checkbox"
                       checked={registeredVehicle.isRegistered}
                       readOnly
-                      className="h-5 w-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-not-allowed"
+                      className="h-5 w-5 rounded border-slate-300 text-yellow-600 focus:ring-yellow-500 cursor-not-allowed"
                     />
                     <label className="text-sm font-medium text-slate-700">Verified Registered</label>
                   </div>
@@ -746,7 +746,7 @@ export default function ApprovePurchasePanel() {
         <Card title="Approval / Rejection (Editable)">
           <div className="grid grid-cols-12 gap-4">
             <div className="col-span-12 md:col-span-6">
-              <div className="bg-white p-4 rounded-xl border border-emerald-200">
+              <div className="bg-white p-4 rounded-xl border border-yellow-200">
                 <h3 className="text-sm font-bold text-slate-800 mb-3">Approval Status</h3>
                 <div className="space-y-4">
                   <Select
@@ -762,7 +762,7 @@ export default function ApprovePurchasePanel() {
                       value={approval.remarks}
                       onChange={(e) => setApproval({ ...approval, remarks: e.target.value })}
                       rows={3}
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
                       placeholder="Enter approval remarks..."
                     />
                   </div>
@@ -772,7 +772,7 @@ export default function ApprovePurchasePanel() {
 
             {/* ===== MEMO UPLOAD (EDITABLE) ===== */}
             <div className="col-span-12 md:col-span-6">
-              <div className="bg-white p-4 rounded-xl border border-emerald-200">
+              <div className="bg-white p-4 rounded-xl border border-yellow-200">
                 <h3 className="text-sm font-bold text-slate-800 mb-3">Memo Upload</h3>
                 
                 <div className="space-y-4">
@@ -791,7 +791,7 @@ export default function ApprovePurchasePanel() {
                       accept=".pdf,.png,.jpg,.jpeg"
                       onChange={handleMemoUpload}
                       disabled={uploading}
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 disabled:opacity-50"
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200 disabled:opacity-50"
                     />
                   </div>
 
