@@ -64,76 +64,56 @@ export default function LandingPage() {
   };
 
   return (
-    <main className="relative min-h-screen flex flex-col justify-between items-center bg-gradient-to-t from-amber-300 via-yellow-200 to-yellow-100 text-gray-800 px-4 sm:px-6 py-6 overflow-hidden">
+    <main className="relative min-h-screen flex flex-col justify-between items-center bg-gradient-to-b from-white via-blue-50 to-amber-200 text-gray-800 px-4 sm:px-6 py-6 overflow-hidden">
       
-      {/* Realistic Yellow/White Shadow on Top */}
-      <div className="absolute inset-0 bg-gradient-to-b from-white/60 via-yellow-100/40 to-transparent pointer-events-none"></div>
+      {/* Cloud Overlays - White/Orange soft clouds */}
+      <div className="absolute inset-0 bg-gradient-to-t from-orange-200/30 via-transparent to-white/50 pointer-events-none"></div>
+      <div className="absolute top-20 left-10 w-64 h-32 bg-white/50 rounded-full blur-3xl"></div>
+      <div className="absolute top-40 right-20 w-80 h-40 bg-white/40 rounded-full blur-3xl"></div>
+      <div className="absolute top-60 left-1/4 w-96 h-48 bg-amber-200/20 rounded-full blur-3xl"></div>
       
-      {/* Shadow on Left Side - Yellow tone */}
-      <div className="absolute inset-0 bg-gradient-to-r from-yellow-200/50 via-transparent to-transparent pointer-events-none"></div>
+      {/* Sun Glow - Half sun at bottom */}
+      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-[600px] h-[300px] sm:w-[800px] sm:h-[400px] md:w-[1100px] md:h-[550px] rounded-t-full bg-gradient-to-t from-orange-300 via-amber-300 to-yellow-200 opacity-50 blur-3xl"></div>
       
-      {/* Shadow on Right Side - Yellow tone */}
-      <div className="absolute inset-0 bg-gradient-to-l from-yellow-200/50 via-transparent to-transparent pointer-events-none"></div>
+      {/* Sun Middle Layer */}
+      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-[450px] h-[225px] sm:w-[600px] sm:h-[300px] md:w-[800px] md:h-[400px] rounded-t-full bg-gradient-to-t from-amber-400 via-orange-300 to-yellow-200 opacity-70 blur-2xl"></div>
       
-      {/* Shadow on Top-Left Corner */}
-      <div className="absolute inset-0 bg-gradient-to-br from-yellow-100/70 via-transparent to-transparent pointer-events-none"></div>
+      {/* Sun Core - Bright Orange/Yellow */}
+      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-[300px] h-[150px] sm:w-[400px] sm:h-[200px] md:w-[550px] md:h-[275px] rounded-t-full bg-gradient-to-t from-orange-300 via-yellow-300 to-yellow-100 opacity-85 blur-xl"></div>
       
-      {/* Shadow on Top-Right Corner */}
-      <div className="absolute inset-0 bg-gradient-to-bl from-yellow-100/70 via-transparent to-transparent pointer-events-none"></div>
+      {/* Sun Center - Bright Yellow/White */}
+      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-[180px] h-[90px] sm:w-[250px] sm:h-[125px] md:w-[350px] md:h-[175px] rounded-t-full bg-gradient-to-t from-yellow-200 via-yellow-100 to-white blur-lg"></div>
+      
+      {/* Sun Highlight - Pure White hot center */}
+      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-[100px] h-[50px] sm:w-[150px] sm:h-[75px] md:w-[200px] md:h-[100px] rounded-t-full bg-white/90 blur-md"></div>
 
-      {/* Sun at Bottom Center - Pure Yellow */}
-      {/* Outer glow */}
-      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-[700px] h-[350px] sm:w-[900px] sm:h-[450px] md:w-[1200px] md:h-[550px] rounded-t-full bg-gradient-to-t from-yellow-300 via-yellow-400 to-yellow-300 opacity-50 blur-3xl"></div>
+      {/* Sun Rays */}
+      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-[500px] h-[300px] sm:w-[700px] sm:h-[400px] md:w-[900px] md:h-[500px] bg-gradient-to-t from-yellow-200/40 via-orange-100/20 to-transparent blur-2xl pointer-events-none"></div>
       
-      {/* Middle layer */}
-      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-[500px] h-[280px] sm:w-[700px] sm:h-[380px] md:w-[900px] md:h-[480px] rounded-t-full bg-gradient-to-t from-yellow-400 via-yellow-300 to-yellow-400 opacity-70 blur-2xl"></div>
-      
-      {/* Sun Core - Bright Yellow */}
-      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-[350px] h-[200px] sm:w-[500px] sm:h-[280px] md:w-[650px] md:h-[380px] rounded-t-full bg-gradient-to-t from-yellow-400 via-yellow-300 to-yellow-200 opacity-90 blur-xl"></div>
-      
-      {/* Sun Center - Pure Yellow Highlight */}
-      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-[200px] h-[120px] sm:w-[300px] sm:h-[180px] md:w-[400px] md:h-[250px] rounded-t-full bg-yellow-300 blur-lg"></div>
-
-      {/* Sun Rays going up - Yellow/White */}
-      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-[600px] h-[500px] bg-gradient-to-t from-yellow-300 via-yellow-200/40 to-transparent opacity-40 blur-2xl pointer-events-none"></div>
-      
-      {/* Additional soft light rays */}
-      <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 w-[400px] h-[300px] bg-gradient-to-t from-yellow-200 via-yellow-100/30 to-transparent opacity-30 blur-3xl pointer-events-none"></div>
+      {/* Golden Hour Light Overlay - Subtle */}
+      <div className="absolute inset-0 bg-gradient-to-t from-amber-500/10 via-yellow-200/5 to-transparent pointer-events-none"></div>
 
       {/* Header */}
-      <header className="relative z-10 flex flex-col items-center w-full mt-8">
-        {/* Logos */}
+      <header className="relative z-10 flex flex-col items-center w-full">
         <div className="relative w-full flex justify-center items-center mb-6">
-          {/* Center logo */}
-          <img
-            src="/aits_pig.png"
-            alt="ERP Dashboard"
-            className="h-20 sm:h-28 md:h-36 w-auto drop-shadow-md"
-          />
-
-          {/* Right corner logo */}
-          <img
-            src="/aits_logo.png"
-            alt="AITS ERP Logo"
-            className="absolute right-2 top-0 h-20 sm:h-28 md:h-36 w-auto drop-shadow-md"
-          />
+          <img src="/aits_pig.png" alt="ERP Dashboard" className="h-20 sm:h-28 md:h-36 w-auto drop-shadow-2xl" />
+          <img src="/aits_logo.png" alt="AITS ERP Logo" className="absolute right-2 top-0 h-20 sm:h-28 md:h-36 w-auto drop-shadow-2xl" />
         </div>
 
-        {/* Title */}
         <motion.h1
           initial={{ opacity: 0, y: -30 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-2xl sm:text-3xl md:text-5xl font-bold text-center mb-3 text-amber-800 drop-shadow-sm"
+          className="text-2xl sm:text-3xl md:text-5xl font-bold text-center mb-3 text-amber-800 drop-shadow-lg"
         >
-          Welcome to <span className="text-amber-600">Jaya Global Logistics</span>
+          Welcome to <span className="text-amber-600 drop-shadow-md">Jaya Global Logistics</span>
         </motion.h1>
         
-        {/* Description */}
+        {/* Description - Clean white text */}
         <motion.p
           variants={descriptionVariants}
           initial="hidden"
           animate="show"
-          className="text-center text-sm sm:text-base md:text-lg max-w-2xl text-amber-900/80"
+          className="text-center text-sm sm:text-base md:text-lg max-w-2xl text-gray-700 drop-shadow-sm"
         >
           Manage your sales, purchases, inventory, and business operations from
           one centralized, modern ERP platform.
@@ -142,26 +122,26 @@ export default function LandingPage() {
 
       {/* Actions & Features */}
       <div className="relative z-10 flex flex-col items-center gap-6 mt-6">
-        {/* Buttons */}
         <div className="flex flex-col sm:flex-row gap-4">
           <Link
             href="/signin"
-            className="px-6 py-3 bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition text-center shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-300"
+            className="px-6 py-3 bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition text-center shadow-2xl hover:shadow-xl transform hover:scale-105 transition-all duration-300"
           >
             Sign In
           </Link>
           <Link
             href="/signup"
-            className="px-6 py-3 border-2 border-amber-500 text-amber-600 rounded-xl hover:bg-amber-50 transition text-center shadow-sm hover:shadow-md"
+            className="px-6 py-3 border-2 border-amber-500 text-amber-600 rounded-xl hover:bg-amber-50 transition text-center shadow-xl hover:shadow-lg"
           >
             Company Registration
           </Link>
         </div>
 
-        {/* Features */}
         <h2 className="text-xl sm:text-2xl font-bold text-amber-800 drop-shadow-sm">
           Key Features
         </h2>
+        
+        {/* Features - Clean text */}
         <motion.ul
           className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 max-w-4xl"
           variants={containerVariants}
@@ -171,7 +151,7 @@ export default function LandingPage() {
           {features.map((text, idx) => (
             <motion.li
               key={idx}
-              className="flex items-start gap-2 text-sm sm:text-base text-amber-900"
+              className="flex items-start gap-2 text-sm sm:text-base text-gray-700 drop-shadow-sm"
               variants={itemVariants}
             >
               <HiCheckCircle className="text-amber-500 mt-0.5 shrink-0" />
@@ -181,12 +161,12 @@ export default function LandingPage() {
         </motion.ul>
       </div>
 
-      {/* Footer */}
+      {/* Footer - Clean text */}
       <motion.footer
         variants={footerVariants}
         initial="hidden"
         animate="show"
-        className="relative z-10 text-center text-xs sm:text-sm text-amber-700 mt-6 mb-4"
+        className="relative z-10 text-center text-xs sm:text-sm text-gray-600 mt-6 drop-shadow-sm"
       >
         &copy; 2025 AITS ERP. All rights reserved.
       </motion.footer>
