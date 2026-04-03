@@ -1,11 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: { unoptimized: true },
+
+  // 🔥 IMPORTANT FIX
+  experimental: {
+    serverActions: true,
+  },
 };
 
 export default nextConfig;
-
-
 
 
 // /** @type {import('next').NextConfig} */
