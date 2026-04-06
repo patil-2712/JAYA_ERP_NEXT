@@ -1320,6 +1320,9 @@ function Select({ label, value, onChange, options = [], col = "" }) {
 /** =========================
  * Searchable Dropdown Component
  ========================= */
+/** =========================
+ * Searchable Dropdown Component - FIXED for better z-index
+ ========================= */
 function SearchableDropdown({ 
   items, 
   selectedId, 
@@ -1335,6 +1338,8 @@ function SearchableDropdown({
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const dropdownRef = useRef(null);
+  const inputRef = useRef(null);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
 
   useEffect(() => {
     setFilteredItems(items);
@@ -1389,6 +1394,16 @@ function SearchableDropdown({
     if (!showDropdown) {
       setFilteredItems(items);
       setShowDropdown(true);
+      
+      // Calculate position for fixed positioning
+      if (inputRef.current) {
+        const rect = inputRef.current.getBoundingClientRect();
+        setDropdownPosition({
+          top: rect.bottom + window.scrollY,
+          left: rect.left + window.scrollX,
+          width: rect.width
+        });
+      }
     }
   };
 
@@ -1403,9 +1418,32 @@ function SearchableDropdown({
     }, 200);
   };
 
+  // Update position on scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      if (showDropdown && inputRef.current) {
+        const rect = inputRef.current.getBoundingClientRect();
+        setDropdownPosition({
+          top: rect.bottom + window.scrollY,
+          left: rect.left + window.scrollX,
+          width: rect.width
+        });
+      }
+    };
+    
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleScroll);
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, [showDropdown]);
+
   return (
     <div className="relative" ref={dropdownRef}>
       <input
+        ref={inputRef}
         type="text"
         value={searchQuery}
         onChange={(e) => handleSearch(e.target.value)}
@@ -1415,15 +1453,26 @@ function SearchableDropdown({
         placeholder={placeholder}
         required={required}
         disabled={disabled}
+        autoComplete="off"
       />
       
       {showDropdown && (
-        <div className="absolute z-9999 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+        <div 
+          className="fixed z-[9999] bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto"
+          style={{
+            top: `${dropdownPosition.top}px`,
+            left: `${dropdownPosition.left}px`,
+            width: `${dropdownPosition.width}px`
+          }}
+        >
           {filteredItems.length > 0 ? (
             filteredItems.map((item) => (
               <div
                 key={item._id}
-                onMouseDown={() => handleSelectItem(item)}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleSelectItem(item);
+                }}
                 className={`p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors ${
                   selectedItem?._id === item._id ? 'bg-sky-50' : ''
                 }`}

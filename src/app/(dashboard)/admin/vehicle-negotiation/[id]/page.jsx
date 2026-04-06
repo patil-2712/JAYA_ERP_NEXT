@@ -1648,151 +1648,167 @@ export default function EditVehicleNegotiation() {
     fetchNegotiationData();
   }, []);
 
-  const fetchNegotiationData = async () => {
-    setFetchLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      
-      // Fetch the vehicle negotiation
-      const res = await fetch(`/api/vehicle-negotiation?id=${negotiationId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      const data = await res.json();
-      
-      if (!data.success) {
-        throw new Error(data.message || 'Failed to fetch vehicle negotiation');
-      }
-
-      const vn = data.data;
-      
-      // Set VNN number
-      setVnnNumber(vn.vnnNo || "");
-      
-      // Set header data
-      setHeader({
-        vnnNo: vn.vnnNo || "",
-        branch: vn.branch || "",
-        branchName: vn.branchName || "",
-        branchCode: vn.branchCode || "",
-        delivery: vn.delivery || "Urgent",
-        date: vn.date ? new Date(vn.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        billingType: vn.billingType || "Multi - Order",
-        loadingPoints: vn.loadingPoints?.toString() || "",
-        dropPoints: vn.dropPoints?.toString() || "",
-        collectionCharges: vn.collectionCharges?.toString() || "",
-        cancellationCharges: vn.cancellationCharges || "",
-        loadingCharges: vn.loadingCharges || "",
-        otherCharges: vn.otherCharges || "",
-        partyName: vn.partyName || vn.customerName || "",
-        customerId: vn.customerId || ""
-      });
-
-      // Set customer data
-      if (vn.customerName) {
-        setSelectedCustomer({
-          _id: vn.customerId,
-          customerName: vn.customerName,
-          customerCode: vn.customerCode || "",
-          contactPersonName: vn.contactPerson || ""
-        });
-        setCustomerSearchQuery(vn.customerName);
-      }
-
-      // Set orders
-      if (vn.orders && vn.orders.length > 0) {
-        const processedOrders = vn.orders.map(order => ({
-          ...order,
-          _id: order._id || uid(),
-          weight: order.weight?.toString() || "",
-        }));
-        setOrders(processedOrders);
-      }
-
-      // Set order panels (if you track them)
-      if (vn.selectedOrderPanels) {
-        setSelectedOrderPanels(vn.selectedOrderPanels);
-      }
-
-      // Set negotiation
-      if (vn.negotiation) {
-        setNegotiation({
-          maxRate: vn.negotiation.maxRate?.toString() || "",
-          targetRate: vn.negotiation.targetRate?.toString() || "",
-          purchaseType: vn.negotiation.purchaseType || "",
-          oldRatePercent: vn.negotiation.oldRatePercent || "",
-          remarks1: vn.negotiation.remarks1 || "",
-        });
-      }
-
-      // Set vendors
-      if (vn.vendors && vn.vendors.length > 0) {
-        const processedVendors = vn.vendors.map(vendor => ({
-          ...vendor,
-          _id: vendor._id || uid(),
-          marketRate: vendor.marketRate?.toString() || "",
-        }));
-        setVendors(processedVendors);
-      } else {
-        setVendors([defaultVendorRow()]);
-      }
-
-      // Set voice note
-      if (vn.voiceNote) {
-        setVoiceUrl(vn.voiceNote);
-      }
-      if (vn.voiceNoteFile) {
-        setVoiceFileInfo(vn.voiceNoteFile);
-      }
-
-      // Set approval
-      if (vn.approval) {
-        setApproval({
-          vendorName: vn.approval.vendorName || "",
-          vendorId: vn.approval.vendorId || null,
-          vendorCode: vn.approval.vendorCode || "",
-          vendorStatus: vn.approval.vendorStatus || "Active",
-          rateType: vn.approval.rateType || "",
-          finalPerMT: vn.approval.finalPerMT?.toString() || "",
-          finalFix: vn.approval.finalFix?.toString() || "",
-          vehicleNo: vn.approval.vehicleNo || "",
-          vehicleId: vn.approval.vehicleId || "",
-          vehicleData: vn.approval.vehicleData || null,
-          mobile: vn.approval.mobile || "",
-          purchaseType: vn.approval.purchaseType || "",
-          paymentTerms: vn.approval.paymentTerms || "",
-          approvalStatus: vn.approval.approvalStatus || "",
-          remarks: vn.approval.remarks || "",
-          memoStatus: vn.approval.memoStatus || "Pending",
-          memoFile: vn.approval.memoFile || null
-        });
-
-        // Set selected vehicle if exists
-        if (vn.approval.vehicleData) {
-          setSelectedVehicle(vn.approval.vehicleData);
-        } else if (vn.approval.vehicleId) {
-          const vehicle = await vehicleSearch.getVehicleById(vn.approval.vehicleId);
-          if (vehicle) {
-            setSelectedVehicle(vehicle);
-          }
-        }
-
-        // Set selected supplier if exists
-        if (vn.approval.vendorName && supplierSearch.suppliers.length > 0) {
-          const supplier = supplierSearch.suppliers.find(s => s.supplierName === vn.approval.vendorName);
-          if (supplier) {
-            setSelectedSupplier(supplier);
-          }
-        }
-      }
-
-    } catch (error) {
-      console.error('Error fetching vehicle negotiation:', error);
-      alert(`Failed to load vehicle negotiation: ${error.message}`);
-    } finally {
-      setFetchLoading(false);
+ const fetchNegotiationData = async () => {
+  setFetchLoading(true);
+  try {
+    const token = localStorage.getItem('token');
+    
+    // Fetch the vehicle negotiation
+    const res = await fetch(`/api/vehicle-negotiation?id=${negotiationId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    
+    const data = await res.json();
+    
+    if (!data.success) {
+      throw new Error(data.message || 'Failed to fetch vehicle negotiation');
     }
-  };
+
+    const vn = data.data;
+    
+    // Set VNN number
+    setVnnNumber(vn.vnnNo || "");
+    
+    // Set header data
+    setHeader({
+      vnnNo: vn.vnnNo || "",
+      branch: vn.branch || "",
+      branchName: vn.branchName || "",
+      branchCode: vn.branchCode || "",
+      delivery: vn.delivery || "Urgent",
+      date: vn.date ? new Date(vn.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      billingType: vn.billingType || "Multi - Order",
+      loadingPoints: vn.loadingPoints?.toString() || "",
+      dropPoints: vn.dropPoints?.toString() || "",
+      collectionCharges: vn.collectionCharges?.toString() || "",
+      cancellationCharges: vn.cancellationCharges || "",
+      loadingCharges: vn.loadingCharges || "",
+      otherCharges: vn.otherCharges || "",
+      partyName: vn.partyName || vn.customerName || "",
+      customerId: vn.customerId || ""
+    });
+
+    // Set customer data
+    if (vn.customerName) {
+      setSelectedCustomer({
+        _id: vn.customerId,
+        customerName: vn.customerName,
+        customerCode: vn.customerCode || "",
+        contactPersonName: vn.contactPerson || ""
+      });
+      setCustomerSearchQuery(vn.customerName);
+    }
+
+    // Set orders
+    if (vn.orders && vn.orders.length > 0) {
+      const processedOrders = vn.orders.map(order => ({
+        ...order,
+        _id: order._id || uid(),
+        weight: order.weight?.toString() || "",
+      }));
+      setOrders(processedOrders);
+    }
+
+    // Set order panels - IMPORTANT: Need to fetch full panel data
+    if (vn.selectedOrderPanels && vn.selectedOrderPanels.length > 0) {
+      // Fetch full panel details for each selected panel
+      const fullPanels = [];
+      for (const panel of vn.selectedOrderPanels) {
+        try {
+          const fullPanel = await orderPanelSearch.getOrderPanelById(panel._id);
+          if (fullPanel) {
+            fullPanels.push(fullPanel);
+          } else {
+            // If can't fetch, use the existing data
+            fullPanels.push(panel);
+          }
+        } catch (err) {
+          console.error("Error fetching panel:", err);
+          fullPanels.push(panel);
+        }
+      }
+      setSelectedOrderPanels(fullPanels);
+    }
+
+    // Set negotiation
+    if (vn.negotiation) {
+      setNegotiation({
+        maxRate: vn.negotiation.maxRate?.toString() || "",
+        targetRate: vn.negotiation.targetRate?.toString() || "",
+        purchaseType: vn.negotiation.purchaseType || "",
+        oldRatePercent: vn.negotiation.oldRatePercent || "",
+        remarks1: vn.negotiation.remarks1 || "",
+      });
+    }
+
+    // Set vendors
+    if (vn.vendors && vn.vendors.length > 0) {
+      const processedVendors = vn.vendors.map(vendor => ({
+        ...vendor,
+        _id: vendor._id || uid(),
+        marketRate: vendor.marketRate?.toString() || "",
+      }));
+      setVendors(processedVendors);
+    } else {
+      setVendors([defaultVendorRow()]);
+    }
+
+    // Set voice note
+    if (vn.voiceNote) {
+      setVoiceUrl(vn.voiceNote);
+    }
+    if (vn.voiceNoteFile) {
+      setVoiceFileInfo(vn.voiceNoteFile);
+    }
+
+    // Set approval
+    if (vn.approval) {
+      setApproval({
+        vendorName: vn.approval.vendorName || "",
+        vendorId: vn.approval.vendorId || null,
+        vendorCode: vn.approval.vendorCode || "",
+        vendorStatus: vn.approval.vendorStatus || "Active",
+        rateType: vn.approval.rateType || "",
+        finalPerMT: vn.approval.finalPerMT?.toString() || "",
+        finalFix: vn.approval.finalFix?.toString() || "",
+        vehicleNo: vn.approval.vehicleNo || "",
+        vehicleId: vn.approval.vehicleId || "",
+        vehicleData: vn.approval.vehicleData || null,
+        mobile: vn.approval.mobile || "",
+        purchaseType: vn.approval.purchaseType || "",
+        paymentTerms: vn.approval.paymentTerms || "",
+        approvalStatus: vn.approval.approvalStatus || "",
+        remarks: vn.approval.remarks || "",
+        memoStatus: vn.approval.memoStatus || "Pending",
+        memoFile: vn.approval.memoFile || null
+      });
+
+      // Set selected vehicle if exists
+      if (vn.approval.vehicleData) {
+        setSelectedVehicle(vn.approval.vehicleData);
+      } else if (vn.approval.vehicleId) {
+        const vehicle = await vehicleSearch.getVehicleById(vn.approval.vehicleId);
+        if (vehicle) {
+          setSelectedVehicle(vehicle);
+        }
+      }
+
+      // Set selected supplier if exists
+      if (vn.approval.vendorName && supplierSearch.suppliers.length > 0) {
+        const supplier = supplierSearch.suppliers.find(s => s.supplierName === vn.approval.vendorName);
+        if (supplier) {
+          setSelectedSupplier(supplier);
+        }
+      }
+    }
+
+  } catch (error) {
+    console.error('Error fetching vehicle negotiation:', error);
+    alert(`Failed to load vehicle negotiation: ${error.message}`);
+  } finally {
+    setFetchLoading(false);
+  }
+};
 
   const fetchBranches = async () => {
     try {
@@ -1982,126 +1998,187 @@ export default function EditVehicleNegotiation() {
   /** =========================
    * Handle Order Panel Multi-Select - FIXED
    ========================= */
-  const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
-    if (removePanelId) {
-      // Remove panel
-      setSelectedOrderPanels(prev => prev.filter(p => p._id !== removePanelId));
-      
-      // Remove all orders from this panel
-      setOrders(prev => prev.filter(order => order.orderPanelId !== removePanelId));
-      
-      // If no panels left, clear header
-      if (selectedOrderPanels.length === 1) {
-        setHeader(prev => ({
-          ...prev,
-          branch: "",
-          branchName: "",
-          branchCode: "",
-          partyName: "",
-          customerId: "",
-          collectionCharges: "",
-          cancellationCharges: "",
-          loadingCharges: "",
-          otherCharges: ""
-        }));
-        setSelectedCustomer(null);
-        setCustomerSearchQuery("");
+ /** =========================
+ * Handle Order Panel Multi-Select - FIXED for Edit Page
+ ========================= */
+const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
+  if (removePanelId) {
+    // Remove panel
+    setSelectedOrderPanels(prev => prev.filter(p => p._id !== removePanelId));
+    
+    // Remove all orders from this panel
+    setOrders(prev => prev.filter(order => order.orderPanelId !== removePanelId));
+    
+    // If no panels left, clear header
+    if (selectedOrderPanels.length === 1) {
+      setHeader(prev => ({
+        ...prev,
+        branch: "",
+        branchName: "",
+        branchCode: "",
+        partyName: "",
+        customerId: "",
+        collectionCharges: "",
+        cancellationCharges: "",
+        loadingCharges: "",
+        otherCharges: "",
+        loadingPoints: "",
+        dropPoints: ""
+      }));
+      setSelectedCustomer(null);
+      setCustomerSearchQuery("");
+    }
+  } else if (fullPanel) {
+    // Check if panel already selected
+    if (selectedOrderPanels.some(p => p._id === fullPanel._id)) {
+      alert("This order panel is already selected");
+      return;
+    }
+    
+    console.log("Adding order panel:", fullPanel);
+    
+    // Add new panel
+    setSelectedOrderPanels(prev => [...prev, fullPanel]);
+    
+    // Check if panel has plantRows
+    let plantRowsToUse = fullPanel.plantRows;
+    
+    // If plantRows is empty, check if the panel has direct order data
+    if (!plantRowsToUse || plantRowsToUse.length === 0) {
+      // Try to fetch the full panel data again
+      try {
+        const fetchedPanel = await orderPanelSearch.getOrderPanelById(fullPanel._id);
+        if (fetchedPanel && fetchedPanel.plantRows && fetchedPanel.plantRows.length > 0) {
+          plantRowsToUse = fetchedPanel.plantRows;
+          console.log("Fetched plantRows from API:", plantRowsToUse);
+        }
+      } catch (err) {
+        console.error("Error fetching panel details:", err);
       }
-    } else {
-      // Add new panel
-      setSelectedOrderPanels(prev => [...prev, fullPanel]);
-      
-      // Add orders from this panel
-      if (fullPanel.plantRows && fullPanel.plantRows.length > 0) {
-        const newOrders = fullPanel.plantRows.map((row) => {
-          // Extract plant ID correctly
-          let plantId = '';
-          let plantName = '';
-          let plantCode = '';
-          
-          if (row.plantCode) {
-            if (typeof row.plantCode === 'object' && row.plantCode._id) {
-              plantId = row.plantCode._id;
-              plantName = row.plantCode.name || '';
-              plantCode = row.plantCode.code || '';
-            } else if (typeof row.plantCode === 'string') {
-              plantId = row.plantCode;
-              plantName = row.plantName || '';
-              plantCode = row.plantCodeValue || '';
-            }
-          }
-          
-          // Also check if plant data is in other fields
-          if (!plantId && row.plantCodeValue) {
-            const plant = plants.find(p => p.code === row.plantCodeValue);
-            if (plant) {
-              plantId = plant._id;
-              plantName = plant.name;
-              plantCode = plant.code;
-            }
-          }
-          
-          return {
-            _id: uid(),
-            orderNo: fullPanel.orderPanelNo,
-            orderPanelId: fullPanel._id,
-            partyName: fullPanel.partyName || fullPanel.customerName || "",
-            customerId: fullPanel.customerId,
-            customerCode: fullPanel.customerCode || "",
-            contactPerson: fullPanel.contactPerson || "",
-            plantCode: plantId,
-            plantName: plantName || row.plantName || "",
-            plantCodeValue: plantCode || row.plantCodeValue || "",
-            orderType: row.orderType || "Sales",
-            pinCode: row.pinCode || "",
-            from: row.from,
-            fromName: row.fromName || "",
-            to: row.to,
-            toName: row.toName || "",
-            country: row.country,
-            countryName: row.countryName || "",
-            state: row.state,
-            stateName: row.stateName || "",
-            district: row.district,
-            districtName: row.districtName || "",
-            weight: row.weight || "",
-            status: row.status || "Open",
-          };
-        });
+    }
+    
+    // Add orders from this panel
+    if (plantRowsToUse && plantRowsToUse.length > 0) {
+      const newOrders = plantRowsToUse.map((row, idx) => {
+        // Extract plant ID correctly
+        let plantId = '';
+        let plantName = '';
+        let plantCode = '';
         
-        setOrders(prev => [...prev, ...newOrders]);
-      }
-
-      // Update header with data from first selected panel (if this is the first)
-      if (selectedOrderPanels.length === 0) {
-        setHeader(prev => ({
-          ...prev,
-          branch: fullPanel.branch || "",
-          branchName: fullPanel.branchName || "",
-          branchCode: fullPanel.branchCode || "",
-          delivery: fullPanel.delivery || "Urgent",
-          date: fullPanel.date ? new Date(fullPanel.date).toISOString().split('T')[0] : prev.date,
-          partyName: fullPanel.partyName || fullPanel.customerName || "",
-          customerId: fullPanel.customerId || "",
-          collectionCharges: fullPanel.collectionCharges || "",
-          cancellationCharges: fullPanel.cancellationCharges || "",
-          loadingCharges: fullPanel.loadingCharges || "",
-          otherCharges: fullPanel.otherCharges || "",
-          loadingPoints: fullPanel.loadingPoints || "",
-          dropPoints: fullPanel.dropPoints || ""
-        }));
-
-        // Update customer selection
-        if (fullPanel.customerId) {
-          const customer = customerSearch.customers.find(c => c._id === fullPanel.customerId);
-          if (customer) {
-            setSelectedCustomer(customer);
-            setCustomerSearchQuery(customer.customerName);
+        if (row.plantCode) {
+          if (typeof row.plantCode === 'object' && row.plantCode._id) {
+            plantId = row.plantCode._id;
+            plantName = row.plantCode.name || '';
+            plantCode = row.plantCode.code || '';
+          } else if (typeof row.plantCode === 'string') {
+            plantId = row.plantCode;
+            plantName = row.plantName || '';
+            plantCode = row.plantCodeValue || '';
           }
+        }
+        
+        // Also check if plant data is in other fields
+        if (!plantId && row.plantCodeValue) {
+          const plant = plants.find(p => p.code === row.plantCodeValue);
+          if (plant) {
+            plantId = plant._id;
+            plantName = plant.name;
+            plantCode = plant.code;
+          }
+        }
+        
+        return {
+          _id: uid(),
+          orderNo: fullPanel.orderPanelNo || row.orderNo || "",
+          orderPanelId: fullPanel._id,
+          partyName: fullPanel.partyName || fullPanel.customerName || row.partyName || "",
+          customerId: fullPanel.customerId || row.customerId || null,
+          customerCode: fullPanel.customerCode || row.customerCode || "",
+          contactPerson: fullPanel.contactPerson || row.contactPerson || "",
+          plantCode: plantId,
+          plantName: plantName || row.plantName || "",
+          plantCodeValue: plantCode || row.plantCodeValue || "",
+          orderType: row.orderType || "Sales",
+          pinCode: row.pinCode || "",
+          from: row.from || "",
+          fromName: row.fromName || "",
+          to: row.to || "",
+          toName: row.toName || "",
+          country: row.country || "",
+          countryName: row.countryName || "",
+          state: row.state || "",
+          stateName: row.stateName || "",
+          district: row.district || "",
+          districtName: row.districtName || "",
+          weight: row.weight || "",
+          status: row.status || "Open",
+        };
+      });
+      
+      console.log("Adding new orders:", newOrders);
+      setOrders(prev => [...prev, ...newOrders]);
+    } else {
+      // If no plantRows, create a default order from panel data
+      const defaultOrder = {
+        _id: uid(),
+        orderNo: fullPanel.orderPanelNo || "",
+        orderPanelId: fullPanel._id,
+        partyName: fullPanel.partyName || fullPanel.customerName || "",
+        customerId: fullPanel.customerId || null,
+        customerCode: fullPanel.customerCode || "",
+        contactPerson: fullPanel.contactPerson || "",
+        plantCode: "",
+        plantName: "",
+        plantCodeValue: "",
+        orderType: "Sales",
+        pinCode: "",
+        from: "",
+        fromName: "",
+        to: "",
+        toName: "",
+        country: "",
+        countryName: "",
+        state: "",
+        stateName: "",
+        district: "",
+        districtName: "",
+        weight: fullPanel.totalWeight || "",
+        status: "Open",
+      };
+      console.log("No plantRows found, creating default order:", defaultOrder);
+      setOrders(prev => [...prev, defaultOrder]);
+    }
+
+    // Update header with data from first selected panel (if this is the first)
+    if (selectedOrderPanels.length === 0) {
+      setHeader(prev => ({
+        ...prev,
+        branch: fullPanel.branch || "",
+        branchName: fullPanel.branchName || "",
+        branchCode: fullPanel.branchCode || "",
+        delivery: fullPanel.delivery || "Urgent",
+        date: fullPanel.date ? new Date(fullPanel.date).toISOString().split('T')[0] : prev.date,
+        partyName: fullPanel.partyName || fullPanel.customerName || "",
+        customerId: fullPanel.customerId || "",
+        collectionCharges: fullPanel.collectionCharges || "",
+        cancellationCharges: fullPanel.cancellationCharges || "",
+        loadingCharges: fullPanel.loadingCharges || "",
+        otherCharges: fullPanel.otherCharges || "",
+        loadingPoints: fullPanel.loadingPoints || "",
+        dropPoints: fullPanel.dropPoints || ""
+      }));
+
+      // Update customer selection
+      if (fullPanel.customerId) {
+        const customer = customerSearch.customers.find(c => c._id === fullPanel.customerId);
+        if (customer) {
+          setSelectedCustomer(customer);
+          setCustomerSearchQuery(customer.customerName);
         }
       }
     }
-  };
+  }
+};
 
   /** =========================
    * ORDER ROW FUNCTIONS

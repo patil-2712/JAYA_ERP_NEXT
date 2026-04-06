@@ -64,34 +64,28 @@ export default function LandingPage() {
   };
 
   return (
-    <main className="relative min-h-screen flex flex-col justify-between items-center bg-gradient-to-b from-white via-blue-50 to-amber-200 text-gray-800 px-4 sm:px-6 py-6 overflow-hidden">
+    <main className="relative min-h-screen flex flex-col justify-between items-center text-gray-800 px-4 sm:px-6 py-6 overflow-hidden">
       
-      {/* Cloud Overlays - White/Orange soft clouds */}
-      <div className="absolute inset-0 bg-gradient-to-t from-orange-200/30 via-transparent to-white/50 pointer-events-none"></div>
-      <div className="absolute top-20 left-10 w-64 h-32 bg-white/50 rounded-full blur-3xl"></div>
-      <div className="absolute top-40 right-20 w-80 h-40 bg-white/40 rounded-full blur-3xl"></div>
-      <div className="absolute top-60 left-1/4 w-96 h-48 bg-amber-200/20 rounded-full blur-3xl"></div>
+      {/* Realistic Sunrise Background Image */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: "url('https://images.unsplash.com/photo-1495616811223-4d98c6e9c869?q=80&w=2070&auto=format')",
+          backgroundSize: "cover",
+          backgroundPosition: "center 70%",
+        }}
+      >
+        {/* Dark overlay for better text readability */}
+        <div className="absolute inset-0 bg-black/20"></div>
+      </div>
       
-      {/* Sun Glow - Half sun at bottom */}
-      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-[600px] h-[300px] sm:w-[800px] sm:h-[400px] md:w-[1100px] md:h-[550px] rounded-t-full bg-gradient-to-t from-orange-300 via-amber-300 to-yellow-200 opacity-50 blur-3xl"></div>
+      {/* Alternative: If you want to use a local image, replace the URL above with "/sunrise-bg.jpg" */}
       
-      {/* Sun Middle Layer */}
-      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-[450px] h-[225px] sm:w-[600px] sm:h-[300px] md:w-[800px] md:h-[400px] rounded-t-full bg-gradient-to-t from-amber-400 via-orange-300 to-yellow-200 opacity-70 blur-2xl"></div>
+      {/* Warm Golden Overlay to enhance the sunrise feel */}
+      <div className="absolute inset-0 bg-gradient-to-t from-amber-500/20 via-orange-400/10 to-transparent pointer-events-none"></div>
       
-      {/* Sun Core - Bright Orange/Yellow */}
-      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-[300px] h-[150px] sm:w-[400px] sm:h-[200px] md:w-[550px] md:h-[275px] rounded-t-full bg-gradient-to-t from-orange-300 via-yellow-300 to-yellow-100 opacity-85 blur-xl"></div>
-      
-      {/* Sun Center - Bright Yellow/White */}
-      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-[180px] h-[90px] sm:w-[250px] sm:h-[125px] md:w-[350px] md:h-[175px] rounded-t-full bg-gradient-to-t from-yellow-200 via-yellow-100 to-white blur-lg"></div>
-      
-      {/* Sun Highlight - Pure White hot center */}
-      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-[100px] h-[50px] sm:w-[150px] sm:h-[75px] md:w-[200px] md:h-[100px] rounded-t-full bg-white/90 blur-md"></div>
-
-      {/* Sun Rays */}
-      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-[500px] h-[300px] sm:w-[700px] sm:h-[400px] md:w-[900px] md:h-[500px] bg-gradient-to-t from-yellow-200/40 via-orange-100/20 to-transparent blur-2xl pointer-events-none"></div>
-      
-      {/* Golden Hour Light Overlay - Subtle */}
-      <div className="absolute inset-0 bg-gradient-to-t from-amber-500/10 via-yellow-200/5 to-transparent pointer-events-none"></div>
+      {/* Soft vignette for focus */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_50%,rgba(0,0,0,0.2)_100%)] pointer-events-none"></div>
 
       {/* Header */}
       <header className="relative z-10 flex flex-col items-center w-full">
@@ -103,17 +97,17 @@ export default function LandingPage() {
         <motion.h1
           initial={{ opacity: 0, y: -30 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-2xl sm:text-3xl md:text-5xl font-bold text-center mb-3 text-amber-800 drop-shadow-lg"
+          className="text-2xl sm:text-3xl md:text-5xl font-bold text-center mb-3 text-white drop-shadow-lg"
         >
-          Welcome to <span className="text-amber-600 drop-shadow-md">Jaya Global Logistics</span>
+          Welcome to <span className="text-amber-300 drop-shadow-md">Jaya Group Of Companies</span>
         </motion.h1>
         
-        {/* Description - Clean white text */}
+        {/* Description */}
         <motion.p
           variants={descriptionVariants}
           initial="hidden"
           animate="show"
-          className="text-center text-sm sm:text-base md:text-lg max-w-2xl text-gray-700 drop-shadow-sm"
+          className="text-center text-sm sm:text-base md:text-lg max-w-2xl text-white/90 drop-shadow-md"
         >
           Manage your sales, purchases, inventory, and business operations from
           one centralized, modern ERP platform.
@@ -131,17 +125,17 @@ export default function LandingPage() {
           </Link>
           <Link
             href="/signup"
-            className="px-6 py-3 border-2 border-amber-500 text-amber-600 rounded-xl hover:bg-amber-50 transition text-center shadow-xl hover:shadow-lg"
+            className="px-6 py-3 border-2 border-amber-400 text-amber-400 rounded-xl hover:bg-amber-500/20 transition text-center shadow-xl hover:shadow-lg"
           >
             Company Registration
           </Link>
         </div>
 
-        <h2 className="text-xl sm:text-2xl font-bold text-amber-800 drop-shadow-sm">
+        <h2 className="text-xl sm:text-2xl font-bold text-white drop-shadow-md">
           Key Features
         </h2>
         
-        {/* Features - Clean text */}
+        {/* Features */}
         <motion.ul
           className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 max-w-4xl"
           variants={containerVariants}
@@ -151,22 +145,22 @@ export default function LandingPage() {
           {features.map((text, idx) => (
             <motion.li
               key={idx}
-              className="flex items-start gap-2 text-sm sm:text-base text-gray-700 drop-shadow-sm"
+              className="flex items-start gap-2 text-sm sm:text-base text-white/90 drop-shadow-md"
               variants={itemVariants}
             >
-              <HiCheckCircle className="text-amber-500 mt-0.5 shrink-0" />
+              <HiCheckCircle className="text-amber-400 mt-0.5 shrink-0" />
               <span>{text}</span>
             </motion.li>
           ))}
         </motion.ul>
       </div>
 
-      {/* Footer - Clean text */}
+      {/* Footer */}
       <motion.footer
         variants={footerVariants}
         initial="hidden"
         animate="show"
-        className="relative z-10 text-center text-xs sm:text-sm text-gray-600 mt-6 drop-shadow-sm"
+        className="relative z-10 text-center text-xs sm:text-sm text-white/80 mt-6 drop-shadow-md"
       >
         &copy; 2025 AITS ERP. All rights reserved.
       </motion.footer>
