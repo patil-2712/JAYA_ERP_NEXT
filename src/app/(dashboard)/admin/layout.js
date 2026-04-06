@@ -432,7 +432,7 @@ export default function Layout({ children }) {
                 <Item href="/admin/price-list"             icon={<HiOutlineOfficeBuilding />} label="Price List"               onClick={closeSidebar} isActive={isActive("/admin/price-list")} />
                 <Item href="/admin/branches"               icon={<HiOfficeBuilding />}    label="Branches"                     onClick={closeSidebar} isActive={isActive("/admin/branches")} />
                 <Item href="/admin/districts"              icon={<HiLocationMarker />}    label="Districts"                    onClick={closeSidebar} isActive={isActive("/admin/districts")} />
-                <Item href="/admin/pincodes"               icon={<HiMail />}              label="Pincodes"                     onClick={closeSidebar} isActive={isActive("/admin/pincodes")} />
+             
                 <Item href="/admin/vehicles"               icon={<HiTruck />}             label="vehicles"                     onClick={closeSidebar} isActive={isActive("/admin/vehicels")} />
                 <Item href="/admin/transport-price-list"   icon={<HiCurrencyRupee />}     label="Transport Price List"         onClick={closeSidebar} isActive={isActive("/admin/transport-price-list")} />
               </Section>
