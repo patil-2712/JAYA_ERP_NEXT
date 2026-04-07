@@ -75,6 +75,7 @@ const vehicleNegotiationSchema = new mongoose.Schema({
       default: () => new mongoose.Types.ObjectId()
     },
     orderNo: String,
+    orderPanelId: String,
     partyName: String,
     customerId: mongoose.Schema.Types.ObjectId,
     customerCode: String,
@@ -101,6 +102,14 @@ const vehicleNegotiationSchema = new mongoose.Schema({
       ref: 'Branch'
     },
     toName: String,
+    taluka: {
+      type: String,
+      default: ''
+    },
+    talukaName: {
+      type: String,
+      default: ''
+    },
     country: String,
     countryName: String,
     state: String,
@@ -240,6 +249,7 @@ const vehicleNegotiationSchema = new mongoose.Schema({
     pinCode: String,
     from: String,
     to: String,
+    taluka: String,
     district: String,
     state: String,
     country: String,
@@ -290,7 +300,7 @@ vehicleNegotiationSchema.pre('save', function(next) {
     this.purchaseAmount = this.approval.finalFix || 0;
   }
   
-  // Generate report rows from orders
+  // Generate report rows from orders with taluka
   this.reportRows = this.orders.map(order => ({
     date: this.date,
     vnn: this.vnnNo,
@@ -301,6 +311,7 @@ vehicleNegotiationSchema.pre('save', function(next) {
     pinCode: order.pinCode || '-',
     from: order.fromName || '-',
     to: order.toName || '-',
+    taluka: order.talukaName || order.taluka || '-',
     district: order.districtName || '-',
     state: order.stateName || '-',
     country: order.countryName || '-',

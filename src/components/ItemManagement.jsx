@@ -47,8 +47,8 @@ const VALIDATORS = {
     const e = {};
     if (!d.itemName?.trim()) e.itemName  = "Item Name is required";
     if (!d.category?.trim()) e.category  = "Category is required";
-    if (!d.unitPrice)        e.unitPrice = "Unit Price is required";
-    if (d.quantity === "" || d.quantity === undefined) e.quantity = "Minimum Stock is required";
+    
+    
     if (!d.uom)     e.uom     = "Unit of Measure is required";
     if (!d.itemType) e.itemType = "Item Type is required";
     return e;

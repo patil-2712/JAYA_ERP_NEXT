@@ -409,8 +409,8 @@ export default function Layout({ children }) {
           {hasFullAccess && (
             <>
               <Section title="Masters" icon={<HiUsers />} isOpen={openMenu === "master"} onToggle={() => toggleMenu("master")}>
-                <Item href="/admin/Countries"            icon={<HiGlobeAlt />}          label="Countries"             onClick={closeSidebar} isActive={isActive("/admin/Countries")} />
-                <Item href="/admin/State"                icon={<HiFlag />}               label="State"                 onClick={closeSidebar} isActive={isActive("/admin/State")} />
+                {/*<Item href="/admin/Countries"            icon={<HiGlobeAlt />}          label="Countries"             onClick={closeSidebar} isActive={isActive("/admin/Countries")} />
+                <Item href="/admin/State"                icon={<HiFlag />}               label="State"                 onClick={closeSidebar} isActive={isActive("/admin/State")} />*/}
                 <Item href="/admin/CreateGroup"          icon={<HiUserGroup />}          label="Create Group"          onClick={closeSidebar} isActive={isActive("/admin/CreateGroup")} />
                 <Item href="/admin/CreateItemGroup"      icon={<HiOutlineCube />}        label="Create Item Group"     onClick={closeSidebar} isActive={isActive("/admin/CreateItemGroup")} />
                 <Item href="/admin/account-bankhead"     icon={<HiOutlineLibrary />}     label="Account Head"          onClick={closeSidebar} isActive={isActive("/admin/account-bankhead")} />
@@ -429,12 +429,14 @@ export default function Layout({ children }) {
                 <Item href="/admin/bank-head-details-view" icon={<HiCurrencyDollar />}    label="General Ledger View"          onClick={closeSidebar} isActive={isActive("/admin/bank-head-details-view")} />
                 <Item href="/admin/email-templates"        icon={<HiDocumentText />}      label="Email Templates"              onClick={closeSidebar} isActive={isActive("/admin/email-templates")} />
                 <Item href="/admin/email-masters"          icon={<HiOutlineCreditCard />} label="Email & App Password Master"  onClick={closeSidebar} isActive={isActive("/admin/email-masters")} />
-                <Item href="/admin/price-list"             icon={<HiOutlineOfficeBuilding />} label="Price List"               onClick={closeSidebar} isActive={isActive("/admin/price-list")} />
+                {/*<Item href="/admin/price-list"             icon={<HiOutlineOfficeBuilding />} label="Price List"               onClick={closeSidebar} isActive={isActive("/admin/price-list")} />*/}
                 <Item href="/admin/branches"               icon={<HiOfficeBuilding />}    label="Branches"                     onClick={closeSidebar} isActive={isActive("/admin/branches")} />
-                <Item href="/admin/districts"              icon={<HiLocationMarker />}    label="Districts"                    onClick={closeSidebar} isActive={isActive("/admin/districts")} />
+				    <Item href="/admin/locations"               icon={<HiOfficeBuilding />}    label="From-location"                     onClick={closeSidebar} isActive={isActive("/admin/locations")} />
+					   <Item href="/admin/pkg-type"               icon={<HiOfficeBuilding />}    label="Pkg-type"                     onClick={closeSidebar} isActive={isActive("/admin/pkg-type")} />
+                {/*<Item href="/admin/districts"              icon={<HiLocationMarker />}    label="Districts"                    onClick={closeSidebar} isActive={isActive("/admin/districts")} />*/}
              
-                <Item href="/admin/vehicles"               icon={<HiTruck />}             label="vehicles"                     onClick={closeSidebar} isActive={isActive("/admin/vehicels")} />
-                <Item href="/admin/transport-price-list"   icon={<HiCurrencyRupee />}     label="Transport Price List"         onClick={closeSidebar} isActive={isActive("/admin/transport-price-list")} />
+                <Item href="/admin/vehicles"               icon={<HiTruck />}             label="Vehicles"                     onClick={closeSidebar} isActive={isActive("/admin/vehicels")} />
+                <Item href="/admin/rate-master"   icon={<HiCurrencyRupee />}     label="Transport rate-master"         onClick={closeSidebar} isActive={isActive("/admin/rate-master")} />
               </Section>
 
               <Section title="Transactions View" icon={<HiOutlineCreditCard />} isOpen={openMenu === "transactionsView"} onToggle={() => toggleMenu("transactionsView")}>

@@ -145,42 +145,46 @@ export async function GET(req) {
         // If order has plantRows, create a row for each plant
         if (order.plantRows && order.plantRows.length > 0) {
           order.plantRows.forEach((row, index) => {
-            flattenedRows.push({
-              _id: `${order._id}-${index}`, // Composite ID for table row
-              originalOrderId: order._id,
-              originalRowId: row._id,
-              date: order.date ? new Date(order.date).toISOString().split('T')[0] : '',
-              orderNo: order.orderPanelNo || 'N/A',
-              branchName: order.branchName || 'N/A',
-              branchCode: order.branchCode || '',
-              partyName: order.partyName || order.customerName || 'N/A',
-              customerName: order.customerName || 'N/A',
-              
-              // Plant-specific fields from plantRows
-              plantCode: row.plantCodeValue || row.plantCode || 'N/A',
-              plantName: row.plantName || '',
-              orderType: row.orderType || 'Sales',
-              pinCode: row.pinCode || '',
-              from: row.fromName || row.from || '',
-              to: row.toName || row.to || '',
-              district: row.districtName || row.district || '',
-              state: row.stateName || row.state || '',
-              country: row.countryName || row.country || '',
-              weight: row.weight || 0,
-              status: row.status || 'Open',
-              
-              // Order-level fields
-              delivery: order.delivery || 'Normal',
-              panelStatus: order.panelStatus || 'Draft',
-              collectionCharges: order.collectionCharges || 0,
-              cancellationCharges: order.cancellationCharges || 'Nil',
-              loadingCharges: order.loadingCharges || 'Nil',
-              otherCharges: order.otherCharges || 0,
-              
-              // Metadata
-              pendingSince: calculatePendingDays(order.date, row.status),
-              placement: 'Pending'
-            });
+           // In the GET function, when creating flattenedRows for table view:
+
+flattenedRows.push({
+  _id: `${order._id}-${index}`,
+  originalOrderId: order._id,
+  originalRowId: row._id,
+  date: order.date ? new Date(order.date).toISOString().split('T')[0] : '',
+  orderNo: order.orderPanelNo || 'N/A',
+  branchName: order.branchName || 'N/A',
+  branchCode: order.branchCode || '',
+  partyName: order.partyName || order.customerName || 'N/A',
+  customerName: order.customerName || 'N/A',
+  
+  // Plant-specific fields from plantRows
+  plantCode: row.plantCodeValue || row.plantCode || 'N/A',
+  plantName: row.plantName || '',
+  orderType: row.orderType || 'Sales',
+  pinCode: row.pinCode || '',
+  from: row.fromName || row.from || '',
+  to: row.toName || row.to || '',
+  // TALUKA FIELDS - add these
+  taluka: row.talukaName || row.taluka || '',
+  district: row.districtName || row.district || '',
+  state: row.stateName || row.state || '',
+  country: row.countryName || row.country || '',
+  weight: row.weight || 0,
+  status: row.status || 'Open',
+  
+  // Order-level fields
+  delivery: order.delivery || 'Normal',
+  panelStatus: order.panelStatus || 'Draft',
+  collectionCharges: order.collectionCharges || 0,
+  cancellationCharges: order.cancellationCharges || 'Nil',
+  loadingCharges: order.loadingCharges || 'Nil',
+  otherCharges: order.otherCharges || 0,
+  
+  // Metadata
+  pendingSince: calculatePendingDays(order.date, row.status),
+  placement: 'Pending'
+});
           });
         } else {
           // If no plantRows, create a single row with default values
@@ -308,48 +312,52 @@ export async function POST(req) {
       branchCode = body.branchCode || '';
     }
 
-    // Process plantRows - FIXED to handle null values properly
-    const processedPlantRows = (body.plantRows || []).map((row) => {
-      const weight = num(row.weight);
-      const rate = num(row.rate);
-      
-      // Handle 'from' field - should be ObjectId or null
-      let fromField = null;
-      if (row.from && mongoose.Types.ObjectId.isValid(row.from)) {
-        fromField = new mongoose.Types.ObjectId(row.from);
-      }
-      
-      // Handle 'to' field - should be ObjectId or null
-      let toField = null;
-      if (row.to && mongoose.Types.ObjectId.isValid(row.to)) {
-        toField = new mongoose.Types.ObjectId(row.to);
-      }
-      
-      return {
-        _id: new mongoose.Types.ObjectId(),
-        plantCode: row.plantCode || '',
-        plantName: row.plantName || '',
-        plantCodeValue: row.plantCodeValue || '',
-        orderType: row.orderType || "Sales",
-        pinCode: row.pinCode || "",
-        from: fromField,  // Will be null if no valid ObjectId
-        fromName: row.fromName || '',
-        to: toField,      // Will be null if no valid ObjectId
-        toName: row.toName || '',
-        country: row.country || "",
-        countryName: row.countryName || row.country || '',
-        state: row.state || "",
-        stateName: row.stateName || row.state || '',
-        district: row.district || "",
-        districtName: row.districtName || row.district || '',
-        weight,
-        status: row.status || "Open",
-        rate: rate,
-        locationRate: num(row.locationRate),
-        totalAmount: weight * rate
-      };
-    });
+  
 
+// Process plantRows - FIXED to handle taluka fields properly
+const processedPlantRows = (body.plantRows || []).map((row) => {
+  const weight = num(row.weight);
+  const rate = num(row.rate);
+  
+  // Handle 'from' field - should be ObjectId or null
+  let fromField = null;
+  if (row.from && mongoose.Types.ObjectId.isValid(row.from)) {
+    fromField = new mongoose.Types.ObjectId(row.from);
+  }
+  
+  // Handle 'to' field - should be ObjectId or null
+  let toField = null;
+  if (row.to && mongoose.Types.ObjectId.isValid(row.to)) {
+    toField = new mongoose.Types.ObjectId(row.to);
+  }
+  
+  return {
+    _id: new mongoose.Types.ObjectId(),
+    plantCode: row.plantCode || '',
+    plantName: row.plantName || '',
+    plantCodeValue: row.plantCodeValue || '',
+    orderType: row.orderType || "Sales",
+    pinCode: row.pinCode || "",
+    from: fromField,
+    fromName: row.fromName || '',
+    to: toField,
+    toName: row.toName || '',
+    // TALUKA FIELDS - properly mapped
+    taluka: row.taluka || "",
+    talukaName: row.talukaName || row.taluka || '',
+    district: row.district || "",
+    districtName: row.districtName || row.district || '',
+    state: row.state || "",
+    stateName: row.stateName || row.state || '',
+    country: row.country || "",
+    countryName: row.countryName || row.country || '',
+    weight,
+    status: row.status || "Open",
+    rate: rate,
+    locationRate: num(row.locationRate),
+    totalAmount: weight * rate
+  };
+});
     // Calculate totals
     const totalWeight = processedPlantRows.reduce((sum, row) => sum + row.weight, 0);
     const totalAmount = processedPlantRows.reduce((sum, row) => sum + row.totalAmount, 0);
@@ -541,46 +549,51 @@ export async function PUT(req) {
 
     // Update plantRows if provided - FIXED to handle null values
     if (body.plantRows && Array.isArray(body.plantRows)) {
-      const processedPlantRows = body.plantRows.map((row) => {
-        const weight = num(row.weight);
-        const rate = num(row.rate);
-        
-        // Handle 'from' field - should be ObjectId or null
-        let fromField = null;
-        if (row.from && mongoose.Types.ObjectId.isValid(row.from)) {
-          fromField = new mongoose.Types.ObjectId(row.from);
-        }
-        
-        // Handle 'to' field - should be ObjectId or null
-        let toField = null;
-        if (row.to && mongoose.Types.ObjectId.isValid(row.to)) {
-          toField = new mongoose.Types.ObjectId(row.to);
-        }
-        
-        return {
-          _id: row._id ? (mongoose.Types.ObjectId.isValid(row._id) ? new mongoose.Types.ObjectId(row._id) : new mongoose.Types.ObjectId()) : new mongoose.Types.ObjectId(),
-          plantCode: row.plantCode || '',
-          plantName: row.plantName || '',
-          plantCodeValue: row.plantCodeValue || '',
-          orderType: row.orderType || "Sales",
-          pinCode: row.pinCode || "",
-          from: fromField,
-          fromName: row.fromName || '',
-          to: toField,
-          toName: row.toName || '',
-          country: row.country || "",
-          countryName: row.countryName || row.country || '',
-          state: row.state || "",
-          stateName: row.stateName || row.state || '',
-          district: row.district || "",
-          districtName: row.districtName || row.district || '',
-          weight,
-          status: row.status || "Open",
-          rate: rate,
-          locationRate: num(row.locationRate),
-          totalAmount: weight * rate
-        };
-      });
+     // In the PUT function, update the processedPlantRows section:
+
+const processedPlantRows = body.plantRows.map((row) => {
+  const weight = num(row.weight);
+  const rate = num(row.rate);
+  
+  // Handle 'from' field - should be ObjectId or null
+  let fromField = null;
+  if (row.from && mongoose.Types.ObjectId.isValid(row.from)) {
+    fromField = new mongoose.Types.ObjectId(row.from);
+  }
+  
+  // Handle 'to' field - should be ObjectId or null
+  let toField = null;
+  if (row.to && mongoose.Types.ObjectId.isValid(row.to)) {
+    toField = new mongoose.Types.ObjectId(row.to);
+  }
+  
+  return {
+    _id: row._id ? (mongoose.Types.ObjectId.isValid(row._id) ? new mongoose.Types.ObjectId(row._id) : new mongoose.Types.ObjectId()) : new mongoose.Types.ObjectId(),
+    plantCode: row.plantCode || '',
+    plantName: row.plantName || '',
+    plantCodeValue: row.plantCodeValue || '',
+    orderType: row.orderType || "Sales",
+    pinCode: row.pinCode || "",
+    from: fromField,
+    fromName: row.fromName || '',
+    to: toField,
+    toName: row.toName || '',
+    // TALUKA FIELDS - properly mapped
+    taluka: row.taluka || "",
+    talukaName: row.talukaName || row.taluka || '',
+    district: row.district || "",
+    districtName: row.districtName || row.district || '',
+    state: row.state || "",
+    stateName: row.stateName || row.state || '',
+    country: row.country || "",
+    countryName: row.countryName || row.country || '',
+    weight,
+    status: row.status || "Open",
+    rate: rate,
+    locationRate: num(row.locationRate),
+    totalAmount: weight * rate
+  };
+});
       
       orderPanel.plantRows = processedPlantRows;
       

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 /** =========================
@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
  ========================= */
 const PACK_TYPES = [
   { key: "PALLETIZATION", label: "Palletization" },
+  { key: "UNIFORM - BAGS/BOXES", label: "Uniform - Bags/Boxes" },
   { key: "LOOSE - CARGO", label: "Loose - Cargo" },
 ];
 
@@ -29,7 +30,7 @@ function num(v) {
 }
 
 /** =========================
- * DEFAULT EMPTY ROWS - UPDATED with null for ObjectId fields
+ * DEFAULT EMPTY ROWS
  ========================= */
 function defaultRow(packType) {
   if (packType === "PALLETIZATION") {
@@ -85,16 +86,18 @@ function defaultPlantRow() {
     plantCodeValue: "",
     orderType: "",
     pinCode: "",
-    from: null,  // Changed from "" to null
+    from: null,
     fromName: "",
-    to: null,    // Changed from "" to null
+    to: null,
     toName: "",
-    country: "",
-    countryName: "",
-    state: "",
-    stateName: "",
+    taluka: "",
+    talukaName: "",
     district: "",
     districtName: "",
+    state: "",
+    stateName: "",
+    country: "",
+    countryName: "",
     weight: "",
     status: "",
   };
@@ -135,13 +138,15 @@ function useCustomerSearch() {
   return { customers, loading, error, searchCustomers };
 }
 
+
 /** =========================
- * External Pincode API Hook
+ * External Pincode API Hook with Multiple Cities Support
  ========================= */
 function useExternalPincodeAPI() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [pincodeData, setPincodeData] = useState(null);
+  const [multipleCities, setMultipleCities] = useState([]);
 
   const fetchPincodeDetails = async (pincode) => {
     if (!pincode || pincode.length !== 6) {
@@ -150,28 +155,64 @@ function useExternalPincodeAPI() {
 
     setLoading(true);
     setError(null);
+    setMultipleCities([]);
     
     try {
       const response = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
       const data = await response.json();
       
       if (data && data[0] && data[0].Status === "Success" && data[0].PostOffice && data[0].PostOffice.length > 0) {
-        const postOffice = data[0].PostOffice[0];
+        const postOffices = data[0].PostOffice;
+        
+        const uniqueLocations = [];
+        const seen = new Set();
+        
+        postOffices.forEach(po => {
+          const cityName = po.Name;
+          const key = `${po.Name}-${po.District}-${po.State}`;
+          
+          if (!seen.has(key)) {
+            seen.add(key);
+            uniqueLocations.push({
+              taluka: po.Block || po.Taluk || po.District,
+              talukaName: po.Block || po.Taluk || po.District,
+              district: po.District,
+              districtName: po.District,
+              state: po.State,
+              stateName: po.State,
+              country: po.Country,
+              countryName: po.Country,
+              city: cityName,
+              cityName: cityName,
+              pincode: pincode,
+              postOffice: po.Name,
+              block: po.Block,
+              division: po.Division
+            });
+          }
+        });
+        
+        if (uniqueLocations.length > 1) {
+          setMultipleCities(uniqueLocations);
+        }
+        
+        const firstLocation = uniqueLocations[0];
         const result = {
-          to: postOffice.Name,
-          toName: postOffice.Name,
-          country: postOffice.Country,
-          countryName: postOffice.Country,
-          state: postOffice.State,
-          stateName: postOffice.State,
-          district: postOffice.District,
-          districtName: postOffice.District,
-          circle: postOffice.Circle,
-          division: postOffice.Division,
-          region: postOffice.Region,
-          block: postOffice.Block,
-          pincode: pincode
+          taluka: firstLocation.taluka,
+          talukaName: firstLocation.talukaName,
+          district: firstLocation.district,
+          districtName: firstLocation.districtName,
+          state: firstLocation.state,
+          stateName: firstLocation.stateName,
+          country: firstLocation.country,
+          countryName: firstLocation.countryName,
+          city: firstLocation.city,
+          cityName: firstLocation.cityName,
+          pincode: pincode,
+          hasMultiple: uniqueLocations.length > 1,
+          allLocations: uniqueLocations
         };
+        
         setPincodeData(result);
         return result;
       } else {
@@ -187,7 +228,7 @@ function useExternalPincodeAPI() {
     }
   };
 
-  return { loading, error, pincodeData, fetchPincodeDetails };
+  return { loading, error, pincodeData, multipleCities, fetchPincodeDetails };
 }
 
 export default function CreateOrderPanel() {
@@ -206,7 +247,8 @@ export default function CreateOrderPanel() {
   const [saveError, setSaveError] = useState(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [orderNumber, setOrderNumber] = useState("");
-
+const [locations, setLocations] = useState([]);
+const [pkgTypes, setPkgTypes] = useState([]);
   /** =========================
    * CUSTOMER SEARCH STATE
    ========================= */
@@ -221,7 +263,30 @@ export default function CreateOrderPanel() {
    ========================= */
   const pincodeAPI = useExternalPincodeAPI();
   const [pincodeInput, setPincodeInput] = useState({});
+  const [showCityDropdown, setShowCityDropdown] = useState({});
+  const [cityOptionsByRow, setCityOptionsByRow] = useState({});
 
+  /** =========================
+   * CHARGES VISIBILITY STATE
+   ========================= */
+  const [showCharges, setShowCharges] = useState(false);
+const fetchLocations = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    const res = await fetch('/api/locations', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    if (data.success && Array.isArray(data.data)) {
+      setLocations(data.data);
+    } else {
+      setLocations([]);
+    }
+  } catch (error) {
+    console.error('Error fetching locations:', error.message);
+    setLocations([]);
+  }
+};
   /** =========================
    * HEADER - EMPTY INITIAL STATE
    ========================= */
@@ -242,17 +307,32 @@ export default function CreateOrderPanel() {
     customerName: "",
     contactPerson: "",
   });
-
+const fetchPkgTypes = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    const res = await fetch('/api/pkg-types', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    if (data.success && Array.isArray(data.data)) {
+      setPkgTypes(data.data);
+    } else {
+      setPkgTypes([]);
+    }
+  } catch (error) {
+    console.error('Error fetching PKG types:', error.message);
+    setPkgTypes([]);
+  }
+};
   /** =========================
-   * PLANT GRID TABLE DATA - EMPTY INITIAL
+   * PLANT GRID TABLE DATA
    ========================= */
   const [plantRows, setPlantRows] = useState([defaultPlantRow()]);
 
   /** =========================
-   * PACK DATA - EMPTY INITIAL
+   * PACK DATA
    ========================= */
   const [activePack, setActivePack] = useState("PALLETIZATION");
-  const [showUniformSection, setShowUniformSection] = useState(false);
   const [packData, setPackData] = useState({
     PALLETIZATION: [defaultRow("PALLETIZATION")],
     "UNIFORM - BAGS/BOXES": [defaultRow("UNIFORM - BAGS/BOXES")],
@@ -266,6 +346,8 @@ export default function CreateOrderPanel() {
     fetchBranches();
     fetchCountries();
     fetchPlants();
+	 fetchLocations();
+	 fetchPkgTypes();
   }, []);
 
   const fetchBranches = async () => {
@@ -319,52 +401,6 @@ export default function CreateOrderPanel() {
     } catch (error) {
       console.error('Error fetching plants:', error.message);
       setPlants([]);
-    }
-  };
-
-  const fetchStates = async (countryCode) => {
-    if (!countryCode) {
-      setStates([]);
-      return;
-    }
-    
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/states?country=${countryCode}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        setStates(data.data);
-      } else {
-        setStates([]);
-      }
-    } catch (error) {
-      console.error('Error fetching states:', error.message);
-      setStates([]);
-    }
-  };
-
-  const fetchDistricts = async (stateId) => {
-    if (!stateId) {
-      setDistricts([]);
-      return;
-    }
-    
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/districts?state=${stateId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        setDistricts(data.data);
-      } else {
-        setDistricts([]);
-      }
-    } catch (error) {
-      console.error('Error fetching districts:', error.message);
-      setDistricts([]);
     }
   };
 
@@ -473,37 +509,55 @@ export default function CreateOrderPanel() {
   };
 
   /** =========================
-   * PINCODE API INTEGRATION - FIXED
-   * When user enters pincode, fetch from external API and auto-fill fields
+   * PINCODE API INTEGRATION with Multiple Cities Support - FIXED
    ========================= */
-  const handlePincodeChange = async (rowId, pincode) => {
-    // Update pincode field
-    updatePlantRow(rowId, 'pinCode', pincode);
+ const handlePincodeChange = async (rowId, pincode) => {
+  updatePlantRow(rowId, 'pinCode', pincode);
+  setPincodeInput(prev => ({ ...prev, [rowId]: pincode }));
+  
+  if (pincode && pincode.length === 6) {
+    const result = await pincodeAPI.fetchPincodeDetails(pincode);
     
-    // Store input value for tracking
-    setPincodeInput(prev => ({ ...prev, [rowId]: pincode }));
-    
-    // Only fetch if pincode is 6 digits
-    if (pincode && pincode.length === 6) {
-      const result = await pincodeAPI.fetchPincodeDetails(pincode);
-      
-      if (result) {
-        // Store city name in toName field
-        updatePlantRow(rowId, 'toName', result.toName);
-        // IMPORTANT: Set to to null (not empty string) when using pincode city
-        updatePlantRow(rowId, 'to', null);
-        
-        // Store country, state, district names and codes
-        updatePlantRow(rowId, 'countryName', result.countryName);
-        updatePlantRow(rowId, 'country', result.country);
-        
-        updatePlantRow(rowId, 'stateName', result.stateName);
-        updatePlantRow(rowId, 'state', result.state);
-        
-        updatePlantRow(rowId, 'districtName', result.districtName);
+    if (result) {
+      if (result.hasMultiple && result.allLocations && result.allLocations.length > 0) {
+        // Store the cities for this specific row
+        setCityOptionsByRow(prev => ({ 
+          ...prev, 
+          [rowId]: result.allLocations 
+        }));
+        // Also show a message that cities are available
+        console.log(`✅ ${result.allLocations.length} locations found for pincode ${pincode}`);
+      } else {
+        setCityOptionsByRow(prev => ({ ...prev, [rowId]: [] }));
+        // Auto-fill with single location
+        updatePlantRow(rowId, 'taluka', result.taluka);
+        updatePlantRow(rowId, 'talukaName', result.talukaName);
         updatePlantRow(rowId, 'district', result.district);
+        updatePlantRow(rowId, 'districtName', result.districtName);
+        updatePlantRow(rowId, 'state', result.state);
+        updatePlantRow(rowId, 'stateName', result.stateName);
+        updatePlantRow(rowId, 'country', result.country);
+        updatePlantRow(rowId, 'countryName', result.countryName);
+        updatePlantRow(rowId, 'toName', result.cityName);
+        updatePlantRow(rowId, 'to', null);
       }
     }
+  } else {
+    setCityOptionsByRow(prev => ({ ...prev, [rowId]: [] }));
+  }
+};
+  const handleSelectCity = (rowId, location) => {
+    updatePlantRow(rowId, 'taluka', location.taluka);
+    updatePlantRow(rowId, 'talukaName', location.talukaName);
+    updatePlantRow(rowId, 'district', location.district);
+    updatePlantRow(rowId, 'districtName', location.districtName);
+    updatePlantRow(rowId, 'state', location.state);
+    updatePlantRow(rowId, 'stateName', location.stateName);
+    updatePlantRow(rowId, 'country', location.country);
+    updatePlantRow(rowId, 'countryName', location.countryName);
+    updatePlantRow(rowId, 'toName', location.cityName);
+    updatePlantRow(rowId, 'to', null);
+    setShowCityDropdown(prev => ({ ...prev, [rowId]: false }));
   };
 
   /** =========================
@@ -526,12 +580,10 @@ export default function CreateOrderPanel() {
   };
 
   /** =========================
-   * PACK DATA FUNCTIONS - UPDATED WITH FORMULAS FOR ALL PACK TYPES
+   * PACK DATA FUNCTIONS
    ========================= */
   const rows = packData[activePack] || [];
-  const uniformRows = packData["UNIFORM - BAGS/BOXES"] || [];
 
-  // Helper function to recalculate weights for PALLETIZATION
   const recalculatePalletizationWeights = (row) => {
     const noOfPallets = num(row.noOfPallets);
     const unitPerPallets = num(row.unitPerPallets);
@@ -539,7 +591,6 @@ export default function CreateOrderPanel() {
     const packWeight = num(row.packWeight);
     const uom = (row.uom || "").toUpperCase();
     
-    // Calculate TOTAL PKGS if we have noOfPallets and unitPerPallets
     if (noOfPallets > 0 && unitPerPallets > 0) {
       const calculatedTotalPkgs = noOfPallets * unitPerPallets;
       row.totalPkgs = calculatedTotalPkgs > 0 ? String(calculatedTotalPkgs) : "";
@@ -547,24 +598,17 @@ export default function CreateOrderPanel() {
     
     const currentTotalPkgs = num(row.totalPkgs);
     
-    // Calculate based on UOM
     if (currentTotalPkgs > 0 && packWeight > 0) {
       if (uom === "LTR" || uom === "L") {
-        // For LTR: WT (LTR) = TOTAL PKGS * PACK-WEIGHT
         const wtLtr = currentTotalPkgs * packWeight;
         row.wtLtr = wtLtr > 0 ? String(wtLtr.toFixed(2)) : "";
-        
-        // ACTUAL WT = WT (LTR) / 1000
         const actualWt = wtLtr / 1000;
         row.actualWt = actualWt > 0 ? String(actualWt.toFixed(3)) : "";
       } else if (uom === "KG" || uom === "KGS") {
-        // For KG: ACTUAL WT = TOTAL PKGS * PACK-WEIGHT / 1000
         const actualWt = (currentTotalPkgs * packWeight) / 1000;
         row.actualWt = actualWt > 0 ? String(actualWt.toFixed(3)) : "";
-        // WT LTR is not applicable for KG
         row.wtLtr = "";
       } else {
-        // For other UOMs
         row.wtLtr = "";
         row.actualWt = "";
       }
@@ -573,50 +617,31 @@ export default function CreateOrderPanel() {
     return row;
   };
 
-  // Helper function to recalculate weights for UNIFORM - BAGS/BOXES
   const recalculateUniformWeights = (row) => {
-    const totalPkgs = num(row.totalPkgs);
-    const packWeight = num(row.packWeight);
-    const uom = (row.uom || "").toUpperCase();
-    
-    if (totalPkgs > 0 && packWeight > 0) {
-      if (uom === "LTR" || uom === "L") {
-        // For LTR: WT (LTR) = TOTAL PKGS * PACK-WEIGHT
-        const wtLtr = totalPkgs * packWeight;
-        row.wtLtr = wtLtr > 0 ? String(wtLtr.toFixed(2)) : "";
-        
-        // ACTUAL WT = WT (LTR) / 1000
-        const actualWt = wtLtr / 1000;
-        row.actualWt = actualWt > 0 ? String(actualWt.toFixed(3)) : "";
-      } else if (uom === "KG" || uom === "KGS") {
-        // For KG: ACTUAL WT = TOTAL PKGS * PACK-WEIGHT / 1000
-        const actualWt = (totalPkgs * packWeight) / 1000;
-        row.actualWt = actualWt > 0 ? String(actualWt.toFixed(3)) : "";
-        // WT LTR is not applicable for KG
-        row.wtLtr = "";
-      } else {
-        // For other UOMs
-        row.wtLtr = "";
-        row.actualWt = "";
-      }
+  const totalPkgs = num(row.totalPkgs);
+  const packWeight = num(row.packWeight);
+  const uom = (row.uom || "").toUpperCase();
+  
+  if (totalPkgs > 0 && packWeight > 0) {
+    if (uom === "LTR" || uom === "L") {
+      const wtLtr = totalPkgs * packWeight;
+      row.wtLtr = wtLtr > 0 ? String(wtLtr.toFixed(2)) : "";
+      let actualWt = wtLtr / 1000;
+      // Multiply by 2 for LTR/L
+      actualWt = actualWt * 2;
+      row.actualWt = actualWt > 0 ? String(actualWt.toFixed(3)) : "";
+    } else if (uom === "KG" || uom === "KGS") {
+      const actualWt = (totalPkgs * packWeight) / 1000;
+      row.actualWt = actualWt > 0 ? String(actualWt.toFixed(3)) : "";
+      row.wtLtr = "";
+    } else {
+      row.wtLtr = "";
+      row.actualWt = "";
     }
-    
-    return row;
-  };
-
-  // Helper function to recalculate weights for LOOSE - CARGO
-  const recalculateLooseWeights = (row) => {
-    const uom = (row.uom || "").toUpperCase();
-    const actualWt = num(row.actualWt);
-    
-    // For LOOSE - CARGO, we don't auto-calculate anything
-    // Just ensure numbers are formatted properly
-    if (actualWt > 0) {
-      row.actualWt = String(actualWt);
-    }
-    
-    return row;
-  };
+  }
+  
+  return row;
+};
 
   const updatePackRow = (rowId, key, value, packType = activePack) => {
     setPackData((prev) => {
@@ -624,13 +649,10 @@ export default function CreateOrderPanel() {
         if (r._id === rowId) {
           const updatedRow = { ...r, [key]: value };
           
-          // Apply appropriate calculations based on pack type
           if (packType === "PALLETIZATION") {
             return recalculatePalletizationWeights(updatedRow);
           } else if (packType === "UNIFORM - BAGS/BOXES") {
             return recalculateUniformWeights(updatedRow);
-          } else if (packType === "LOOSE - CARGO") {
-            return recalculateLooseWeights(updatedRow);
           }
           
           return updatedRow;
@@ -648,12 +670,6 @@ export default function CreateOrderPanel() {
   const addRow = (packType = activePack) => {
     setPackData((prev) => {
       const updatedPack = [...prev[packType], defaultRow(packType)];
-      
-      // If adding to UNIFORM - BAGS/BOXES, update visibility
-      if (packType === "UNIFORM - BAGS/BOXES") {
-        setShowUniformSection(updatedPack.length > 0);
-      }
-      
       return {
         ...prev,
         [packType]: updatedPack,
@@ -666,12 +682,6 @@ export default function CreateOrderPanel() {
     if (currentRows.length > 1) {
       setPackData((prev) => {
         const updatedPack = prev[packType].filter((r) => r._id !== id);
-        
-        // If removing from UNIFORM - BAGS/BOXES, update visibility
-        if (packType === "UNIFORM - BAGS/BOXES") {
-          setShowUniformSection(updatedPack.length > 0);
-        }
-        
         return {
           ...prev,
           [packType]: updatedPack,
@@ -687,12 +697,6 @@ export default function CreateOrderPanel() {
     if (!row) return;
     setPackData((prev) => {
       const updatedPack = [...prev[packType], { ...row, _id: uid() }];
-      
-      // If duplicating in UNIFORM - BAGS/BOXES, update visibility
-      if (packType === "UNIFORM - BAGS/BOXES") {
-        setShowUniformSection(updatedPack.length > 0);
-      }
-      
       return {
         ...prev,
         [packType]: updatedPack,
@@ -701,85 +705,14 @@ export default function CreateOrderPanel() {
   };
 
   /** =========================
-   * TOGGLE UNIFORM MODE FOR PALLETIZATION
-   * When checked, adds a corresponding row to UNIFORM - BAGS/BOXES
-   * When unchecked, removes the corresponding row
-   ========================= */
-  const toggleUniformMode = (rowId) => {
-    setPackData((prev) => {
-      // Find the palletization row being toggled
-      const palletRow = prev.PALLETIZATION.find(r => r._id === rowId);
-      if (!palletRow) return prev;
-      
-      const newIsUniform = !palletRow.isUniform;
-      
-      // Update the palletization row
-      const updatedPalletRows = prev.PALLETIZATION.map((r) => {
-        if (r._id === rowId) {
-          return { ...r, isUniform: newIsUniform };
-        }
-        return r;
-      });
-      
-      let updatedUniformRows = [...prev["UNIFORM - BAGS/BOXES"]];
-      
-      if (newIsUniform) {
-        // Add a new uniform row based on palletization data with calculated values
-        const newUniformRow = {
-          _id: uid(),
-          totalPkgs: palletRow.totalPkgs || "",
-          pkgsType: palletRow.pkgsType || "",
-          uom: palletRow.uom || "",
-          skuSize: palletRow.skuSize || "",
-          packWeight: palletRow.packWeight || "",
-          productName: palletRow.productName || "",
-          wtLtr: palletRow.wtLtr || "",
-          actualWt: palletRow.actualWt || "",
-          chargedWt: palletRow.chargedWt || "",
-          wtUom: palletRow.wtUom || "",
-        };
-        
-        // Apply uniform calculations to the new row
-        const calculatedRow = recalculateUniformWeights(newUniformRow);
-        updatedUniformRows = [...updatedUniformRows, calculatedRow];
-      } else {
-        // Remove the corresponding uniform row (based on matching data)
-        const matchingIndex = updatedUniformRows.findIndex(u => 
-          u.totalPkgs === palletRow.totalPkgs &&
-          u.pkgsType === palletRow.pkgsType &&
-          u.uom === palletRow.uom &&
-          u.skuSize === palletRow.skuSize &&
-          u.packWeight === palletRow.packWeight &&
-          u.productName === palletRow.productName
-        );
-        
-        if (matchingIndex !== -1) {
-          updatedUniformRows.splice(matchingIndex, 1);
-        }
-      }
-      
-      // Update the visibility state based on whether there are any uniform rows
-      setShowUniformSection(updatedUniformRows.length > 0);
-      
-      return {
-        ...prev,
-        PALLETIZATION: updatedPalletRows,
-        "UNIFORM - BAGS/BOXES": updatedUniformRows,
-      };
-    });
-  };
-
-  /** =========================
    * SAVE ORDER FUNCTION
    ========================= */
   const handleSave = async () => {
-    // Validation
     if (!top.branch) {
       alert("Please select a branch");
       return;
     }
     
-    // Validate plant rows
     const hasInvalidPlantRows = plantRows.some(row => !row.plantCode);
     if (hasInvalidPlantRows) {
       alert("Please select plant for all plant rows");
@@ -796,29 +729,21 @@ export default function CreateOrderPanel() {
         throw new Error("No authentication token found. Please login again.");
       }
       
-      // Prepare payload
       const payload = {
-        // Header info
         branch: top.branch,
         branchName: top.branchName,
         branchCode: top.branchCode,
         delivery: top.delivery,
         date: top.date,
-        
-        // Customer info
         customerId: selectedCustomer?._id || null,
         customerCode: selectedCustomer?.customerCode || '',
         customerName: selectedCustomer?.customerName || '',
         contactPerson: selectedCustomer?.contactPersonName || '',
         partyName: selectedCustomer?.customerName || top.partyName || '',
-        
-        // Charges
         collectionCharges: num(top.collectionCharges) || 0,
         cancellationCharges: top.cancellationCharges || 'Nil',
         loadingCharges: top.loadingCharges || 'Nil',
         otherCharges: num(top.otherCharges) || 0,
-        
-        // Plant rows
         plantRows: plantRows.map(row => ({
           plantCode: row.plantCode || '',
           plantName: row.plantName || '',
@@ -829,19 +754,19 @@ export default function CreateOrderPanel() {
           fromName: row.fromName || "",
           to: row.to || null,
           toName: row.toName || "",
-          country: row.country || "",
-          countryName: row.countryName || "",
-          state: row.state || "",
-          stateName: row.stateName || "",
+          taluka: row.taluka || "",
+          talukaName: row.talukaName || "",
           district: row.district || "",
           districtName: row.districtName || "",
+          state: row.state || "",
+          stateName: row.stateName || "",
+          country: row.country || "",
+          countryName: row.countryName || "",
           weight: num(row.weight) || 0,
           status: row.status || "Open",
           rate: 0,
           locationRate: 0
         })),
-        
-        // Pack data
         packData: {
           PALLETIZATION: packData.PALLETIZATION.map(row => ({
             noOfPallets: num(row.noOfPallets),
@@ -877,17 +802,13 @@ export default function CreateOrderPanel() {
             chargedWt: num(row.chargedWt)
           }))
         },
-        
-        // Send reference data arrays for name resolution
         branches: branches,
         plants: plants,
         countries: countries,
         states: states,
         districts: districts
       };
-
-      console.log("Sending payload:", JSON.stringify(payload, null, 2));
-
+      
       const res = await fetch('/api/order-panel', {
         method: 'POST',
         headers: {
@@ -898,7 +819,6 @@ export default function CreateOrderPanel() {
       });
 
       const data = await res.json();
-      console.log("Response:", data);
 
       if (!res.ok) {
         throw new Error(data.message || `Failed to save order: ${res.status}`);
@@ -955,18 +875,13 @@ export default function CreateOrderPanel() {
     setCustomerSearchQuery("");
     setFilteredCustomers([]);
     setPincodeInput({});
+    setShowCityDropdown({});
+    setCityOptionsByRow({});
+    setShowCharges(false);
     
     setActivePack("PALLETIZATION");
-    setShowUniformSection(false);
     
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  /** =========================
-   * CREATE CUSTOMER FUNCTION
-   ========================= */
-  const handleCreateCustomer = () => {
-    router.push('/admin/customer2');
   };
 
   return (
@@ -1025,9 +940,9 @@ export default function CreateOrderPanel() {
         </div>
       </div>
 
-      {/* ===== Main Layout - Full Width ===== */}
+      {/* ===== Main Layout ===== */}
       <div className="mx-auto max-w-full p-4">
-        {/* Header info - Full Width */}
+        {/* Header info */}
         <Card title="Order Details">
           <div className="grid grid-cols-12 gap-3">
             <div className="col-span-12 md:col-span-4">
@@ -1037,7 +952,6 @@ export default function CreateOrderPanel() {
               </div>
             </div>
             
-            {/* Branch Dropdown - Searchable with Create Button */}
             <div className="col-span-12 md:col-span-4 relative">
               <label className="text-xs font-bold text-slate-600">Branch *</label>
               <div className="flex items-center gap-2">
@@ -1078,7 +992,6 @@ export default function CreateOrderPanel() {
               onChange={(v) => setTop((p) => ({ ...p, date: v }))}
             />
             
-            {/* Customer Search - Party Name Field with Create Button */}
             <div className="col-span-12 md:col-span-8 relative">
               <label className="text-xs font-bold text-slate-600">Party Name *</label>
               <div className="flex items-center gap-2">
@@ -1093,7 +1006,6 @@ export default function CreateOrderPanel() {
                     placeholder="Search customer by name... *"
                   />
                   
-                  {/* Customer Search Dropdown */}
                   {showCustomerDropdown && (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
                       {customerSearch.loading ? (
@@ -1131,73 +1043,88 @@ export default function CreateOrderPanel() {
               </div>
             </div>
 
-            <Input
-              col="col-span-6 md:col-span-3"
-              label="Collection Charges"
-              value={top.collectionCharges}
-              onChange={(v) =>
-                setTop((p) => ({ ...p, collectionCharges: v }))
-              }
-              type="number"
-            />
-            <Input
-              col="col-span-6 md:col-span-3"
-              label="Cancellation Charges"
-              value={top.cancellationCharges}
-              onChange={(v) =>
-                setTop((p) => ({ ...p, cancellationCharges: v }))
-              }
-            />
-			
-            <Input
-              col="col-span-6 md:col-span-3"
-              label="Loading Charges"
-              value={top.loadingCharges}
-              onChange={(v) => setTop((p) => ({ ...p, loadingCharges: v }))}
-            />
-            <Input
-              col="col-span-6 md:col-span-3"
-              label="Other Charges"
-              value={top.otherCharges}
-              onChange={(v) => setTop((p) => ({ ...p, otherCharges: v }))}
-              type="number"
-            />
+            {/* Charges Fields - Conditionally Visible */}
+            {showCharges && (
+              <>
+                <Input
+                  col="col-span-6 md:col-span-3"
+                  label="Collection Charges"
+                  value={top.collectionCharges}
+                  onChange={(v) =>
+                    setTop((p) => ({ ...p, collectionCharges: v }))
+                  }
+                  type="number"
+                />
+                <Input
+                  col="col-span-6 md:col-span-3"
+                  label="Cancellation Charges"
+                  value={top.cancellationCharges}
+                  onChange={(v) =>
+                    setTop((p) => ({ ...p, cancellationCharges: v }))
+                  }
+                />
+                <Input
+                  col="col-span-6 md:col-span-3"
+                  label="Loading Charges"
+                  value={top.loadingCharges}
+                  onChange={(v) => setTop((p) => ({ ...p, loadingCharges: v }))}
+                />
+                <Input
+                  col="col-span-6 md:col-span-3"
+                  label="Other Charges"
+                  value={top.otherCharges}
+                  onChange={(v) => setTop((p) => ({ ...p, otherCharges: v }))}
+                  type="number"
+                />
+              </>
+            )}
           </div>
         </Card>
 
         <div className="mt-4">
-          {/* Plant Code / Route Section */}
-          <Card title="Plant Code / Route">
-            <div className="mb-4 flex justify-between items-center">
-              <div className="text-sm text-slate-600">
-                Manage plant routes and distribution - Enter pincode to auto-fill location fields
-              </div>
-              <button
-                onClick={addPlantRow}
-                className="rounded-xl bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-700 transition"
-              >
-                + Add Row
-              </button>
-            </div>
-            <PlantGridTable
-              rows={plantRows}
-              onChange={updatePlantRow}
-              onRemove={removePlantRow}
-              onPlantChange={handlePlantChange}
-              onPincodeChange={handlePincodeChange}
-              plants={plants}
-              countries={countries}
-              states={states}
-              districts={districts}
-              branches={branches}
-              pincodeAPI={pincodeAPI}
-              pincodeInput={pincodeInput}
-            />
-          </Card>
-
+        <Card title="Plant Code / Route">
+  <div className="mb-4 flex justify-between items-center">
+    <div className="text-sm text-slate-600">
+      Manage plant routes and distribution - Enter pincode to auto-fill location fields
+    </div>
+    <div className="flex gap-2">
+      <button
+        onClick={() => setShowCharges(!showCharges)}
+        className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+          showCharges 
+            ? 'bg-blue-600 text-white hover:bg-blue-700' 
+            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+        }`}
+      >
+        {showCharges ? 'Hide Charges' : 'Charges'}
+      </button>
+      <button
+        onClick={addPlantRow}
+        className="rounded-xl bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-700 transition"
+      >
+        + Add Row
+      </button>
+    </div>
+  </div>
+  <PlantGridTable
+    rows={plantRows}
+    onChange={updatePlantRow}
+    onRemove={removePlantRow}
+    onPlantChange={handlePlantChange}
+    onPincodeChange={handlePincodeChange}
+    onSelectCity={handleSelectCity}
+    plants={plants}
+    branches={branches}
+    locations={locations} // Add this line
+    pincodeAPI={pincodeAPI}
+    pincodeInput={pincodeInput}
+    showCityDropdown={showCityDropdown}
+    setShowCityDropdown={setShowCityDropdown}
+    cityOptionsByRow={cityOptionsByRow}
+  />
+</Card>
           {/* PACK TYPE SECTIONS */}
           <div className="mt-4 space-y-6">
-            {/* First Card: PALLETIZATION and LOOSE - CARGO with Dropdown */}
             <Card title="Pack Type">
               <div className="mb-4 flex justify-between items-center">
                 <div className="flex items-center gap-3">
@@ -1218,47 +1145,20 @@ export default function CreateOrderPanel() {
                   onClick={() => addRow(activePack)}
                   className="rounded-xl bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-700 transition"
                 >
-                  + Add Row to {activePack === "PALLETIZATION" ? "Palletization" : "Loose Cargo"}
+                  + Add Row
                 </button>
               </div>
               
-              {/* Pack Type Form Table */}
               <PackTypeTable
                 packType={activePack}
                 rows={rows}
                 onChange={(rowId, key, value) => updatePackRow(rowId, key, value, activePack)}
                 onRemove={(id) => removeRow(activePack, id)}
                 onDuplicate={(id) => duplicateRow(activePack, id)}
-                onToggleUniform={toggleUniformMode}
+				 pkgTypes={pkgTypes}
+  onNavigateToCreate={() => router.push('/admin/pkg-type?returnUrl=/admin/order-panel/create')}
               />
             </Card>
-
-            {/* Second Card: UNIFORM - BAGS/BOXES (Only visible when showUniformSection is true) */}
-            {showUniformSection && (
-              <Card title="UNIFORM - BAGS / BOXES">
-                <div className="mb-4 flex justify-between items-center">
-                  <div className="text-sm text-slate-600">
-                    Manage uniform bags and boxes packaging (Auto-populated from checked Palletization rows)
-                  </div>
-                  <button
-                    onClick={() => addRow("UNIFORM - BAGS/BOXES")}
-                    className="rounded-xl bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-700 transition"
-                  >
-                    + Add Row to Uniform Bags/Boxes
-                  </button>
-                </div>
-                
-                {/* Uniform Bags/Boxes Table */}
-                <PackTypeTable
-                  packType="UNIFORM - BAGS/BOXES"
-                  rows={uniformRows}
-                  onChange={(rowId, key, value) => updatePackRow(rowId, key, value, "UNIFORM - BAGS/BOXES")}
-                  onRemove={(id) => removeRow("UNIFORM - BAGS/BOXES", id)}
-                  onDuplicate={(id) => duplicateRow("UNIFORM - BAGS/BOXES", id)}
-                  onToggleUniform={toggleUniformMode}
-                />
-              </Card>
-            )}
           </div>
         </div>
       </div>
@@ -1320,9 +1220,6 @@ function Select({ label, value, onChange, options = [], col = "" }) {
 /** =========================
  * Searchable Dropdown Component
  ========================= */
-/** =========================
- * Searchable Dropdown Component - FIXED for better z-index
- ========================= */
 function SearchableDropdown({ 
   items, 
   selectedId, 
@@ -1353,11 +1250,10 @@ function SearchableDropdown({
       setSelectedItem(null);
       setSearchQuery("");
     }
-  }, [items, selectedId, displayField]);
+  }, [items, selectedId]);
 
   const getDisplayValue = (item) => {
     if (!item) return "";
-    if (displayField === 'customerName') return item.customerName || "";
     const display = item[displayField] || "";
     const code = item[codeField] ? `(${item[codeField]})` : "";
     return `${display} ${code}`.trim();
@@ -1371,8 +1267,7 @@ function SearchableDropdown({
     } else {
       const filtered = items.filter(item =>
         (item[displayField] && item[displayField].toLowerCase().includes(query.toLowerCase())) ||
-        (item[codeField] && item[codeField].toLowerCase().includes(query.toLowerCase())) ||
-        (item.customerName && item.customerName.toLowerCase().includes(query.toLowerCase()))
+        (item[codeField] && item[codeField].toLowerCase().includes(query.toLowerCase()))
       );
       setFilteredItems(filtered);
     }
@@ -1395,7 +1290,6 @@ function SearchableDropdown({
       setFilteredItems(items);
       setShowDropdown(true);
       
-      // Calculate position for fixed positioning
       if (inputRef.current) {
         const rect = inputRef.current.getBoundingClientRect();
         setDropdownPosition({
@@ -1418,7 +1312,6 @@ function SearchableDropdown({
     }, 200);
   };
 
-  // Update position on scroll
   useEffect(() => {
     const handleScroll = () => {
       if (showDropdown && inputRef.current) {
@@ -1478,7 +1371,7 @@ function SearchableDropdown({
                 }`}
               >
                 <div className="font-medium text-slate-800">
-                  {item[displayField] || item.customerName}
+                  {item[displayField]}
                 </div>
                 {item[codeField] && (
                   <div className="text-xs text-slate-500 mt-1">
@@ -1501,114 +1394,26 @@ function SearchableDropdown({
   );
 }
 
-/** =========================
- * Plant Grid Table Component with yellow header - FINAL CORRECTED
- ========================= */
 function PlantGridTable({ 
   rows, 
   onChange, 
   onRemove, 
   onPlantChange,
   onPincodeChange,
+  onSelectCity,
   plants,
-  countries,
-  states,
-  districts,
   branches,
+  locations, // Add this prop
   pincodeAPI,
-  pincodeInput
+  pincodeInput,
+  showCityDropdown,
+  setShowCityDropdown,
+  cityOptionsByRow
 }) {
-  const router = useRouter();
-  const [stateData, setStateData] = useState({});
-  const [districtData, setDistrictData] = useState({});
+  const [cityDropdownPosition, setCityDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+  const [activeCityRowId, setActiveCityRowId] = useState(null);
+  const inputRefs = useRef({});
 
-  const fetchStatesForCountry = async (countryCode) => {
-    if (!countryCode) return [];
-    
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/states?country=${countryCode}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        return data.data;
-      }
-      return [];
-    } catch (error) {
-      console.error('Error fetching states:', error.message);
-      return [];
-    }
-  };
-
-  const fetchDistrictsForState = async (stateId) => {
-    if (!stateId) return [];
-    
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/districts?state=${stateId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        return data.data;
-      }
-      return [];
-    } catch (error) {
-      console.error('Error fetching districts:', error.message);
-      return [];
-    }
-  };
-
-  const handleCountrySelect = async (rowId, country) => {
-    if (country) {
-      onChange(rowId, 'country', country.code);
-      onChange(rowId, 'countryName', country.name);
-      onChange(rowId, 'state', '');
-      onChange(rowId, 'stateName', '');
-      onChange(rowId, 'district', '');
-      onChange(rowId, 'districtName', '');
-      
-      const statesForCountry = await fetchStatesForCountry(country.code);
-      setStateData(prev => ({ ...prev, [country.code]: statesForCountry }));
-    } else {
-      onChange(rowId, 'country', '');
-      onChange(rowId, 'countryName', '');
-      onChange(rowId, 'state', '');
-      onChange(rowId, 'stateName', '');
-      onChange(rowId, 'district', '');
-      onChange(rowId, 'districtName', '');
-    }
-  };
-
-  const handleStateSelect = async (rowId, state) => {
-    if (state) {
-      onChange(rowId, 'state', state._id);
-      onChange(rowId, 'stateName', state.name);
-      onChange(rowId, 'district', '');
-      onChange(rowId, 'districtName', '');
-      
-      const districtsForState = await fetchDistrictsForState(state._id);
-      setDistrictData(prev => ({ ...prev, [state._id]: districtsForState }));
-    } else {
-      onChange(rowId, 'state', '');
-      onChange(rowId, 'stateName', '');
-      onChange(rowId, 'district', '');
-      onChange(rowId, 'districtName', '');
-    }
-  };
-
-  const handleDistrictSelect = (rowId, district) => {
-    if (district) {
-      onChange(rowId, 'district', district._id);
-      onChange(rowId, 'districtName', district.name);
-    } else {
-      onChange(rowId, 'district', '');
-      onChange(rowId, 'districtName', '');
-    }
-  };
-
-  // FIXED: handleBranchSelect now uses null instead of empty string
   const handleBranchSelect = (rowId, field, branch) => {
     if (branch) {
       onChange(rowId, field, branch._id);
@@ -1618,7 +1423,6 @@ function PlantGridTable({
         onChange(rowId, 'toName', branch.name);
       }
     } else {
-      // When branch is deselected, set to null instead of empty string
       onChange(rowId, field, null);
       if (field === 'from') {
         onChange(rowId, 'fromName', '');
@@ -1628,268 +1432,371 @@ function PlantGridTable({
     }
   };
 
-  const handleCreatePlant = () => {
-    router.push('/admin/plant2');
+  const handleLocationSelect = (rowId, field, location) => {
+    if (location) {
+      onChange(rowId, field, location._id);
+      if (field === 'from') {
+        onChange(rowId, 'fromName', location.name);
+      } else if (field === 'to') {
+        onChange(rowId, 'toName', location.name);
+      }
+    } else {
+      onChange(rowId, field, null);
+      if (field === 'from') {
+        onChange(rowId, 'fromName', '');
+      } else if (field === 'to') {
+        onChange(rowId, 'toName', '');
+      }
+    }
   };
 
-  // Define cols INSIDE the component - WITHOUT separate City column
+  const handleCityInputClick = (event, rowId) => {
+    const cityOptions = cityOptionsByRow[rowId];
+    if (cityOptions && cityOptions.length > 0) {
+      const rect = event.target.getBoundingClientRect();
+      setCityDropdownPosition({
+        top: rect.bottom + window.scrollY,
+        left: rect.left + window.scrollX,
+        width: rect.width
+      });
+      setActiveCityRowId(rowId);
+    }
+  };
+
   const cols = [
-    { key: "plantCode", label: "Plant Code *", type: "plant", data: plants },
-    { key: "plantName", label: "Plant Name", readOnly: true },
-    { key: "orderType", label: "Order Type", options: ORDER_TYPES },
-    { key: "pinCode", label: "Pin Code", type: "pincode" },
-    { key: "from", label: "From", type: "branch", data: branches },
-    { key: "to", label: "To", type: "branch", data: branches },
-    { key: "country", label: "Country", type: "country", data: countries },
-    { key: "state", label: "State", type: "state", data: [] },
-    { key: "district", label: "District", type: "district", data: [] },
-    { key: "weight", label: "Weight", type: "number" },
-    { key: "status", label: "Status", options: STATUSES },
+    { key: "plantCode", label: "Plant Code *", width: "200px" },
+    { key: "plantName", label: "Plant Name", width: "200px" },
+    { key: "orderType", label: "Order Type", width: "150px" },
+    { key: "pinCode", label: "Pin Code", width: "120px" },
+    { key: "from", label: "From", width: "200px" },
+    { key: "to", label: "To / City", width: "220px" },
+    { key: "taluka", label: "Taluka", width: "150px" },
+    { key: "district", label: "District", width: "150px" },
+    { key: "state", label: "State", width: "150px" },
+    { key: "country", label: "Country", width: "150px" },
+    { key: "weight", label: "Weight", width: "100px" },
+    { key: "status", label: "Status", width: "120px" },
   ];
 
-  return (
-    <div className="overflow-auto rounded-xl border border-yellow-300">
-      <table className="min-w-full w-full text-sm">
-        <thead className="sticky top-0 bg-yellow-400 z-10">
-          <tr>
-            {cols.map((c) => (
-              <th
-                key={c.key}
-                className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
-              >
-                {c.label}
-              </th>
-            ))}
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
-              Action
-            </th>
-          </tr>
-        </thead>
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (activeCityRowId && !event.target.closest('.city-dropdown-container') && !event.target.closest('.city-input-field')) {
+        setActiveCityRowId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [activeCityRowId]);
 
-        <tbody>
-          {rows.map((r) => {
-            const currentStates = stateData[r.country] || [];
-            const currentDistricts = districtData[r.state] || [];
-            const isPincodeLoading = pincodeAPI.loading && pincodeInput[r._id]?.length === 6;
-            
-            return (
-              <tr key={r._id} className="hover:bg-yellow-50 even:bg-slate-50">
-                {/* Plant Code */}
-                <td className="border border-yellow-300 px-2 py-2 relative">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                      <TableSearchableDropdown
-                        items={plants}
-                        selectedId={r.plantCode}
-                        onSelect={(plant) => {
-                          if (plant) {
-                            onPlantChange(r._id, plant._id);
-                          } else {
-                            onChange(r._id, 'plantCode', '');
-                            onChange(r._id, 'plantName', '');
-                            onChange(r._id, 'plantCodeValue', '');
+  // Update dropdown position on scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      if (activeCityRowId && inputRefs.current[activeCityRowId]) {
+        const rect = inputRefs.current[activeCityRowId].getBoundingClientRect();
+        setCityDropdownPosition({
+          top: rect.bottom + window.scrollY,
+          left: rect.left + window.scrollX,
+          width: rect.width
+        });
+      }
+    };
+    
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleScroll);
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, [activeCityRowId]);
+
+  return (
+    <>
+      <div className="rounded-xl border border-yellow-300 overflow-x-auto">
+        <table className="min-w-max w-full text-sm">
+          <thead className="sticky top-0 bg-yellow-400 z-10">
+            <tr>
+              {cols.map((c) => (
+                <th
+                  key={c.key}
+                  style={{ minWidth: c.width, width: c.width }}
+                  className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
+                >
+                  {c.label}
+                  {(c.key === "plantName" || c.key === "taluka" || c.key === "district" || c.key === "state" || c.key === "country") && 
+                    <span className="ml-1 text-xs text-blue-600">*Auto</span>
+                  }
+                </th>
+              ))}
+              <th style={{ minWidth: "100px", width: "100px" }} className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
+                Action
+              </th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {rows.map((r) => {
+              const isPincodeLoading = pincodeAPI.loading && pincodeInput[r._id]?.length === 6;
+              const cityOptions = cityOptionsByRow[r._id] || [];
+              const hasCities = cityOptions.length > 0;
+              
+              return (
+                <tr key={r._id} className="hover:bg-yellow-50 even:bg-slate-50">
+                  {/* Plant Code */}
+                  <td className="border border-yellow-300 px-2 py-2">
+                    <TableSearchableDropdown
+                      items={plants}
+                      selectedId={r.plantCode}
+                      onSelect={(plant) => {
+                        if (plant) {
+                          onPlantChange(r._id, plant._id);
+                        } else {
+                          onChange(r._id, 'plantCode', '');
+                          onChange(r._id, 'plantName', '');
+                          onChange(r._id, 'plantCodeValue', '');
+                        }
+                      }}
+                      placeholder="Search plant..."
+                      required={true}
+                      displayField="name"
+                      codeField="code"
+                    />
+                  </td>
+
+                  {/* Plant Name */}
+                  <td className="border border-yellow-300 px-2 py-2">
+                    <input
+                      type="text"
+                      value={r.plantName || ""}
+                      readOnly
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-sm outline-none"
+                      placeholder="Auto-filled"
+                    />
+                  </td>
+
+                  {/* Order Type */}
+                  <td className="border border-yellow-300 px-2 py-2">
+                    <select
+                      value={r.orderType || ""}
+                      onChange={(e) => onChange(r._id, 'orderType', e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                    >
+                      <option value="">Select Order Type</option>
+                      {ORDER_TYPES.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+
+                  {/* Pin Code */}
+                  <td className="border border-yellow-300 px-2 py-2">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={r.pinCode || ""}
+                        onChange={(e) => onPincodeChange(r._id, e.target.value)}
+                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                        placeholder="Enter 6-digit pincode"
+                        maxLength="6"
+                      />
+                      {isPincodeLoading && (
+                        <div className="absolute right-2 top-2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-sky-500"></div>
+                        </div>
+                      )}
+                    </div>
+                    {pincodeAPI.error && r.pinCode?.length === 6 && (
+                      <div className="text-xs text-red-500 mt-1">{pincodeAPI.error}</div>
+                    )}
+                  </td>
+
+                  {/* From - Now shows Location Master data */}
+                  <td className="border border-yellow-300 px-2 py-2">
+                    <TableSearchableDropdown
+                      items={locations}
+                      selectedId={r.from}
+                      onSelect={(location) => handleLocationSelect(r._id, 'from', location)}
+                      placeholder="Search location..."
+                      displayField="name"
+                      codeField="code"
+                    />
+                  </td>
+
+                  {/* To / City */}
+                  <td className="border border-yellow-300 px-2 py-2">
+                    <div className="relative city-dropdown-container">
+                      <input
+                        ref={el => inputRefs.current[r._id] = el}
+                        type="text"
+                        value={r.toName || ""}
+                        readOnly={hasCities}
+                        onChange={(e) => {
+                          if (!hasCities) {
+                            onChange(r._id, 'toName', e.target.value);
+                            onChange(r._id, 'to', null);
                           }
                         }}
-                        placeholder="Search plant... *"
-                        required={true}
-                        displayField="name"
-                        codeField="code"
-                        cellId={`plant-${r._id}`}
+                        onClick={(e) => {
+                          if (hasCities) {
+                            handleCityInputClick(e, r._id);
+                          }
+                        }}
+                        className={`city-input-field w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                          hasCities ? 'cursor-pointer bg-yellow-50 hover:bg-yellow-100' : ''
+                        }`}
+                        placeholder={hasCities ? "Click to select city/area" : "Enter city name"}
                       />
+                      {hasCities && (
+                        <div className="absolute right-2 top-2 text-gray-400 pointer-events-none">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      )}
                     </div>
-                    <button
-                      onClick={handleCreatePlant}
-                      className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 transition whitespace-nowrap"
-                      title="Create New Plant"
-                    >
-                      Create
-                    </button>
-                  </div>
-                </td>
-
-                {/* Plant Name */}
-                <td className="border border-yellow-300 px-2 py-2">
-                  <input
-                    type="text"
-                    value={r.plantName || ""}
-                    readOnly
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm outline-none"
-                    placeholder="Auto-filled from plant selection"
-                  />
-                </td>
-
-                {/* Order Type */}
-                <td className="border border-yellow-300 px-2 py-2">
-                  <select
-                    value={r.orderType || ""}
-                    onChange={(e) => onChange(r._id, 'orderType', e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                  >
-                    <option value="">Select Order Type</option>
-                    {ORDER_TYPES.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-
-                {/* Pin Code - Direct input with API integration */}
-                <td className="border border-yellow-300 px-2 py-2 relative">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={r.pinCode || ""}
-                      onChange={(e) => onPincodeChange(r._id, e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                      placeholder="Enter 6-digit pincode"
-                      maxLength="6"
-                    />
-                    {isPincodeLoading && (
-                      <div className="absolute right-2 top-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-sky-500"></div>
+                    {hasCities && cityOptions.length > 0 && (
+                      <div className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                        {/* City count indicator */}
                       </div>
                     )}
-                  </div>
-                  {pincodeAPI.error && r.pinCode?.length === 6 && (
-                    <div className="text-xs text-red-500 mt-1">{pincodeAPI.error}</div>
-                  )}
-                </td>
+                  </td>
 
-                {/* From Branch */}
-                <td className="border border-yellow-300 px-2 py-2 relative">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                      <TableSearchableDropdown
-                        items={branches}
-                        selectedId={r.from}
-                        onSelect={(branch) => handleBranchSelect(r._id, 'from', branch)}
-                        placeholder="Search branch..."
-                        displayField="name"
-                        codeField="code"
-                        cellId={`from-${r._id}`}
-                      />
-                    </div>
-                  </div>
-                </td>
-
-                {/* To Field - FIXED: Shows either selected branch OR city from pincode */}
-                <td className="border border-yellow-300 px-2 py-2 relative">
-                  {r.to ? (
-                    // If a branch is selected, show branch dropdown
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <TableSearchableDropdown
-                          items={branches}
-                          selectedId={r.to}
-                          onSelect={(branch) => handleBranchSelect(r._id, 'to', branch)}
-                          placeholder="Search branch..."
-                          displayField="name"
-                          codeField="code"
-                          cellId={`to-${r._id}`}
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    // If no branch selected, show city from pincode
+                  {/* Taluka */}
+                  <td className="border border-yellow-300 px-2 py-2">
                     <input
                       type="text"
-                      value={r.toName || ""}
-                      onChange={(e) => {
-                        // Update toName
-                        onChange(r._id, 'toName', e.target.value);
-                        // IMPORTANT: Set to to null when no branch is selected
-                        onChange(r._id, 'to', null);
-                      }}
-                      className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                      placeholder={r.toName ? r.toName : "Enter city name or select branch"}
+                      value={r.talukaName || r.taluka || ""}
+                      readOnly
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-sm outline-none"
+                      placeholder="Auto-filled"
                     />
-                  )}
-                </td>
+                  </td>
 
-                {/* Country - Auto-filled from pincode API */}
-                <td className="border border-yellow-300 px-2 py-2 relative">
-                  <input
-                    type="text"
-                    value={r.countryName || r.country || ""}
-                    readOnly
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm outline-none"
-                    placeholder="Auto-filled from pincode"
-                  />
-                </td>
+                  {/* District */}
+                  <td className="border border-yellow-300 px-2 py-2">
+                    <input
+                      type="text"
+                      value={r.districtName || r.district || ""}
+                      readOnly
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-sm outline-none"
+                      placeholder="Auto-filled"
+                    />
+                  </td>
 
-                {/* State - Auto-filled from pincode API */}
-                <td className="border border-yellow-300 px-2 py-2 relative">
-                  <input
-                    type="text"
-                    value={r.stateName || r.state || ""}
-                    readOnly
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm outline-none"
-                    placeholder="Auto-filled from pincode"
-                  />
-                </td>
+                  {/* State */}
+                  <td className="border border-yellow-300 px-2 py-2">
+                    <input
+                      type="text"
+                      value={r.stateName || r.state || ""}
+                      readOnly
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-sm outline-none"
+                      placeholder="Auto-filled"
+                    />
+                  </td>
 
-                {/* District - Auto-filled from pincode API */}
-                <td className="border border-yellow-300 px-2 py-2 relative">
-                  <input
-                    type="text"
-                    value={r.districtName || r.district || ""}
-                    readOnly
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm outline-none"
-                    placeholder="Auto-filled from pincode"
-                  />
-                </td>
+                  {/* Country */}
+                  <td className="border border-yellow-300 px-2 py-2">
+                    <input
+                      type="text"
+                      value={r.countryName || r.country || ""}
+                      readOnly
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-sm outline-none"
+                      placeholder="Auto-filled"
+                    />
+                  </td>
 
-                {/* Weight */}
-                <td className="border border-yellow-300 px-2 py-2">
-                  <input
-                    type="number"
-                    value={r.weight || ""}
-                    onChange={(e) => onChange(r._id, 'weight', e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                    placeholder="Enter Weight"
-                  />
-                </td>
+                  {/* Weight */}
+                  <td className="border border-yellow-300 px-2 py-2">
+                    <input
+                      type="number"
+                      value={r.weight || ""}
+                      onChange={(e) => onChange(r._id, 'weight', e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                      placeholder="Weight"
+                    />
+                  </td>
 
-                {/* Status */}
-                <td className="border border-yellow-300 px-2 py-2">
-                  <select
-                    value={r.status || ""}
-                    onChange={(e) => onChange(r._id, 'status', e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                  >
-                    <option value="">Select Status</option>
-                    {STATUSES.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
-                </td>
+                  {/* Status */}
+                  <td className="border border-yellow-300 px-2 py-2">
+                    <select
+                      value={r.status || ""}
+                      onChange={(e) => onChange(r._id, 'status', e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                    >
+                      <option value="">Select Status</option>
+                      {STATUSES.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
 
-                {/* Action */}
-                <td className="border border-yellow-300 px-2 py-2 text-center">
-                  <button
-                    onClick={() => onRemove(r._id)}
-                    className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-600 transition"
-                  >
-                    Remove
-                  </button>
+                  {/* Action */}
+                  <td className="border border-yellow-300 px-2 py-2 text-center">
+                    <button
+                      onClick={() => onRemove(r._id)}
+                      className="rounded-lg bg-red-500 px-3 py-2 text-xs font-bold text-white hover:bg-red-600 transition whitespace-nowrap"
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+            
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={cols.length + 1} className="border border-yellow-300 px-4 py-8 text-center text-slate-400">
+                  No plant routes added. Click "+ Add Row" to add a new route.
                 </td>
               </tr>
-            );
-          })}
-          
-          {rows.length === 0 && (
-            <tr>
-              <td colSpan={cols.length + 1} className="border border-yellow-300 px-4 py-8 text-center text-slate-400">
-                No plant routes added. Click "+ Add Row" to add a new route.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* City Dropdown - Portal style positioning */}
+      {activeCityRowId && cityOptionsByRow[activeCityRowId] && cityOptionsByRow[activeCityRowId].length > 0 && (
+        <div 
+          className="fixed z-[99999] bg-white border border-slate-200 rounded-lg shadow-xl overflow-y-auto"
+          style={{
+            position: 'fixed',
+            top: `${cityDropdownPosition.top}px`,
+            left: `${cityDropdownPosition.left}px`,
+            width: `${cityDropdownPosition.width}px`,
+            maxHeight: '300px',
+            minWidth: '200px'
+          }}
+        >
+          <div className="sticky top-0 bg-gray-50 px-3 py-2 text-xs font-semibold text-slate-600 border-b">
+            Select Area/City
+          </div>
+          {cityOptionsByRow[activeCityRowId].map((loc, idx) => (
+            <div
+              key={idx}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onSelectCity(activeCityRowId, loc);
+                setActiveCityRowId(null);
+              }}
+              className="px-3 py-2 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors"
+            >
+              <div className="font-medium text-slate-800 text-sm">
+                {loc.cityName}
+              </div>
+              <div className="text-xs text-slate-500 mt-0.5">
+                {loc.districtName}, {loc.stateName}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -1900,13 +1807,11 @@ function TableSearchableDropdown({
   items, 
   selectedId, 
   onSelect, 
-  onSearch,
   placeholder = "Search...",
   required = false,
   displayField = 'name',
   codeField = 'code',
   disabled = false,
-  cellId = "",
   loading = false,
   renderItem = null
 }) {
@@ -1917,11 +1822,22 @@ function TableSearchableDropdown({
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
+// Add this with other state declarations
+
+
+// Add this function with other fetch functions
+
+  const getDisplayValue = useCallback((item) => {
+    if (!item) return "";
+    const display = item[displayField] || "";
+    const code = item[codeField] ? `(${item[codeField]})` : "";
+    return `${display} ${code}`.trim();
+  }, [displayField, codeField]);
 
   useEffect(() => {
     setFilteredItems(items);
     if (selectedId) {
-      const item = items.find(i => i._id === selectedId || i.pincode === selectedId);
+      const item = items.find(i => i._id === selectedId);
       setSelectedItem(item);
       if (item) {
         setSearchQuery(getDisplayValue(item));
@@ -1930,40 +1846,22 @@ function TableSearchableDropdown({
       setSelectedItem(null);
       setSearchQuery("");
     }
-  }, [items, selectedId, displayField]);
-
-  const getDisplayValue = (item) => {
-    if (!item) return "";
-    if (displayField === 'customerName') return item.customerName || "";
-    if (displayField === 'pincode') {
-      return item.pincode ? `${item.pincode} - ${item.city || ''}` : "";
-    }
-    const display = item[displayField] || "";
-    const code = item[codeField] ? `(${item[codeField]})` : "";
-    return `${display} ${code}`.trim();
-  };
+  }, [items, selectedId, getDisplayValue]);
 
   const handleSearch = (query) => {
     setSearchQuery(query);
     
-    if (onSearch) {
-      onSearch(query);
+    if (!query.trim()) {
+      setFilteredItems(items);
     } else {
-      if (!query.trim()) {
-        setFilteredItems(items);
-      } else {
-        const filtered = items.filter(item => {
-          const searchLower = query.toLowerCase();
-          return (
-            (item[displayField] && item[displayField].toLowerCase().includes(searchLower)) ||
-            (item[codeField] && item[codeField].toLowerCase().includes(searchLower)) ||
-            (item.customerName && item.customerName.toLowerCase().includes(searchLower)) ||
-            (item.pincode && item.pincode.includes(query)) ||
-            (item.city && item.city.toLowerCase().includes(searchLower))
-          );
-        });
-        setFilteredItems(filtered);
-      }
+      const filtered = items.filter(item => {
+        const searchLower = query.toLowerCase();
+        return (
+          (item[displayField] && item[displayField].toLowerCase().includes(searchLower)) ||
+          (item[codeField] && item[codeField].toLowerCase().includes(searchLower))
+        );
+      });
+      setFilteredItems(filtered);
     }
     
     if (selectedItem && query !== getDisplayValue(selectedItem)) {
@@ -1983,16 +1881,12 @@ function TableSearchableDropdown({
     if (!showDropdown && inputRef.current) {
       setFilteredItems(items);
       
-      const inputRect = inputRef.current.getBoundingClientRect();
-      const tableContainer = inputRef.current.closest('.overflow-auto');
-      
-      if (tableContainer) {
-        setDropdownPosition({
-          top: inputRect.bottom + window.scrollY + 4,
-          left: inputRect.left + window.scrollX,
-          width: inputRect.width
-        });
-      }
+      const rect = inputRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + window.scrollY,
+        left: rect.left + window.scrollX,
+        width: rect.width
+      });
       
       setShowDropdown(true);
     }
@@ -2011,7 +1905,7 @@ function TableSearchableDropdown({
 
   return (
     <>
-      <div className="relative">
+      <div className="relative w-full">
         <input
           ref={inputRef}
           type="text"
@@ -2019,10 +1913,11 @@ function TableSearchableDropdown({
           onChange={(e) => handleSearch(e.target.value)}
           onFocus={handleInputFocus}
           onBlur={handleInputBlur}
-          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 disabled:opacity-50"
+          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 disabled:opacity-50"
           placeholder={placeholder}
           required={required}
           disabled={disabled}
+          autoComplete="off"
         />
         {loading && (
           <div className="absolute right-2 top-2">
@@ -2034,11 +1929,12 @@ function TableSearchableDropdown({
       {showDropdown && (
         <div 
           ref={dropdownRef}
-          className="fixed z-[9999] bg-white border border-slate-200 rounded-lg shadow-lg overflow-y-auto max-h-60"
+          className="fixed z-[10000] bg-white border border-slate-200 rounded-lg shadow-xl overflow-y-auto"
           style={{
             top: `${dropdownPosition.top}px`,
             left: `${dropdownPosition.left}px`,
-            width: `${dropdownPosition.width}px`
+            width: `${dropdownPosition.width}px`,
+            maxHeight: '300px'
           }}
         >
           {loading ? (
@@ -2063,11 +1959,11 @@ function TableSearchableDropdown({
                 ) : (
                   <>
                     <div className="font-medium text-slate-800 text-sm">
-                      {item[displayField] || item.customerName}
+                      {item[displayField]}
                     </div>
                     {item[codeField] && (
                       <div className="text-xs text-slate-500 mt-0.5">
-                        {displayField === 'pincode' ? `City: ${item.city}` : `Code: ${item[codeField]}`}
+                        Code: {item[codeField]}
                       </div>
                     )}
                   </>
@@ -2075,7 +1971,7 @@ function TableSearchableDropdown({
               </div>
             ))
           ) : (
-            <div className="p-2 text-center text-sm text-slate-500">
+            <div className="p-3 text-center text-sm text-slate-500">
               {searchQuery.trim() ? 
                 `No items found for "${searchQuery}"` : 
                 "No items available"
@@ -2088,15 +1984,16 @@ function TableSearchableDropdown({
   );
 }
 
-/** ===== Pack Type Table Component with Uniform Checkbox ===== */
-function PackTypeTable({ packType, rows, onChange, onRemove, onDuplicate, onToggleUniform }) {
+/** ===== Pack Type Table Component ===== */
+/** ===== Pack Type Table Component ===== */
+function PackTypeTable({ packType, rows, onChange, onRemove, onDuplicate, pkgTypes = [], onNavigateToCreate }) {
   const cols = useMemo(() => {
     if (packType === "PALLETIZATION") {
       return [
         { key: "noOfPallets", label: "NO OF PALLETS", type: "number", options: null },
         { key: "unitPerPallets", label: "UNIT PER PALLETS", type: "number", options: null },
         { key: "totalPkgs", label: "TOTAL PKGS", type: "number", options: null, readOnly: true },
-        { key: "pkgsType", label: "PKG TYPE", type: "text", options: PKGS_TYPE_OPTIONS },
+        { key: "pkgsType", label: "PKG TYPE", type: "select", options: pkgTypes, isDynamic: true },
         { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
         { key: "skuSize", label: "SKU - SIZE", type: "text", options: SKU_SIZE_OPTIONS },
         { key: "packWeight", label: "PACK - WEIGHT", type: "number", options: null },
@@ -2111,7 +2008,7 @@ function PackTypeTable({ packType, rows, onChange, onRemove, onDuplicate, onTogg
     if (packType === "UNIFORM - BAGS/BOXES") {
       return [
         { key: "totalPkgs", label: "TOTAL PKGS", type: "number", options: null },
-        { key: "pkgsType", label: "PKG TYPE", type: "text", options: PKGS_TYPE_OPTIONS },
+        { key: "pkgsType", label: "PKG TYPE", type: "select", options: pkgTypes, isDynamic: true },
         { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
         { key: "skuSize", label: "SKU - SIZE", type: "text", options: SKU_SIZE_OPTIONS },
         { key: "packWeight", label: "PACK - WEIGHT", type: "number", options: null },
@@ -2130,23 +2027,23 @@ function PackTypeTable({ packType, rows, onChange, onRemove, onDuplicate, onTogg
       { key: "actualWt", label: "ACTUAL - WT", type: "number", options: null },
       { key: "chargedWt", label: "CHARGED - WT", type: "number", options: null },
     ];
-  }, [packType]);
+  }, [packType, pkgTypes]);
 
   const handleChange = (rowId, key, value) => {
     onChange(rowId, key, value);
   };
 
+  // Function to get display value for PKG type
+  const getPkgTypeDisplay = (pkgTypeId) => {
+    const pkgType = pkgTypes.find(pt => pt._id === pkgTypeId);
+    return pkgType ? pkgType.name : '';
+  };
+
   return (
     <div className="overflow-auto rounded-xl border border-yellow-300">
-      <table className="min-w-full w-full text-sm">
+      <table className="min-w-max w-full text-sm">
         <thead className="sticky top-0 bg-yellow-400">
           <tr>
-            {/* Add Uniform checkbox column only for PALLETIZATION */}
-            {packType === "PALLETIZATION" && (
-              <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center w-16">
-                UNIFORM
-              </th>
-            )}
             {cols.map((c) => (
               <th
                 key={c.key}
@@ -2163,25 +2060,34 @@ function PackTypeTable({ packType, rows, onChange, onRemove, onDuplicate, onTogg
         </thead>
 
         <tbody>
-          {rows.length ? (
+          {rows.length > 0 ? (
             rows.map((r) => (
               <tr key={r._id} className="hover:bg-yellow-50 even:bg-slate-50">
-                {/* Uniform checkbox only for PALLETIZATION */}
-                {packType === "PALLETIZATION" && (
-                  <td className="border border-yellow-300 px-2 py-2 text-center">
-                    <input
-                      type="checkbox"
-                      checked={r.isUniform || false}
-                      onChange={() => onToggleUniform(r._id)}
-                      className="h-4 w-4 rounded border-yellow-300 text-yellow-600 focus:ring-yellow-500 cursor-pointer"
-                      title="Check to add to Uniform Bags/Boxes"
-                    />
-                  </td>
-                )}
-                
                 {cols.map((c) => (
                   <td key={c.key} className="border border-yellow-300 px-2 py-2">
-                    {c.options ? (
+                    {c.key === "pkgsType" && c.isDynamic ? (
+                      <div className="flex gap-2 items-center">
+                        <select
+                          value={r[c.key] || ""}
+                          onChange={(e) => handleChange(r._id, c.key, e.target.value)}
+                          className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                        >
+                          <option value="">Select {c.label}</option>
+                          {c.options.map((opt) => (
+                            <option key={opt._id} value={opt.name}>
+                              {opt.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={onNavigateToCreate}
+                          className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-700 transition whitespace-nowrap"
+                          title="Create New PKG Type"
+                        >
+                          Create
+                        </button>
+                      </div>
+                    ) : c.options ? (
                       <select
                         value={r[c.key] || ""}
                         onChange={(e) => handleChange(r._id, c.key, e.target.value)}
@@ -2232,7 +2138,7 @@ function PackTypeTable({ packType, rows, onChange, onRemove, onDuplicate, onTogg
           ) : (
             <tr>
               <td
-                colSpan={cols.length + (packType === "PALLETIZATION" ? 2 : 1)}
+                colSpan={cols.length + 1}
                 className="border border-yellow-300 px-4 py-10 text-center text-slate-400 font-semibold"
               >
                 No rows yet. Click <b>Add Row</b> to add data.

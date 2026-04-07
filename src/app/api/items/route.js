@@ -95,7 +95,7 @@ export async function POST(req) {
     const data = await req.json();
 
     // ✅ Validate required fields
-    const requiredFields = ["itemCode", "itemName", "category", "unitPrice", "quantity"];
+    const requiredFields = ["itemCode", "itemName", "category", ];
     for (let field of requiredFields) {
       if (!data[field]) {
         return NextResponse.json({ success: false, message: `${field} is required` }, { status: 400 });

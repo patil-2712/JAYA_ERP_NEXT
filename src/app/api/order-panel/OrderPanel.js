@@ -15,13 +15,8 @@ const orderPanelSchema = new mongoose.Schema({
     ref: 'Branch',
     required: true
   },
-   branchName: String,  // ⭐ ADD THIS
-  branchCode: String,  // ⭐ ADD THIS
-  delivery: {
-    type: String,
-    enum: ['Urgent', 'Normal', 'Express', 'Scheduled'],
-    default: 'Normal'
-  },
+  branchName: String,
+  branchCode: String,
   delivery: {
     type: String,
     enum: ['Urgent', 'Normal', 'Express', 'Scheduled'],
@@ -36,7 +31,7 @@ const orderPanelSchema = new mongoose.Schema({
   customerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Customer',
-    required: false  // Make optional since you want to allow empty
+    required: false
   },
   customerCode: String,
   customerName: String,
@@ -89,12 +84,15 @@ const orderPanelSchema = new mongoose.Schema({
       ref: 'Branch'
     },
     toName: String,
-    country: String,
-    countryName: String,
-    state: String,
-    stateName: String,
+    // NEW FIELDS - taluka
+    taluka: String,
+    talukaName: String,
     district: String,
     districtName: String,
+    state: String,
+    stateName: String,
+    country: String,
+    countryName: String,
     weight: {
       type: Number,
       default: 0
@@ -165,6 +163,16 @@ const orderPanelSchema = new mongoose.Schema({
       actualWt: Number,
       chargedWt: Number
     }]
+  },
+  
+  // Calculated fields
+  totalWeight: {
+    type: Number,
+    default: 0
+  },
+  totalAmount: {
+    type: Number,
+    default: 0
   },
   
   // Company & User Tracking

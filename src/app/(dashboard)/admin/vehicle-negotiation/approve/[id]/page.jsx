@@ -114,8 +114,7 @@ function TableSearchableDropdown({
   displayField = 'name',
   codeField = 'code',
   disabled = false,
-  showCode = true,
-  cellId = ""
+  showCode = true
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredItems, setFilteredItems] = useState([]);
@@ -128,7 +127,7 @@ function TableSearchableDropdown({
   useEffect(() => {
     setFilteredItems(items);
     if (selectedId) {
-      const item = items.find(i => i._id === selectedId || i.supplierName === selectedId);
+      const item = items.find(i => i._id === selectedId || i.supplierName === selectedId || i.vehicleNumber === selectedId);
       if (item) {
         setSelectedItem(item);
         setSearchQuery(getDisplayValue(item));
@@ -226,7 +225,7 @@ function TableSearchableDropdown({
         onChange={(e) => handleSearch(e.target.value)}
         onFocus={handleInputFocus}
         onBlur={handleInputBlur}
-        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 disabled:opacity-50"
+        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 disabled:opacity-50"
         placeholder={placeholder}
         disabled={disabled}
         autoComplete="off"
@@ -252,7 +251,7 @@ function TableSearchableDropdown({
                   e.preventDefault();
                   handleSelectItem(item);
                 }}
-                className="p-2 hover:bg-slate-50 cursor-pointer border-b border-slate-100"
+                className="p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors"
               >
                 <div className="font-medium text-slate-800 text-sm">
                   {item[displayField]}
@@ -265,7 +264,7 @@ function TableSearchableDropdown({
               </div>
             ))
           ) : (
-            <div className="p-2 text-center text-sm text-slate-500">
+            <div className="p-3 text-center text-sm text-slate-500">
               {searchQuery.trim() ? 
                 `No items found for "${searchQuery}"` : 
                 "No items available"
@@ -334,35 +333,37 @@ function Select({ label, value, onChange, options = [], col = "", readOnly = fal
 }
 
 /* =======================
-  Orders Table Component (Read-only)
+  Orders Table Component (Read-only with Taluka)
 ========================= */
 function OrdersTable({ rows }) {
   const columns = [
-    { key: "orderNo", label: "Order No" },
-    { key: "partyName", label: "Party Name" },
-    { key: "plantCode", label: "Plant Code" },
-    { key: "plantName", label: "Plant Name" },
-    { key: "plantCodeValue", label: "Plant Code Value" },
-    { key: "orderType", label: "Order Type" },
-    { key: "pinCode", label: "Pin Code" },
-    { key: "from", label: "From" },
-    { key: "to", label: "To" },
-    { key: "country", label: "Country" },
-    { key: "state", label: "State" },
-    { key: "district", label: "District" },
-    { key: "weight", label: "Weight" },
-    { key: "status", label: "Status" },
+    { key: "orderNo", label: "Order No", minWidth: "120px" },
+    { key: "partyName", label: "Party Name", minWidth: "150px" },
+    { key: "plantCode", label: "Plant Code", minWidth: "100px" },
+    { key: "plantName", label: "Plant Name", minWidth: "120px" },
+    { key: "plantCodeValue", label: "Plant Code Value", minWidth: "120px" },
+    { key: "orderType", label: "Order Type", minWidth: "100px" },
+    { key: "pinCode", label: "Pin Code", minWidth: "100px" },
+    { key: "from", label: "From", minWidth: "120px" },
+    { key: "to", label: "To", minWidth: "120px" },
+    { key: "taluka", label: "Taluka", minWidth: "120px" },
+    { key: "country", label: "Country", minWidth: "100px" },
+    { key: "state", label: "State", minWidth: "100px" },
+    { key: "district", label: "District", minWidth: "100px" },
+    { key: "weight", label: "Weight", minWidth: "80px" },
+    { key: "status", label: "Status", minWidth: "100px" },
   ];
 
   return (
-    <div className="overflow-auto rounded-xl border border-yellow-300">
-      <table className="min-w-full w-full text-sm">
-        <thead className="sticky top-0 bg-yellow-400">
+    <div className="overflow-auto rounded-xl border border-yellow-300 max-h-[500px]">
+      <table className="min-w-max w-full text-sm">
+        <thead className="sticky top-0 bg-yellow-400 z-10">
           <tr>
             {columns.map((col) => (
               <th
                 key={col.key}
                 className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
+                style={{ minWidth: col.minWidth }}
               >
                 {col.label}
               </th>
@@ -383,6 +384,7 @@ function OrdersTable({ rows }) {
                 <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.pinCode || '-'}</td>
                 <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.fromName || row.from || '-'}</td>
                 <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.toName || row.to || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.talukaName || row.taluka || '-'}</td>
                 <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.countryName || row.country || '-'}</td>
                 <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.stateName || row.state || '-'}</td>
                 <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.districtName || row.district || '-'}</td>
@@ -417,9 +419,9 @@ function OrdersTable({ rows }) {
 ========================= */
 function VendorsTable({ rows }) {
   return (
-    <div className="overflow-auto rounded-xl border border-yellow-300">
+    <div className="overflow-auto rounded-xl border border-yellow-300 max-h-[300px]">
       <table className="min-w-full w-full text-sm">
-        <thead className="sticky top-0 bg-yellow-400">
+        <thead className="sticky top-0 bg-yellow-400 z-10">
           <tr>
             <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
               Supplier Name
@@ -474,7 +476,23 @@ export default function ApproveVehicleNegotiation() {
 
   // State for all data
   const [vnnNumber, setVnnNumber] = useState("");
-  const [header, setHeader] = useState({});
+  const [header, setHeader] = useState({
+    vnnNo: "",
+    branchName: "",
+    branchCode: "",
+    delivery: "",
+    date: "",
+    billingType: "",
+    loadingPoints: "",
+    dropPoints: "",
+    collectionCharges: "",
+    cancellationCharges: "",
+    loadingCharges: "",
+    otherCharges: "",
+    partyName: "",
+    customerCode: "",
+    contactPerson: ""
+  });
   const [orders, setOrders] = useState([]);
   const [negotiation, setNegotiation] = useState({});
   const [vendors, setVendors] = useState([]);
@@ -530,7 +548,7 @@ export default function ApproveVehicleNegotiation() {
       // Set VNN number
       setVnnNumber(vn.vnnNo || "");
       
-      // Set header data
+      // ✅ FIXED: Set header data with all fields properly mapped
       setHeader({
         vnnNo: vn.vnnNo || "",
         branchName: vn.branchName || "",
@@ -544,9 +562,10 @@ export default function ApproveVehicleNegotiation() {
         cancellationCharges: vn.cancellationCharges || "Nil",
         loadingCharges: vn.loadingCharges || "Nil",
         otherCharges: vn.otherCharges || "Nil",
-        partyName: vn.partyName || vn.customerName || "",
-        customerCode: vn.customerCode || "",
-        contactPerson: vn.contactPerson || ""
+        // ✅ FIXED: Party Name mapping - check multiple possible field names
+        partyName: vn.partyName || vn.customerName || vn.header?.partyName || "",
+        customerCode: vn.customerCode || vn.header?.customerCode || "",
+        contactPerson: vn.contactPerson || vn.header?.contactPerson || ""
       });
 
       // Set orders
@@ -872,7 +891,7 @@ export default function ApproveVehicleNegotiation() {
             
             <div className="col-span-12 md:col-span-6">
               <label className="text-xs font-bold text-slate-600">Selected Order Panels</label>
-              <div className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              <div className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 min-h-[42px]">
                 {selectedOrderPanels.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {selectedOrderPanels.map((panel, idx) => (
@@ -894,10 +913,11 @@ export default function ApproveVehicleNegotiation() {
               readOnly={true}
             />
 
+            {/* ✅ FIXED: Delivery field */}
             <Input
               col="col-span-12 md:col-span-3"
               label="Delivery"
-              value={header.delivery}
+              value={header.delivery || "Urgent"}
               readOnly={true}
             />
 
@@ -908,24 +928,25 @@ export default function ApproveVehicleNegotiation() {
               readOnly={true}
             />
             
+            {/* ✅ FIXED: Party Name field */}
             <Input
               col="col-span-12 md:col-span-3"
               label="Party Name"
-              value={header.partyName}
+              value={header.partyName || "-"}
               readOnly={true}
             />
             
             <Input
               col="col-span-12 md:col-span-3"
               label="Customer Code"
-              value={header.customerCode}
+              value={header.customerCode || "-"}
               readOnly={true}
             />
             
             <Input
               col="col-span-12 md:col-span-3"
               label="Contact Person"
-              value={header.contactPerson}
+              value={header.contactPerson || "-"}
               readOnly={true}
             />
           </div>
@@ -1019,7 +1040,7 @@ export default function ApproveVehicleNegotiation() {
             <div className="col-span-12 md:col-span-7">
               <div className="rounded-xl border border-slate-200 p-4">
                 <div className="text-sm font-extrabold text-slate-900 mb-3">Remarks</div>
-                <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 min-h-[80px]">
                   {negotiation.remarks1 || "-"}
                 </div>
               </div>
@@ -1034,7 +1055,7 @@ export default function ApproveVehicleNegotiation() {
                     <audio src={voiceUrl} controls className="w-full" />
                   </div>
                 ) : (
-                  <div className="text-sm text-slate-500">No voice note uploaded</div>
+                  <div className="text-sm text-slate-500 italic">No voice note uploaded</div>
                 )}
               </div>
             </div>
@@ -1046,7 +1067,7 @@ export default function ApproveVehicleNegotiation() {
           <div className="grid grid-cols-12 gap-3 mb-4">
             {/* Supplier Name with Dropdown */}
             <div className="col-span-12 md:col-span-4">
-              <label className="text-xs font-bold text-slate-600">Supplier Name</label>
+              <label className="text-xs font-bold text-slate-600">Supplier Name *</label>
               <TableSearchableDropdown
                 items={supplierSearch.suppliers}
                 selectedId={approval.vendorName}
@@ -1118,7 +1139,7 @@ export default function ApproveVehicleNegotiation() {
               <div className="flex flex-col">
                 <label className="text-xs font-bold text-slate-600">Purchase Amount (A x B)</label>
                 <div className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-extrabold text-emerald-700">
-                  {purchaseAmount}
+                  ₹{purchaseAmount.toLocaleString('en-IN')}
                 </div>
               </div>
             </div>
@@ -1127,7 +1148,7 @@ export default function ApproveVehicleNegotiation() {
           <div className="grid grid-cols-12 gap-3 mb-4">
             {/* Vehicle Number with Dropdown and Create Button */}
             <div className="col-span-12 md:col-span-4">
-              <label className="text-xs font-bold text-slate-600">Vehicle Number</label>
+              <label className="text-xs font-bold text-slate-600">Vehicle Number *</label>
               <div className="flex items-center gap-2">
                 <div className="flex-1">
                   <TableSearchableDropdown
@@ -1140,11 +1161,11 @@ export default function ApproveVehicleNegotiation() {
                   />
                 </div>
                 <button
-                  onClick={() => router.push('/admin/vehicle2')}
-                  className="rounded-lg bg-green-600 px-3 py-2 text-xs font-bold text-white hover:bg-green-700 transition whitespace-nowrap"
+                  onClick={handleCreateVehicle}
+                  className="rounded-lg bg-green-600 px-3 py-2 text-xs font-bold text-white hover:bg-green-700 transition whitespace-nowrap mt-1"
                   type="button"
                 >
-                  Create
+                  + Create
                 </button>
               </div>
             </div>
@@ -1180,7 +1201,7 @@ export default function ApproveVehicleNegotiation() {
             {/* Approval Status */}
             <Select
               col="col-span-12 md:col-span-4"
-              label="Approval Status"
+              label="Approval Status *"
               value={approval.approvalStatus}
               onChange={(v) => setApproval({ ...approval, approvalStatus: v })}
               options={APPROVALS}
@@ -1207,13 +1228,14 @@ export default function ApproveVehicleNegotiation() {
             
             <div className="grid grid-cols-12 gap-4">
               <div className="col-span-12 md:col-span-6">
+                <label className="text-xs font-bold text-slate-600">Upload New Memo</label>
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept=".pdf,.png,.jpg,.jpeg"
                   onChange={handleMemoUpload}
                   disabled={uploading}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 disabled:opacity-50"
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 disabled:opacity-50"
                 />
               </div>
               
@@ -1228,7 +1250,7 @@ export default function ApproveVehicleNegotiation() {
               
               <div className="col-span-12 md:col-span-3">
                 <label className="text-xs font-bold text-slate-600">Current File</label>
-                <div className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                <div className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 truncate">
                   {approval.memoFile?.originalName || "No file uploaded"}
                 </div>
               </div>
@@ -1249,7 +1271,7 @@ export default function ApproveVehicleNegotiation() {
                 <p className="text-sm font-medium text-green-800">Uploaded File:</p>
                 <p className="text-sm text-green-700 mt-1">{approval.memoFile.originalName}</p>
                 <p className="text-xs text-green-600 mt-0.5">Size: {(approval.memoFile.size / 1024).toFixed(1)} KB</p>
-                {approval.memoFile.filePath && process.env.NODE_ENV === 'development' && (
+                {approval.memoFile.filePath && (
                   <a 
                     href={approval.memoFile.filePath} 
                     target="_blank" 

@@ -1,3 +1,4 @@
+// /app/api/pricing-panel/route.js
 import { NextResponse } from "next/server";
 import connectDb from "@/lib/db";
 import PricingPanel from "./PricingPanel";
@@ -32,9 +33,6 @@ async function validateUser(req) {
 /* ========================================
    POST /api/pricing-panel - Create New Pricing Panel
 ======================================== */
-/* ========================================
-   POST /api/pricing-panel - Create New Pricing Panel (UPDATED)
-======================================== */
 export async function POST(req) {
   await connectDb();
   const { user, error, status } = await validateUser(req);
@@ -60,17 +58,12 @@ export async function POST(req) {
     let branchCode = '';
     
     if (body.header?.branch) {
-      // Check if branch is an object with _id or just a string
       if (typeof body.header.branch === 'object' && body.header.branch !== null) {
-        // It's an object (like from frontend)
         branchId = body.header.branch._id || null;
         branchName = body.header.branch.name || body.header.branchName || '';
         branchCode = body.header.branch.code || body.header.branchCode || '';
       } else {
-        // It's a string ID
         branchId = body.header.branch;
-        
-        // Try to find branch details from the branches array
         if (body.branches && Array.isArray(body.branches)) {
           const branchFromArray = body.branches.find(b => b._id === branchId);
           if (branchFromArray) {
@@ -93,7 +86,6 @@ export async function POST(req) {
       console.log(`Processing ${body.orders.length} orders from frontend`);
       
       for (const order of body.orders) {
-        // Skip empty rows
         if (!order.orderNo || order.orderNo.trim() === "") {
           console.log("Skipping empty order row");
           continue;
@@ -103,10 +95,8 @@ export async function POST(req) {
         let vehicleNegotiationId = null;
         if (order.vehicleNegotiationId) {
           if (typeof order.vehicleNegotiationId === 'object' && order.vehicleNegotiationId !== null) {
-            // If it's an object with _id property
             vehicleNegotiationId = order.vehicleNegotiationId._id || null;
           } else if (typeof order.vehicleNegotiationId === 'string') {
-            // If it's a string ID, validate it
             if (isValidObjectId(order.vehicleNegotiationId)) {
               vehicleNegotiationId = new mongoose.Types.ObjectId(order.vehicleNegotiationId);
             } else {
@@ -120,12 +110,13 @@ export async function POST(req) {
         const toBranch = body.branches?.find(b => b._id === order.to);
         const plant = body.plants?.find(p => p._id === order.plantCode);
         const country = body.countries?.find(c => c.code === order.country);
-        const state = body.states?.find(s => s._id === order.state);
-        const district = body.districts?.find(d => d._id === order.district);
+        const state = body.states?.find(s => s._id === order.stateId);
+        const district = body.districts?.find(d => d._id === order.districtId);
+        const taluka = body.talukas?.find(t => t._id === order.talukaId);
         
         orders.push({
           orderNo: order.orderNo,
-          vehicleNegotiationId: vehicleNegotiationId, // ✅ Store the VNN ID properly
+          vehicleNegotiationId: vehicleNegotiationId,
           partyName: order.partyName || body.header?.partyName || '',
           customerId: order.customerId || body.header?.customerId || null,
           customerCode: order.customerCode || '',
@@ -138,14 +129,20 @@ export async function POST(req) {
           country: order.country || '',
           countryName: country?.name || order.countryName || '',
           state: order.state || '',
-          stateName: state ? `${state.name} (${state.code})` : order.stateName || '',
+          stateName: state ? state.name : order.stateName || '',
+          stateId: order.stateId || null,
           district: order.district || '',
-          districtName: district ? `${district.name} (${district.code})` : order.districtName || '',
+          districtName: district ? district.name : order.districtName || '',
+          districtId: order.districtId || null,
+          // TALUKA FIELDS - Properly mapped
+          taluka: order.taluka || '',
+          talukaName: taluka ? taluka.name : (order.talukaName || order.taluka || ''),
+          talukaId: order.talukaId || null,
           from: order.from || null,
-          fromName: fromBranch ? `${fromBranch.name} (${fromBranch.code})` : order.fromName || '',
+          fromName: fromBranch ? fromBranch.name : order.fromName || '',
           to: order.to || null,
-          toName: toBranch ? `${toBranch.name} (${toBranch.code})` : order.toName || '',
-          locationRate: parseFloat(order.locationRate) || 0,
+          toName: toBranch ? toBranch.name : order.toName || '',
+          locationRate: order.locationRate || '',  // Store as string, not number
           priceList: order.priceList || '',
           weight: parseFloat(order.weight) || 0,
           rate: parseFloat(order.rate) || 0,
@@ -178,7 +175,7 @@ export async function POST(req) {
       }
     }
 
-    // ✅ Create pricing report rows
+    // ✅ Create pricing report rows - WITH TALUKA
     const reportRows = orders.map(order => ({
       date: body.header?.date ? new Date(body.header.date) : new Date(),
       pricingSerialNo: pricingSerialNo,
@@ -187,6 +184,7 @@ export async function POST(req) {
       plantCode: order.plantName || '-',
       orderType: order.orderType || 'Sales',
       pinCode: order.pinCode || '-',
+      taluka: order.talukaName || order.taluka || '-',
       state: order.stateName || '-',
       district: order.districtName || '-',
       from: order.fromName || '-',
@@ -347,7 +345,6 @@ export async function PUT(req) {
       pricingPanel.dropPoints = parseInt(body.billing.dropPoints) || pricingPanel.dropPoints;
       pricingPanel.collectionCharges = parseFloat(body.billing.collectionCharges) || pricingPanel.collectionCharges;
       
-      // Handle string fields
       if (body.billing.cancellationCharges !== undefined) {
         pricingPanel.cancellationCharges = typeof body.billing.cancellationCharges === 'number' 
           ? body.billing.cancellationCharges.toString() 
@@ -367,7 +364,7 @@ export async function PUT(req) {
       }
     }
 
-    // Update orders
+    // Update orders - WITH COMPLETE TALUKA FIELDS
     if (body.orders) {
       const processedOrders = body.orders.map(order => ({
         _id: order._id && mongoose.Types.ObjectId.isValid(order._id) 
@@ -388,13 +385,19 @@ export async function PUT(req) {
         countryName: order.countryName || '',
         state: order.state || '',
         stateName: order.stateName || '',
+        stateId: order.stateId || null,
         district: order.district || '',
         districtName: order.districtName || '',
+        districtId: order.districtId || null,
+        // TALUKA FIELDS - Properly mapped
+        taluka: order.taluka || '',
+        talukaName: order.talukaName || order.taluka || '',
+        talukaId: order.talukaId || null,
         from: order.from || null,
         fromName: order.fromName || '',
         to: order.to || null,
         toName: order.toName || '',
-        locationRate: parseFloat(order.locationRate) || 0,
+       locationRate: order.locationRate || '',  // Store as string
         priceList: order.priceList || '',
         weight: parseFloat(order.weight) || 0,
         rate: parseFloat(order.rate) || 0,
@@ -413,8 +416,10 @@ export async function PUT(req) {
       };
     }
 
-    // Save the updated pricing panel (this will trigger pre-save hooks to recalculate totals and report rows)
+    // Save the updated pricing panel (this will trigger pre-save hooks)
     await pricingPanel.save();
+
+    console.log(`✅ Pricing panel updated successfully: ${id}`);
 
     return NextResponse.json({ 
       success: true, 
@@ -445,9 +450,6 @@ export async function PUT(req) {
 
 /* ========================================
    GET /api/pricing-panel - Get Pricing Panels
-======================================== */
-/* ========================================
-   GET /api/pricing-panel - Get Pricing Panels (FIXED)
 ======================================== */
 export async function GET(req) {
   await connectDb();
@@ -497,36 +499,55 @@ export async function GET(req) {
     if (format === 'table') {
       console.log("📋 Fetching pricing panels for table report");
       
-      // Build query
       let query = { 
         companyId: user.companyId,
         status: 'Active'
       };
 
-      // Fetch pricing panels
+      // Apply filters from query params
+      if (url.searchParams.get("search")) {
+        const search = url.searchParams.get("search");
+        query.$or = [
+          { pricingSerialNo: { $regex: search, $options: 'i' } },
+          { partyName: { $regex: search, $options: 'i' } },
+          { branchName: { $regex: search, $options: 'i' } }
+        ];
+      }
+      
+      if (url.searchParams.get("pricingStatus")) {
+        // This would need to be handled in reportRows
+      }
+      
+      if (url.searchParams.get("approvalStatus")) {
+        query['rateApproval.approvalStatus'] = url.searchParams.get("approvalStatus");
+      }
+      
+      if (url.searchParams.get("fromDate")) {
+        query.date = { $gte: new Date(url.searchParams.get("fromDate")) };
+      }
+      
+      if (url.searchParams.get("toDate")) {
+        query.date = { ...query.date, $lte: new Date(url.searchParams.get("toDate")) };
+      }
+
       const pricingPanels = await PricingPanel.find(query)
         .sort({ date: -1, createdAt: -1 })
         .lean();
 
       console.log(`Found ${pricingPanels.length} pricing panels`);
 
-      // Helper function to format date as DD/MM/YYYY
       const formatDateDDMMYYYY = (date) => {
         if (!date) return '';
         const d = new Date(date);
         if (isNaN(d.getTime())) return '';
-        
         const day = String(d.getDate()).padStart(2, '0');
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const year = d.getFullYear();
-        
         return `${day}/${month}/${year}`;
       };
 
-      // Helper function to get VNN number from vehicleNegotiationId
       const getVNNNumber = async (vehicleNegotiationId) => {
         if (!vehicleNegotiationId) return null;
-        
         try {
           const VehicleNegotiation = mongoose.models.VehicleNegotiation;
           if (VehicleNegotiation) {
@@ -539,34 +560,31 @@ export async function GET(req) {
         return null;
       };
 
-      // Flatten the data for table display
       const tableData = [];
       
       for (const panel of pricingPanels) {
-        // Format date
         const formattedDate = panel.date ? formatDateDDMMYYYY(panel.date) : '';
         
-        // If there are orders, create a row for each order
         if (panel.orders && panel.orders.length > 0) {
           for (const order of panel.orders) {
-            // Find corresponding report row for this order to get pricing status
             const reportRow = panel.reportRows?.find(r => r.order === order.orderNo);
             
-            // Get VNN number if vehicleNegotiationId exists
             let vnnNumber = null;
             if (order.vehicleNegotiationId) {
               vnnNumber = await getVNNNumber(order.vehicleNegotiationId);
             }
             
             tableData.push({
+              panelId: panel._id.toString(),
               date: formattedDate,
               pricingSerialNo: panel.pricingSerialNo || '',
-              vnn: vnnNumber || '-', // VNN number added here
-              order: order.orderNo || '',
+              vnn: vnnNumber || '-',
+              orderNo: order.orderNo || '',
               partyName: order.partyName || panel.partyName || '',
               plantCode: order.plantName || '',
               orderType: order.orderType || '',
               pinCode: order.pinCode || '',
+              taluka: order.talukaName || order.taluka || '-',
               state: order.stateName || '',
               district: order.districtName || '',
               from: order.fromName || '',
@@ -574,22 +592,21 @@ export async function GET(req) {
               weight: order.weight || 0,
               pricing: reportRow?.pricing || panel.reportRows?.[0]?.pricing || 'Pending',
               approval: panel.rateApproval?.approvalStatus || 'Pending',
-              panelId: panel._id.toString(),
-              orderId: order._id ? order._id.toString() : null,
               branchName: panel.branchName || ''
             });
           }
         } else {
-          // If no orders, create a row with empty order fields
           tableData.push({
+            panelId: panel._id.toString(),
             date: formattedDate,
             pricingSerialNo: panel.pricingSerialNo || '',
-            vnn: '-', // No VNN
-            order: '',
+            vnn: '-',
+            orderNo: '',
             partyName: panel.partyName || '',
             plantCode: '',
             orderType: '',
             pinCode: '',
+            taluka: '-',
             state: '',
             district: '',
             from: '',
@@ -597,8 +614,6 @@ export async function GET(req) {
             weight: 0,
             pricing: panel.reportRows?.[0]?.pricing || 'Pending',
             approval: panel.rateApproval?.approvalStatus || 'Pending',
-            panelId: panel._id.toString(),
-            orderId: null,
             branchName: panel.branchName || ''
           });
         }
@@ -623,14 +638,11 @@ export async function GET(req) {
     .lean();
 
     const formattedPanels = pricingPanels.map(panel => {
-      // Get unique VNNs from orders
       const vnns = new Set();
       if (panel.orders && panel.orders.length > 0) {
         panel.orders.forEach(order => {
-          // You might want to fetch actual VNN numbers here too
-          // For now, we'll use the vehicleNegotiationId as placeholder
           if (order.vehicleNegotiationId) {
-            vnns.add(order.vehicleNegotiationId.toString().slice(-6)); // Placeholder
+            vnns.add(order.vehicleNegotiationId.toString().slice(-6));
           }
         });
       }
@@ -690,7 +702,6 @@ export async function DELETE(req) {
 
     console.log(`🗑️ Deleting pricing panel: ${id}`);
     
-    // Validate ID format
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json({ 
         success: false, 
@@ -698,7 +709,6 @@ export async function DELETE(req) {
       }, { status: 400 });
     }
     
-    // Find the pricing panel first to check if it exists
     const pricingPanel = await PricingPanel.findOne({
       _id: id,
       companyId: user.companyId
@@ -711,7 +721,6 @@ export async function DELETE(req) {
       }, { status: 404 });
     }
 
-    // Permanent delete
     const result = await PricingPanel.deleteOne({
       _id: id,
       companyId: user.companyId

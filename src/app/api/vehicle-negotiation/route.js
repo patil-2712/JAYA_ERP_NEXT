@@ -143,6 +143,7 @@ export async function GET(req) {
               pinCode: order.pinCode || '',
               from: order.fromName || '',
               to: order.toName || '',
+              taluka: order.talukaName || order.taluka || '',
               district: order.districtName || '',
               state: order.stateName || '',
               country: order.countryName || '',
@@ -168,6 +169,7 @@ export async function GET(req) {
             pinCode: '',
             from: '',
             to: '',
+            taluka: '',
             district: '',
             state: '',
             country: '',
@@ -254,6 +256,8 @@ export async function POST(req) {
       fromName: order.fromName || '',
       to: order.to && isValidObjectId(order.to) ? order.to : null,
       toName: order.toName || '',
+      taluka: order.taluka || '',
+      talukaName: order.talukaName || '',
       country: order.country || '',
       countryName: order.countryName || '',
       state: order.state || '',
@@ -440,7 +444,7 @@ export async function PUT(req) {
       vehicleNegotiation.otherCharges = body.header.otherCharges || vehicleNegotiation.otherCharges || 'Nil';
     }
 
-    // Update orders - Proper null handling
+    // Update orders - Proper null handling with taluka
     if (body.orders) {
       const processedOrders = body.orders.map(order => ({
         _id: order._id && isValidObjectId(order._id) 
@@ -461,6 +465,8 @@ export async function PUT(req) {
         fromName: order.fromName || '',
         to: order.to && isValidObjectId(order.to) ? order.to : null,
         toName: order.toName || '',
+        taluka: order.taluka || '',
+        talukaName: order.talukaName || '',
         country: order.country || '',
         countryName: order.countryName || '',
         state: order.state || '',
@@ -652,12 +658,6 @@ export async function DELETE(req) {
     }, { status: 500 });
   }
 }
-
-
-
-
-
-
 
 
 //import { NextResponse } from "next/server";

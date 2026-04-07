@@ -317,6 +317,8 @@ function defaultOrderRow(index = 1) {
     fromName: "",
     to: null,
     toName: "",
+    taluka: "",
+    talukaName: "",
     district: "",
     districtName: "",
     state: "",
@@ -332,7 +334,7 @@ function defaultVendorRow() {
   return {
     _id: uid(),
     vendorName: "",
-	 vendorCode: "", 
+    vendorCode: "", 
     marketRate: "",
   };
 }
@@ -666,7 +668,7 @@ function SearchableDropdown({
   };
 
   const handleInputFocus = () => {
-    if (!showDropdown) {
+    if (!showDropdown && !disabled) {
       setFilteredItems(items);
       setShowDropdown(true);
     }
@@ -691,14 +693,16 @@ function SearchableDropdown({
         onChange={(e) => handleSearch(e.target.value)}
         onFocus={handleInputFocus}
         onBlur={handleInputBlur}
-        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 disabled:opacity-50"
+        className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+          disabled ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+        }`}
         placeholder={placeholder}
         required={required}
         disabled={disabled}
         autoComplete="off"
       />
       
-      {showDropdown && (
+      {showDropdown && !disabled && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
           {filteredItems.length > 0 ? (
             filteredItems.map((item) => (
@@ -966,7 +970,10 @@ function VehicleSearchDropdown({
 }
 
 /* =======================
-  Multi-Select Order Panel Dropdown Component
+  Multi-Select Order Panel Dropdown Component - FIXED for staying open
+========================= */
+/* =======================
+  Multi-Select Order Panel Dropdown Component - FIXED for staying open
 ========================= */
 function MultiSelectOrderPanelDropdown({ 
   selectedPanels = [],
@@ -979,13 +986,13 @@ function MultiSelectOrderPanelDropdown({
   const [panels, setPanels] = useState([]);
   const [allPanels, setAllPanels] = useState([]);
   const dropdownRef = useRef(null);
+  const inputRef = useRef(null);
   const orderPanelSearch = useOrderPanelSearch();
 
   useEffect(() => {
     if (orderPanelSearch.orderPanels.length > 0) {
       setAllPanels(orderPanelSearch.orderPanels);
       
-      // Filter out already selected panels from the available panels
       const selectedIds = selectedPanels.map(p => p._id);
       const filtered = orderPanelSearch.orderPanels.filter(
         panel => !selectedIds.includes(panel._id)
@@ -996,9 +1003,6 @@ function MultiSelectOrderPanelDropdown({
 
   const handleSearch = (query) => {
     setSearchQuery(query);
-    if (!showDropdown) {
-      setShowDropdown(true);
-    }
     
     const selectedIds = selectedPanels.map(p => p._id);
     
@@ -1031,8 +1035,10 @@ function MultiSelectOrderPanelDropdown({
       if (fullPanel) {
         onSelect(fullPanel);
         
-        // Remove the selected panel from the dropdown list
         setPanels(prev => prev.filter(p => p._id !== panel._id));
+        setSearchQuery("");
+        // Keep dropdown open after selection
+        setShowDropdown(true);
       }
     } catch (error) {
       console.error('Error fetching order panel details:', error);
@@ -1042,7 +1048,6 @@ function MultiSelectOrderPanelDropdown({
   };
 
   const handleRemovePanel = (panelId) => {
-    // When removing a panel, add it back to the dropdown list
     const removedPanel = selectedPanels.find(p => p._id === panelId);
     onSelect(null, panelId);
     
@@ -1059,10 +1064,11 @@ function MultiSelectOrderPanelDropdown({
         });
       }
     }
+    // Keep dropdown open after removal
+    setShowDropdown(true);
   };
 
   const handleInputFocus = async () => {
-    // Refresh the list of available panels (this will check vehicle negotiations again)
     await orderPanelSearch.searchOrderPanels();
     
     const selectedIds = selectedPanels.map(p => p._id);
@@ -1072,6 +1078,30 @@ function MultiSelectOrderPanelDropdown({
     setPanels(filtered);
     setShowDropdown(true);
   };
+
+  const handleInputClick = () => {
+    setShowDropdown(true);
+  };
+
+  // Don't close dropdown on blur
+  const handleInputBlur = () => {
+    // Do nothing - keep dropdown open
+  };
+
+  // Close dropdown only when clicking outside both input and dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target) &&
+          inputRef.current && !inputRef.current.contains(event.target)) {
+        setShowDropdown(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -1095,18 +1125,22 @@ function MultiSelectOrderPanelDropdown({
       )}
       
       <input
+        ref={inputRef}
         type="text"
         value={searchQuery}
         onChange={(e) => handleSearch(e.target.value)}
         onFocus={handleInputFocus}
-        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+        onClick={handleInputClick}
+        onBlur={handleInputBlur}
         className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
         placeholder={placeholder}
         autoComplete="off"
       />
       
       {showDropdown && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+        <div 
+          className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto"
+        >
           {loading || orderPanelSearch.loading ? (
             <div className="p-3 text-center text-sm text-slate-500">
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-sky-500 mx-auto"></div>
@@ -1116,7 +1150,10 @@ function MultiSelectOrderPanelDropdown({
             panels.map((panel) => (
               <div
                 key={panel._id}
-                onMouseDown={() => handleSelectPanel(panel)}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleSelectPanel(panel);
+                }}
                 className="p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors"
               >
                 <div className="font-medium text-slate-800">
@@ -1140,9 +1177,6 @@ function MultiSelectOrderPanelDropdown({
                   {selectedPanels.length} panel(s) already selected in this negotiation
                 </div>
               )}
-              <div className="text-xs text-slate-400 mt-2">
-                All other order panels have already been used in other vehicle negotiations
-              </div>
             </div>
           )}
         </div>
@@ -1151,11 +1185,19 @@ function MultiSelectOrderPanelDropdown({
   );
 }
 
+
+
 /* =======================
   Billing Type Table Component (Single Row)
 ========================= */
-function BillingTypeTable({ header, setHeader, billingColumns, selectedOrderPanels }) {
-  const isReadOnly = selectedOrderPanels.length > 0;
+function BillingTypeTable({ header, setHeader, billingColumns, selectedOrderPanels, orders }) {
+  // Auto-determine billing type based on number of selected panels
+  // 1 panel = Single Order, 2+ panels = Multi - Order
+  const autoBillingType = selectedOrderPanels.length > 1 ? "Multi - Order" : "Single Order";
+  
+  // Only make charges fields read-only when panels are selected
+  // Loading Points and Drop Points should ALWAYS be editable
+  const isChargeReadOnly = selectedOrderPanels.length > 0;
 
   return (
     <div className="overflow-auto rounded-xl border border-yellow-300">
@@ -1177,22 +1219,23 @@ function BillingTypeTable({ header, setHeader, billingColumns, selectedOrderPane
           <tr className="hover:bg-yellow-50 even:bg-slate-50">
             {billingColumns.map((col) => (
               <td key={col.key} className="border border-yellow-300 px-2 py-2">
-                {col.options ? (
+                {col.key === "billingType" ? (
+                  <select
+                    value={autoBillingType}
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm outline-none cursor-not-allowed"
+                    disabled={true}
+                  >
+                    <option value="Single Order">Single Order</option>
+                    <option value="Multi - Order">Multi - Order</option>
+                  </select>
+                ) : col.options ? (
                   <select
                     value={header[col.key] || ""}
-                    onChange={(e) => {
-                      if (col.key === "billingType") {
-                        setHeader(prev => ({ ...prev, [col.key]: e.target.value }));
-                      } else {
-                        setHeader(prev => ({ ...prev, [col.key]: e.target.value }));
-                      }
-                    }}
+                    onChange={(e) => setHeader(prev => ({ ...prev, [col.key]: e.target.value }))}
                     className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
-                      isReadOnly && col.key !== "billingType" && col.key !== "loadingPoints" && col.key !== "dropPoints" 
-                        ? 'bg-slate-50 cursor-not-allowed' 
-                        : 'bg-white'
+                      isChargeReadOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
                     }`}
-                    disabled={isReadOnly && col.key !== "billingType" && col.key !== "loadingPoints" && col.key !== "dropPoints"}
+                    disabled={isChargeReadOnly}
                   >
                     <option value="">Select {col.label}</option>
                     {col.options.map((opt) => (
@@ -1206,11 +1249,10 @@ function BillingTypeTable({ header, setHeader, billingColumns, selectedOrderPane
                     type={col.type || "text"}
                     value={header[col.key] || ""}
                     onChange={(e) => setHeader(prev => ({ ...prev, [col.key]: e.target.value }))}
-                    readOnly={isReadOnly && col.key !== "loadingPoints" && col.key !== "dropPoints"}
+                    // Make Loading Points and Drop Points ALWAYS editable
+                    readOnly={col.key !== "loadingPoints" && col.key !== "dropPoints" ? isChargeReadOnly : false}
                     className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
-                      isReadOnly && col.key !== "loadingPoints" && col.key !== "dropPoints" 
-                        ? 'bg-slate-50 cursor-not-allowed' 
-                        : 'bg-white'
+                      col.key !== "loadingPoints" && col.key !== "dropPoints" && isChargeReadOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
                     }`}
                     placeholder={`Enter ${col.label}`}
                   />
@@ -1220,12 +1262,8 @@ function BillingTypeTable({ header, setHeader, billingColumns, selectedOrderPane
           </tr>
         </tbody>
       </table>
-      {isReadOnly && (
-        <div className="text-xs text-slate-500 mt-2 p-2">
-          * Collection Charges, Cancellation Charges, Loading Charges, Other Charges are populated from the first selected Order Panel.
-          Loading Points and Drop Points are editable.
-        </div>
-      )}
+      
+      
     </div>
   );
 }
@@ -1255,7 +1293,8 @@ export default function VehicleNegotiationPanel() {
    ========================= */
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const vehicleSearch = useVehicleSearch();
-const supplierSearch = useSupplierSearch();
+  const supplierSearch = useSupplierSearch();
+  
   /** =========================
    * CUSTOMER SEARCH STATE
    ========================= */
@@ -1284,7 +1323,7 @@ const supplierSearch = useSupplierSearch();
     branchCode: "",
     delivery: "Urgent",
     date: new Date().toISOString().split('T')[0],
-    billingType: "Multi - Order", // Default to Multi - Order
+   
     loadingPoints: "",
     dropPoints: "",
     collectionCharges: "",
@@ -1295,8 +1334,9 @@ const supplierSearch = useSupplierSearch();
     customerId: null
   });
 
+
   /* ===== ORDERS ===== */
-  const [orders, setOrders] = useState([]); // Start with empty array, not default row
+const [orders, setOrders] = useState([]); // Start with empty array - no empty row
 
   /* ===== FILE UPLOAD STATES ===== */
   const [voiceFileInfo, setVoiceFileInfo] = useState(null);
@@ -1310,7 +1350,7 @@ const supplierSearch = useSupplierSearch();
     fetchBranches();
     fetchCountries();
     fetchPlants();
-	 supplierSearch.searchSuppliers();
+    supplierSearch.searchSuppliers();
   }, []);
 
   const fetchBranches = async () => {
@@ -1463,7 +1503,7 @@ const supplierSearch = useSupplierSearch();
   };
 
   const handleCustomerInputFocus = async () => {
-    if (!showCustomerDropdown) {
+    if (!showCustomerDropdown && selectedOrderPanels.length === 0) {
       if (customerSearch.customers.length === 0) {
         await customerSearch.searchCustomers("");
       }
@@ -1498,129 +1538,175 @@ const supplierSearch = useSupplierSearch();
     }));
   };
 
-  /** =========================
-   * FIXED: Handle Order Panel Multi-Select
-   ========================= */
-  const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
-    if (removePanelId) {
-      // Remove panel
-      setSelectedOrderPanels(prev => prev.filter(p => p._id !== removePanelId));
-      
-      // Remove all orders from this panel
-      setOrders(prev => prev.filter(order => order.orderPanelId !== removePanelId));
-      
-      // If no panels left, clear header
-      if (selectedOrderPanels.length === 1) {
-        setHeader(prev => ({
-          ...prev,
-          branch: null,
-          branchName: "",
-          branchCode: "",
-          partyName: "",
-          customerId: null,
-          collectionCharges: "",
-          cancellationCharges: "",
-          loadingCharges: "",
-          otherCharges: ""
-        }));
-        setSelectedCustomer(null);
-        setCustomerSearchQuery("");
-      }
-    } else {
-      // Add new panel
-      setSelectedOrderPanels(prev => [...prev, fullPanel]);
-      
-      // Add orders from this panel
-      if (fullPanel.plantRows && fullPanel.plantRows.length > 0) {
-        const newOrders = fullPanel.plantRows.map((row) => {
-          // Extract plant ID correctly
-          let plantId = null;
-          let plantName = '';
-          let plantCode = '';
-          
-          if (row.plantCode) {
-            if (typeof row.plantCode === 'object' && row.plantCode._id) {
-              plantId = row.plantCode._id;
-              plantName = row.plantCode.name || '';
-              plantCode = row.plantCode.code || '';
-            } else if (typeof row.plantCode === 'string' && isValidObjectId(row.plantCode)) {
-              plantId = row.plantCode;
-              plantName = row.plantName || '';
-              plantCode = row.plantCodeValue || '';
-            }
-          }
-          
-          // Also check if plant data is in other fields
-          if (!plantId && row.plantCodeValue) {
-            const plant = plants.find(p => p.code === row.plantCodeValue);
-            if (plant) {
-              plantId = plant._id;
-              plantName = plant.name;
-              plantCode = plant.code;
-            }
-          }
-          
-          return {
-            _id: uid(),
-            orderNo: fullPanel.orderPanelNo,
-            orderPanelId: fullPanel._id,
-            partyName: fullPanel.partyName || fullPanel.customerName || "",
-            customerId: fullPanel.customerId || null,
-            customerCode: fullPanel.customerCode || "",
-            contactPerson: fullPanel.contactPerson || "",
-            plantCode: plantId,
-            plantName: plantName || row.plantName || "",
-            plantCodeValue: plantCode || row.plantCodeValue || "",
-            orderType: row.orderType || "Sales",
-            pinCode: row.pinCode || "",
-            from: row.from || null,
-            fromName: row.fromName || "",
-            to: row.to || null,
-            toName: row.toName || "",
-            country: row.country || "",
-            countryName: row.countryName || "",
-            state: row.state || "",
-            stateName: row.stateName || "",
-            district: row.district || "",
-            districtName: row.districtName || "",
-            weight: row.weight || "",
-            status: row.status || "Open",
-          };
-        });
+/** =========================
+ * Handle Order Panel Multi-Select with Smart Billing Type - FIXED for APPENDING orders
+ ========================= */
+const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
+  if (removePanelId) {
+    // Remove panel
+    const panelToRemove = selectedOrderPanels.find(p => p._id === removePanelId);
+    
+    setSelectedOrderPanels(prev => prev.filter(p => p._id !== removePanelId));
+    setOrders(prev => prev.filter(order => order.orderPanelId !== removePanelId));
+    
+    // Subtract charges from the removed panel
+    if (panelToRemove) {
+      setHeader(prev => ({
+        ...prev,
+        collectionCharges: String(Math.max(0, (Number(prev.collectionCharges) || 0) - (Number(panelToRemove.collectionCharges) || 0))),
+        cancellationCharges: String(Math.max(0, (Number(prev.cancellationCharges) || 0) - (Number(panelToRemove.cancellationCharges) || 0))),
+        loadingCharges: String(Math.max(0, (Number(prev.loadingCharges) || 0) - (Number(panelToRemove.loadingCharges) || 0))),
+        otherCharges: String(Math.max(0, (Number(prev.otherCharges) || 0) - (Number(panelToRemove.otherCharges) || 0))),
+        loadingPoints: String(Math.max(0, (Number(prev.loadingPoints) || 0) - (Number(panelToRemove.loadingPoints) || 0))),
+        dropPoints: String(Math.max(0, (Number(prev.dropPoints) || 0) - (Number(panelToRemove.dropPoints) || 0)))
+      }));
+    }
+    
+    // If no panels left, add ONE empty row for manual entry
+    if (selectedOrderPanels.length === 1) {
+      setOrders([defaultOrderRow()]); // Add one empty row
+      setHeader(prev => ({
+        ...prev,
+        branch: null,
+        branchName: "",
+        branchCode: "",
+        partyName: "",
+        customerId: null,
+        collectionCharges: "",
+        cancellationCharges: "",
+        loadingCharges: "",
+        otherCharges: "",
+        loadingPoints: "",
+        dropPoints: ""
+      }));
+      setSelectedCustomer(null);
+      setCustomerSearchQuery("");
+    }
+  } else {
+    // Check if panel is already selected
+    if (selectedOrderPanels.some(p => p._id === fullPanel._id)) {
+      alert("This order panel is already selected");
+      return;
+    }
+    
+    // Add new panel to selected panels
+    const newSelectedPanels = [...selectedOrderPanels, fullPanel];
+    setSelectedOrderPanels(newSelectedPanels);
+    
+    // Create orders from this panel
+    if (fullPanel.plantRows && fullPanel.plantRows.length > 0) {
+      const newOrders = fullPanel.plantRows.map((row) => {
+        let plantId = null;
+        let plantName = '';
+        let plantCode = '';
         
-        setOrders(prev => [...prev, ...newOrders]);
-      }
-
-      // Update header with data from first selected panel (if this is the first)
-      if (selectedOrderPanels.length === 0) {
-        setHeader(prev => ({
-          ...prev,
-          branch: fullPanel.branch || null,
-          branchName: fullPanel.branchName || "",
-          branchCode: fullPanel.branchCode || "",
-          delivery: fullPanel.delivery || "Urgent",
-          date: fullPanel.date ? new Date(fullPanel.date).toISOString().split('T')[0] : prev.date,
-          partyName: fullPanel.partyName || fullPanel.customerName || "",
-          customerId: fullPanel.customerId || null,
-          collectionCharges: fullPanel.collectionCharges || "",
-          cancellationCharges: fullPanel.cancellationCharges || "",
-          loadingCharges: fullPanel.loadingCharges || "",
-          otherCharges: fullPanel.otherCharges || "",
-          loadingPoints: fullPanel.loadingPoints || "",
-          dropPoints: fullPanel.dropPoints || ""
-        }));
-
-        // Update customer selection
-        if (fullPanel.customerId) {
-          const customer = customerSearch.customers.find(c => c._id === fullPanel.customerId);
-          if (customer) {
-            setSelectedCustomer(customer);
-            setCustomerSearchQuery(customer.customerName);
+        if (row.plantCode) {
+          if (typeof row.plantCode === 'object' && row.plantCode._id) {
+            plantId = row.plantCode._id;
+            plantName = row.plantCode.name || '';
+            plantCode = row.plantCode.code || '';
+          } else if (typeof row.plantCode === 'string' && isValidObjectId(row.plantCode)) {
+            plantId = row.plantCode;
+            plantName = row.plantName || '';
+            plantCode = row.plantCodeValue || '';
           }
         }
+        
+        if (!plantId && row.plantCodeValue) {
+          const plant = plants.find(p => p.code === row.plantCodeValue);
+          if (plant) {
+            plantId = plant._id;
+            plantName = plant.name;
+            plantCode = plant.code;
+          }
+        }
+        
+        return {
+          _id: uid(),
+          orderNo: fullPanel.orderPanelNo,
+          orderPanelId: fullPanel._id,
+          partyName: fullPanel.partyName || fullPanel.customerName || "",
+          customerId: fullPanel.customerId || null,
+          customerCode: fullPanel.customerCode || "",
+          contactPerson: fullPanel.contactPerson || "",
+          plantCode: plantId,
+          plantName: plantName || row.plantName || "",
+          plantCodeValue: plantCode || row.plantCodeValue || "",
+          orderType: row.orderType || "Sales",
+          pinCode: row.pinCode || "",
+          from: row.from || null,
+          fromName: row.fromName || "",
+          to: row.to || null,
+          toName: row.toName || "",
+          taluka: row.taluka || "",
+          talukaName: row.talukaName || "",
+          district: row.district || "",
+          districtName: row.districtName || "",
+          state: row.state || "",
+          stateName: row.stateName || "",
+          country: row.country || "",
+          countryName: row.countryName || "",
+          weight: row.weight || "",
+          status: row.status || "Open",
+        };
+      });
+      
+      // ✅ FIXED: APPEND new orders to existing orders (don't replace)
+      setOrders(prev => {
+        // Check if we already have orders from this panel (avoid duplicates)
+        const existingOrdersFromPanel = prev.filter(o => o.orderPanelId === fullPanel._id);
+        if (existingOrdersFromPanel.length > 0) {
+          // Replace orders from this panel (update)
+          const otherOrders = prev.filter(o => o.orderPanelId !== fullPanel._id);
+          return [...otherOrders, ...newOrders];
+        }
+        // Append new orders
+        return [...prev, ...newOrders];
+      });
+    }
+
+    // Update header with charges
+    if (selectedOrderPanels.length === 0) {
+      // First panel - set initial values (replace empty header)
+      setHeader(prev => ({
+        ...prev,
+        branch: fullPanel.branch || null,
+        branchName: fullPanel.branchName || "",
+        branchCode: fullPanel.branchCode || "",
+        delivery: fullPanel.delivery || "Urgent",
+        date: fullPanel.date ? new Date(fullPanel.date).toISOString().split('T')[0] : prev.date,
+        partyName: fullPanel.partyName || fullPanel.customerName || "",
+        customerId: fullPanel.customerId || null,
+        collectionCharges: fullPanel.collectionCharges || "0",
+        cancellationCharges: fullPanel.cancellationCharges || "0",
+        loadingCharges: fullPanel.loadingCharges || "0",
+        otherCharges: fullPanel.otherCharges || "0",
+        loadingPoints: fullPanel.loadingPoints || "0",
+        dropPoints: fullPanel.dropPoints || "0"
+      }));
+    } else {
+      // Additional panels - ADD to existing values
+      setHeader(prev => ({
+        ...prev,
+        collectionCharges: String((Number(prev.collectionCharges) || 0) + (Number(fullPanel.collectionCharges) || 0)),
+        cancellationCharges: String((Number(prev.cancellationCharges) || 0) + (Number(fullPanel.cancellationCharges) || 0)),
+        loadingCharges: String((Number(prev.loadingCharges) || 0) + (Number(fullPanel.loadingCharges) || 0)),
+        otherCharges: String((Number(prev.otherCharges) || 0) + (Number(fullPanel.otherCharges) || 0)),
+        loadingPoints: String((Number(prev.loadingPoints) || 0) + (Number(fullPanel.loadingPoints) || 0)),
+        dropPoints: String((Number(prev.dropPoints) || 0) + (Number(fullPanel.dropPoints) || 0))
+      }));
+    }
+
+    // Update customer selection for first panel only
+    if (selectedOrderPanels.length === 0 && fullPanel.customerId) {
+      const customer = customerSearch.customers.find(c => c._id === fullPanel.customerId);
+      if (customer) {
+        setSelectedCustomer(customer);
+        setCustomerSearchQuery(customer.customerName);
       }
     }
-  };
+  }
+};
 
   /** =========================
    * ORDER ROW FUNCTIONS
@@ -1672,92 +1758,6 @@ const supplierSearch = useSupplierSearch();
    ========================= */
   const handleBillingTypeChange = (value) => {
     setHeader((prev) => ({ ...prev, billingType: value }));
-  };
-
-  // Handle plant selection
-  const handlePlantSelect = async (rowId, plant) => {
-    if (plant) {
-      updateOrder(rowId, 'plantCode', plant._id);
-      updateOrder(rowId, 'plantName', plant.name);
-      updateOrder(rowId, 'plantCodeValue', plant.code);
-    } else {
-      updateOrder(rowId, 'plantCode', null);
-      updateOrder(rowId, 'plantName', '');
-      updateOrder(rowId, 'plantCodeValue', '');
-    }
-  };
-
-  // Handle branch selection (From)
-  const handleFromSelect = (rowId, branch) => {
-    if (branch) {
-      updateOrder(rowId, 'from', branch._id);
-      updateOrder(rowId, 'fromName', `${branch.name} (${branch.code})`);
-    } else {
-      updateOrder(rowId, 'from', null);
-      updateOrder(rowId, 'fromName', '');
-    }
-  };
-
-  // Handle branch selection (To)
-  const handleToSelect = (rowId, branch) => {
-    if (branch) {
-      updateOrder(rowId, 'to', branch._id);
-      updateOrder(rowId, 'toName', `${branch.name} (${branch.code})`);
-    } else {
-      updateOrder(rowId, 'to', null);
-      updateOrder(rowId, 'toName', '');
-    }
-  };
-
-  // Handle country selection
-  const handleCountrySelect = async (rowId, country) => {
-    if (country) {
-      updateOrder(rowId, 'country', country.code);
-      updateOrder(rowId, 'countryName', country.name);
-      updateOrder(rowId, 'state', '');
-      updateOrder(rowId, 'stateName', '');
-      updateOrder(rowId, 'district', '');
-      updateOrder(rowId, 'districtName', '');
-      
-      const statesForCountry = await fetchStatesForCountry(country.code);
-      setStateData(prev => ({ ...prev, [country.code]: statesForCountry }));
-    } else {
-      updateOrder(rowId, 'country', '');
-      updateOrder(rowId, 'countryName', '');
-      updateOrder(rowId, 'state', '');
-      updateOrder(rowId, 'stateName', '');
-      updateOrder(rowId, 'district', '');
-      updateOrder(rowId, 'districtName', '');
-    }
-  };
-
-  // Handle state selection
-  const handleStateSelect = async (rowId, state) => {
-    if (state) {
-      updateOrder(rowId, 'state', state._id);
-      updateOrder(rowId, 'stateName', `${state.name} (${state.code})`);
-      updateOrder(rowId, 'district', '');
-      updateOrder(rowId, 'districtName', '');
-      
-      const districtsForState = await fetchDistrictsForState(state._id);
-      setDistrictData(prev => ({ ...prev, [state._id]: districtsForState }));
-    } else {
-      updateOrder(rowId, 'state', '');
-      updateOrder(rowId, 'stateName', '');
-      updateOrder(rowId, 'district', '');
-      updateOrder(rowId, 'districtName', '');
-    }
-  };
-
-  // Handle district selection
-  const handleDistrictSelect = (rowId, district) => {
-    if (district) {
-      updateOrder(rowId, 'district', district._id);
-      updateOrder(rowId, 'districtName', `${district.name} (${district.code})`);
-    } else {
-      updateOrder(rowId, 'district', '');
-      updateOrder(rowId, 'districtName', '');
-    }
   };
 
   /* ===== NEGOTIATION ===== */
@@ -1827,6 +1827,7 @@ const supplierSearch = useSupplierSearch();
       pinCode: o.pinCode || "-",
       from: o.fromName || "-",
       to: o.toName || "-",
+      taluka: o.talukaName || "-",
       district: o.districtName || "-",
       state: o.stateName || "-",
       country: o.countryName || "-",
@@ -2023,6 +2024,8 @@ const supplierSearch = useSupplierSearch();
           fromName: order.fromName,
           to: order.to || null,
           toName: order.toName,
+          taluka: order.taluka,
+          talukaName: order.talukaName,
           district: order.district,
           districtName: order.districtName,
           state: order.state,
@@ -2042,7 +2045,7 @@ const supplierSearch = useSupplierSearch();
         },
         vendors: vendors.map(vendor => ({
           vendorName: vendor.vendorName,
-		    vendorCode: vendor.vendorCode || '',
+          vendorCode: vendor.vendorCode || '',
           marketRate: num(vendor.marketRate)
         })),
         voiceUrl: voiceUrl || '',
@@ -2123,7 +2126,7 @@ const supplierSearch = useSupplierSearch();
       header.cancellationCharges || 
       header.loadingCharges || 
       header.otherCharges ||
-      orders.length > 0 ||
+      orders.length > 1 ||
       vendors.some(vendor => vendor.vendorName || vendor.marketRate) ||
       negotiation.maxRate !== "" ||
       negotiation.targetRate !== "" ||
@@ -2158,7 +2161,7 @@ const supplierSearch = useSupplierSearch();
       customerId: null
     });
     
-    setOrders([]);
+    setOrders([defaultOrderRow()]);
     
     setNegotiation({
       maxRate: "",
@@ -2216,21 +2219,21 @@ const supplierSearch = useSupplierSearch();
     { key: "partyName", label: "Party Name" },
     { key: "plantCode", label: "Plant Code *" },
     { key: "plantName", label: "Plant Name" },
-    { key: "plantCodeValue", label: "Plant Code Value" },
     { key: "orderType", label: "Order Type" },
     { key: "pinCode", label: "Pin Code" },
     { key: "from", label: "From" },
     { key: "to", label: "To" },
-    { key: "country", label: "Country" },
-    { key: "state", label: "State" },
+    { key: "taluka", label: "Taluka" },
     { key: "district", label: "District" },
+    { key: "state", label: "State" },
+    { key: "country", label: "Country" },
     { key: "weight", label: "Weight" },
     { key: "status", label: "Status" },
   ];
 
   const vendorColumns = [
     { key: "vendorName", label: "Supplier Name" },
-	 { key: "vendorCode", label: "Supplier Code" },
+    { key: "vendorCode", label: "Supplier Code" },
     { key: "marketRate", label: "Market Rates", type: "number" },
   ];
 
@@ -2244,6 +2247,7 @@ const supplierSearch = useSupplierSearch();
     { key: "pinCode", label: "Pin Code" },
     { key: "from", label: "From" },
     { key: "to", label: "To" },
+    { key: "taluka", label: "Taluka" },
     { key: "district", label: "District" },
     { key: "state", label: "State" },
     { key: "country", label: "Country" },
@@ -2264,20 +2268,22 @@ const supplierSearch = useSupplierSearch();
   ];
 
   /* =======================
-    Custom Yellow Table for Orders - FIXED: Shows empty state message
+    Custom Yellow Table for Orders - FIXED with scrollable and taluka
   ========================= */
   const OrdersTable = ({ rows, onChange, onRemove }) => {
     const columns = ordersColumns;
+    const isReadOnlyMode = selectedOrderPanels.length > 0;
 
     return (
-      <div className="overflow-auto rounded-xl border border-yellow-300">
-        <table className="min-w-full w-full text-sm">
-          <thead className="sticky top-0 bg-yellow-400">
+      <div className="overflow-auto rounded-xl border border-yellow-300 max-h-[500px]">
+        <table className="min-w-max w-full text-sm">
+          <thead className="sticky top-0 bg-yellow-400 z-10">
             <tr>
               {columns.map((col) => (
                 <th
                   key={col.key}
                   className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
+                  style={{ minWidth: col.key === "orderNo" ? "120px" : col.key === "partyName" ? "150px" : "120px" }}
                 >
                   {col.label}
                 </th>
@@ -2291,6 +2297,8 @@ const supplierSearch = useSupplierSearch();
           <tbody>
             {rows.length > 0 ? (
               rows.map((row) => {
+                const isReadOnly = isReadOnlyMode || (row.orderPanelId && selectedOrderPanels.length > 0);
+                
                 return (
                   <tr key={row._id} className="hover:bg-yellow-50 even:bg-slate-50">
                     {/* Order No */}
@@ -2298,7 +2306,10 @@ const supplierSearch = useSupplierSearch();
                       <input
                         value={row.orderNo || ""}
                         onChange={(e) => onChange(row._id, 'orderNo', e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                        readOnly={isReadOnly}
+                        className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                          isReadOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                        }`}
                         placeholder="Enter Order No"
                       />
                     </td>
@@ -2308,7 +2319,10 @@ const supplierSearch = useSupplierSearch();
                       <input
                         value={row.partyName || ""}
                         onChange={(e) => onChange(row._id, 'partyName', e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                        readOnly={isReadOnly}
+                        className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                          isReadOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                        }`}
                         placeholder="Enter Party Name"
                       />
                     </td>
@@ -2318,7 +2332,10 @@ const supplierSearch = useSupplierSearch();
                       <input
                         value={row.plantCode || ""}
                         onChange={(e) => onChange(row._id, 'plantCode', e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                        readOnly={isReadOnly}
+                        className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                          isReadOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                        }`}
                         placeholder="Enter Plant Code"
                       />
                     </td>
@@ -2329,19 +2346,11 @@ const supplierSearch = useSupplierSearch();
                         type="text"
                         value={row.plantName || ""}
                         onChange={(e) => onChange(row._id, 'plantName', e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                        readOnly={isReadOnly}
+                        className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                          isReadOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                        }`}
                         placeholder="Enter Plant Name"
-                      />
-                    </td>
-
-                    {/* Plant Code Value */}
-                    <td className="border border-yellow-300 px-2 py-2">
-                      <input
-                        type="text"
-                        value={row.plantCodeValue || ""}
-                        onChange={(e) => onChange(row._id, 'plantCodeValue', e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                        placeholder="Enter Plant Code Value"
                       />
                     </td>
 
@@ -2350,7 +2359,10 @@ const supplierSearch = useSupplierSearch();
                       <select
                         value={row.orderType || ""}
                         onChange={(e) => onChange(row._id, 'orderType', e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                        disabled={isReadOnly}
+                        className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                          isReadOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                        }`}
                       >
                         <option value="">Select Order Type</option>
                         {ORDER_TYPES.map((opt) => (
@@ -2366,7 +2378,10 @@ const supplierSearch = useSupplierSearch();
                       <input
                         value={row.pinCode || ""}
                         onChange={(e) => onChange(row._id, 'pinCode', e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                        readOnly={isReadOnly}
+                        className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                          isReadOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                        }`}
                         placeholder="Enter Pin Code"
                       />
                     </td>
@@ -2376,7 +2391,10 @@ const supplierSearch = useSupplierSearch();
                       <input
                         value={row.fromName || ""}
                         onChange={(e) => onChange(row._id, 'fromName', e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                        readOnly={isReadOnly}
+                        className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                          isReadOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                        }`}
                         placeholder="Enter From"
                       />
                     </td>
@@ -2386,38 +2404,63 @@ const supplierSearch = useSupplierSearch();
                       <input
                         value={row.toName || ""}
                         onChange={(e) => onChange(row._id, 'toName', e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                        readOnly={isReadOnly}
+                        className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                          isReadOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                        }`}
                         placeholder="Enter To"
                       />
                     </td>
 
-                    {/* Country */}
+                    {/* Taluka */}
                     <td className="border border-yellow-300 px-2 py-2">
                       <input
-                        value={row.countryName || ""}
-                        onChange={(e) => onChange(row._id, 'countryName', e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                        placeholder="Enter Country"
-                      />
-                    </td>
-
-                    {/* State */}
-                    <td className="border border-yellow-300 px-2 py-2">
-                      <input
-                        value={row.stateName || ""}
-                        onChange={(e) => onChange(row._id, 'stateName', e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                        placeholder="Enter State"
+                        value={row.talukaName || row.taluka || ""}
+                        onChange={(e) => onChange(row._id, 'talukaName', e.target.value)}
+                        readOnly={isReadOnly}
+                        className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                          isReadOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                        }`}
+                        placeholder="Enter Taluka"
                       />
                     </td>
 
                     {/* District */}
                     <td className="border border-yellow-300 px-2 py-2">
                       <input
-                        value={row.districtName || ""}
+                        value={row.districtName || row.district || ""}
                         onChange={(e) => onChange(row._id, 'districtName', e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                        readOnly={isReadOnly}
+                        className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                          isReadOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                        }`}
                         placeholder="Enter District"
+                      />
+                    </td>
+
+                    {/* State */}
+                    <td className="border border-yellow-300 px-2 py-2">
+                      <input
+                        value={row.stateName || row.state || ""}
+                        onChange={(e) => onChange(row._id, 'stateName', e.target.value)}
+                        readOnly={isReadOnly}
+                        className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                          isReadOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                        }`}
+                        placeholder="Enter State"
+                      />
+                    </td>
+
+                    {/* Country */}
+                    <td className="border border-yellow-300 px-2 py-2">
+                      <input
+                        value={row.countryName || row.country || ""}
+                        onChange={(e) => onChange(row._id, 'countryName', e.target.value)}
+                        readOnly={isReadOnly}
+                        className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                          isReadOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                        }`}
+                        placeholder="Enter Country"
                       />
                     </td>
 
@@ -2427,7 +2470,10 @@ const supplierSearch = useSupplierSearch();
                         type="number"
                         value={row.weight || ""}
                         onChange={(e) => onChange(row._id, 'weight', e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                        readOnly={isReadOnly}
+                        className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                          isReadOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                        }`}
                         placeholder="Enter Weight"
                       />
                     </td>
@@ -2437,7 +2483,10 @@ const supplierSearch = useSupplierSearch();
                       <select
                         value={row.status || ""}
                         onChange={(e) => onChange(row._id, 'status', e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                        disabled={isReadOnly}
+                        className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                          isReadOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                        }`}
                       >
                         <option value="">Select Status</option>
                         {STATUSES.map((opt) => (
@@ -2448,20 +2497,14 @@ const supplierSearch = useSupplierSearch();
                       </select>
                     </td>
 
-                    {/* Actions */}
-                    <td className="border border-yellow-300 px-2 py-2 text-center">
-                      {header.billingType === "Multi - Order" && rows.length > 1 && (
-                        <button
-                          onClick={() => onRemove(row._id)}
-                          className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-600 transition"
-                        >
-                          Remove
-                        </button>
-                      )}
-                      {header.billingType === "Multi - Order" && rows.length === 1 && (
-                        <span className="text-xs text-slate-400">Required</span>
-                      )}
-                    </td>
+                {/* Actions */}
+<td className="border border-yellow-300 px-2 py-2 text-center">
+  {isReadOnly ? (
+    <span className="text-xs text-slate-400">Read Only</span>
+  ) : (
+    <span className="text-xs text-slate-400">-</span>
+  )}
+</td>
                   </tr>
                 );
               })
@@ -2566,6 +2609,7 @@ const supplierSearch = useSupplierSearch();
                 required={true}
                 displayField="name"
                 codeField="code"
+                disabled={selectedOrderPanels.length > 0}
               />
             </div>
 
@@ -2574,7 +2618,8 @@ const supplierSearch = useSupplierSearch();
               label="Delivery"
               value={header.delivery}
               onChange={(v) => setHeader((p) => ({ ...p, delivery: v }))}
-              options={["Urgent", "Normal"]}
+              options={["Urgent", "Normal", "Express", "Scheduled"]}
+              readOnly={selectedOrderPanels.length > 0}
             />
 
             <Input
@@ -2583,9 +2628,10 @@ const supplierSearch = useSupplierSearch();
               label="Date"
               value={header.date}
               onChange={(v) => setHeader((p) => ({ ...p, date: v }))}
+              readOnly={selectedOrderPanels.length > 0}
             />
             
-            {/* Customer Search - Party Name Field */}
+            {/* Customer Search - Party Name Field - Read Only when panels selected */}
             <div className="col-span-12 md:col-span-3 relative">
               <label className="text-xs font-bold text-slate-600">Party Name</label>
               <input
@@ -2594,12 +2640,15 @@ const supplierSearch = useSupplierSearch();
                 onChange={(e) => handleCustomerSearch(e.target.value)}
                 onFocus={handleCustomerInputFocus}
                 onBlur={handleCustomerInputBlur}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                readOnly={selectedOrderPanels.length > 0}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                  selectedOrderPanels.length > 0 ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                }`}
                 placeholder="Search customer by name..."
                 autoComplete="off"
               />
               
-              {showCustomerDropdown && (
+              {showCustomerDropdown && selectedOrderPanels.length === 0 && (
                 <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
                   {customerSearch.loading ? (
                     <div className="p-3 text-center text-sm text-slate-500">
@@ -2635,36 +2684,31 @@ const supplierSearch = useSupplierSearch();
           <div className="mb-4">
             <div className="text-sm font-bold text-slate-700 mb-2">Billing Type / Charges</div>
             <BillingTypeTable 
-              header={header} 
-              setHeader={setHeader} 
-              billingColumns={billingColumns}
-              selectedOrderPanels={selectedOrderPanels}
-            />
+  header={header} 
+  setHeader={setHeader} 
+  billingColumns={billingColumns}
+  selectedOrderPanels={selectedOrderPanels}
+  orders={orders}
+/>
           </div>
 
           {/* Orders Table */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-sm font-bold text-slate-700">
-                Orders (Part-1) - {header.billingType} - {orders.length} row{orders.length !== 1 ? 's' : ''}
-              </div>
-              
-              {header.billingType === "Multi - Order" && (
-                <button
-                  onClick={addOrder}
-                  className="rounded-xl bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-700"
-                >
-                  + Add Row
-                </button>
-              )}
-            </div>
-            
-            <OrdersTable
-              rows={orders}
-              onChange={updateOrder}
-              onRemove={removeOrder}
-            />
-          </div>
+{/* Orders Table */}
+<div>
+  <div className="flex items-center justify-between mb-4">
+    <div className="text-sm font-bold text-slate-700">
+      Orders (Part-1) - {selectedOrderPanels.length > 0 ? "Multi - Order" : "Single Order"} - {orders.length} row{orders.length !== 1 ? 's' : ''}
+    </div>
+    
+    {/* Remove the Add Row button - no manual adding */}
+  </div>
+  
+  <OrdersTable
+    rows={orders}
+    onChange={updateOrder}
+    onRemove={removeOrder}
+  />
+</div>
 
           {/* Total Weight */}
           <div className="flex justify-end mt-4">
@@ -2705,102 +2749,102 @@ const supplierSearch = useSupplierSearch();
             />
           </div>
 
-        {/* Vendors / Market Rates */}
-<div className="mb-4">
-  <div className="flex items-center justify-between mb-4">
-    <div className="text-sm font-bold text-slate-700">Suppliers / Market Rates</div>
-    <button
-      onClick={addVendor}
-      className="rounded-xl bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-700"
-    >
-      + Add Supplier
-    </button>
-  </div>
-  
-  <div className="overflow-auto rounded-xl border border-yellow-300">
-    <table className="min-w-full w-full text-sm">
-      <thead className="sticky top-0 bg-yellow-400">
-        <tr>
-          {vendorColumns.map((col) => (
-            <th
-              key={col.key}
-              className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
-            >
-              {col.label}
-            </th>
-          ))}
-          <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
-            Actions
-          </th>
-        </tr>
-      </thead>
+          {/* Vendors / Market Rates */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-sm font-bold text-slate-700">Suppliers / Market Rates</div>
+              <button
+                onClick={addVendor}
+                className="rounded-xl bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-700"
+              >
+                + Add Supplier
+              </button>
+            </div>
+            
+            <div className="overflow-auto rounded-xl border border-yellow-300 max-h-[300px]">
+              <table className="min-w-full w-full text-sm">
+                <thead className="sticky top-0 bg-yellow-400">
+                  <tr>
+                    {vendorColumns.map((col) => (
+                      <th
+                        key={col.key}
+                        className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
+                      >
+                        {col.label}
+                      </th>
+                    ))}
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
 
-      <tbody>
-        {vendors.map((row, index) => (
-          <tr key={row._id} className="hover:bg-yellow-50 even:bg-slate-50">
-            {/* Supplier Name with Dropdown */}
-            <td className="border border-yellow-300 px-2 py-2">
-              <TableSearchableDropdown
-                items={supplierSearch?.suppliers || []}
-                selectedId={row.vendorName}
-                onSelect={(supplier) => {
-                  if (supplier) {
-                    const newVendors = [...vendors];
-                    newVendors[index] = {
-                      ...newVendors[index],
-                      vendorName: supplier.supplierName,
-                      vendorCode: supplier.supplierCode || '',
-                      marketRate: newVendors[index].marketRate || ''
-                    };
-                    setVendors(newVendors);
-                  }
-                }}
-                placeholder="Select Supplier"
-                displayField="supplierName"
-                codeField="supplierCode"
-                cellId={`supplier-${row._id}`}
-              />
-            </td>
-            
-            {/* Supplier Code - Auto-filled */}
-            <td className="border border-yellow-300 px-2 py-2">
-              <input
-                type="text"
-                value={row.vendorCode || ""}
-                readOnly
-                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm outline-none cursor-not-allowed"
-                placeholder="Auto-filled"
-              />
-            </td>
-            
-            {/* Market Rate */}
-            <td className="border border-yellow-300 px-2 py-2">
-              <input
-                type="number"
-                value={row.marketRate || ""}
-                onChange={(e) => updateVendor(row._id, 'marketRate', e.target.value)}
-                className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                placeholder="Enter Market Rate"
-              />
-            </td>
-            
-            {/* Actions */}
-            <td className="border border-yellow-300 px-2 py-2 text-center">
-              {vendors.length > 1 && (
-                <button
-                  onClick={() => removeVendor(row._id)}
-                  className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-600 transition"
-                >
-                  Remove
-                </button>
-              )}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-</div>
+                <tbody>
+                  {vendors.map((row, index) => (
+                    <tr key={row._id} className="hover:bg-yellow-50 even:bg-slate-50">
+                      {/* Supplier Name with Dropdown */}
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <TableSearchableDropdown
+                          items={supplierSearch?.suppliers || []}
+                          selectedId={row.vendorName}
+                          onSelect={(supplier) => {
+                            if (supplier) {
+                              const newVendors = [...vendors];
+                              newVendors[index] = {
+                                ...newVendors[index],
+                                vendorName: supplier.supplierName,
+                                vendorCode: supplier.supplierCode || '',
+                                marketRate: newVendors[index].marketRate || ''
+                              };
+                              setVendors(newVendors);
+                            }
+                          }}
+                          placeholder="Select Supplier"
+                          displayField="supplierName"
+                          codeField="supplierCode"
+                          cellId={`supplier-${row._id}`}
+                        />
+                      </td>
+                      
+                      {/* Supplier Code - Auto-filled */}
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.vendorCode || ""}
+                          readOnly
+                          className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm outline-none cursor-not-allowed"
+                          placeholder="Auto-filled"
+                        />
+                      </td>
+                      
+                      {/* Market Rate */}
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="number"
+                          value={row.marketRate || ""}
+                          onChange={(e) => updateVendor(row._id, 'marketRate', e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                          placeholder="Enter Market Rate"
+                        />
+                      </td>
+                      
+                      {/* Actions */}
+                      <td className="border border-yellow-300 px-2 py-2 text-center">
+                        {vendors.length > 1 && (
+                          <button
+                            onClick={() => removeVendor(row._id)}
+                            className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-600 transition"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
           {/* Remarks & Voice Note */}
           <div className="grid grid-cols-12 gap-4">
             <div className="col-span-12 md:col-span-7">

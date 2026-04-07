@@ -94,8 +94,23 @@ const pricingPanelSchema = new mongoose.Schema({
     countryName: String,
     state: String,
     stateName: String,
+    stateId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'State'
+    },
     district: String,
     districtName: String,
+    districtId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'District'
+    },
+    // TALUKA FIELDS - ADDED
+    taluka: String,
+    talukaName: String,
+    talukaId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Taluka'
+    },
     from: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Branch'
@@ -106,10 +121,11 @@ const pricingPanelSchema = new mongoose.Schema({
       ref: 'Branch'
     },
     toName: String,
-    locationRate: {
-      type: Number,
-      default: 0
-    },
+    // In the orders array schema
+locationRate: {
+  type: String,  // Changed from Number to String
+  default: ''
+},
     priceList: String,
     weight: {
       type: Number,
@@ -163,6 +179,7 @@ const pricingPanelSchema = new mongoose.Schema({
     plantCode: String,
     orderType: String,
     pinCode: String,
+    taluka: String,
     state: String,
     district: String,
     from: String,
@@ -220,7 +237,7 @@ pricingPanelSchema.pre('save', function(next) {
   this.totalWeight = this.orders.reduce((sum, order) => sum + (order.weight || 0), 0);
   this.totalAmount = this.orders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
   
-  // Generate report rows from orders
+  // Generate report rows from orders with taluka
   this.reportRows = this.orders.map(order => ({
     date: this.date,
     pricingSerialNo: this.pricingSerialNo,
@@ -229,6 +246,7 @@ pricingPanelSchema.pre('save', function(next) {
     plantCode: order.plantName || '-',
     orderType: order.orderType,
     pinCode: order.pinCode || '-',
+    taluka: order.talukaName || order.taluka || '-',
     state: order.stateName || '-',
     district: order.districtName || '-',
     from: order.fromName || '-',

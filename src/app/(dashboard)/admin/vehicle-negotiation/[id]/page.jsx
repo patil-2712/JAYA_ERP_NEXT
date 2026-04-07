@@ -313,6 +313,8 @@ function defaultOrderRow(index = 1) {
     fromName: "",
     to: "",
     toName: "",
+    taluka: "",
+    talukaName: "",
     district: "",
     districtName: "",
     state: "",
@@ -328,7 +330,7 @@ function defaultVendorRow() {
   return {
     _id: uid(),
     vendorName: "",
-	 vendorCode: "",
+    vendorCode: "",
     marketRate: "",
   };
 }
@@ -954,7 +956,7 @@ function VehicleSearchDropdown({
 }
 
 /* =======================
-  Multi-Select Order Panel Dropdown Component - FIXED
+  Multi-Select Order Panel Dropdown Component
 ========================= */
 function MultiSelectOrderPanelDropdown({ 
   selectedPanels = [],
@@ -965,7 +967,7 @@ function MultiSelectOrderPanelDropdown({
   const [showDropdown, setShowDropdown] = useState(false);
   const [panels, setPanels] = useState([]);
   const [allPanels, setAllPanels] = useState([]);
-  const [count, setCount] = useState(0); // Added for showing count
+  const [count, setCount] = useState(0);
   const dropdownRef = useRef(null);
   const orderPanelSearch = useOrderPanelSearch();
 
@@ -973,7 +975,6 @@ function MultiSelectOrderPanelDropdown({
     if (orderPanelSearch.orderPanels.length > 0) {
       setAllPanels(orderPanelSearch.orderPanels);
       
-      // Filter out already selected panels from the available panels
       const selectedIds = selectedPanels.map(p => p._id);
       const filtered = orderPanelSearch.orderPanels.filter(
         panel => !selectedIds.includes(panel._id)
@@ -1021,7 +1022,6 @@ function MultiSelectOrderPanelDropdown({
       if (fullPanel) {
         onSelect(fullPanel);
         
-        // Remove the selected panel from the dropdown list
         setPanels(prev => {
           const newPanels = prev.filter(p => p._id !== panel._id);
           setCount(newPanels.length);
@@ -1034,7 +1034,6 @@ function MultiSelectOrderPanelDropdown({
   };
 
   const handleRemovePanel = (panelId) => {
-    // When removing a panel, add it back to the dropdown list
     const removedPanel = selectedPanels.find(p => p._id === panelId);
     onSelect(null, panelId);
     
@@ -1056,7 +1055,6 @@ function MultiSelectOrderPanelDropdown({
   };
 
   const handleInputFocus = async () => {
-    // Refresh the list of available panels
     await orderPanelSearch.searchOrderPanels();
     
     const selectedIds = selectedPanels.map(p => p._id);
@@ -1144,35 +1142,40 @@ function MultiSelectOrderPanelDropdown({
 }
 
 /* =======================
-  Orders Table Component
+  Orders Table Component - SCROLLABLE WITH TALUKA
+========================= */
+/* =======================
+  Orders Table Component - SCROLLABLE WITH TALUKA
 ========================= */
 function OrdersTable({ rows, onChange, onRemove, billingType, readOnly = false }) {
   const columns = [
-    { key: "orderNo", label: "Order No" },
-    { key: "partyName", label: "Party Name" },
-    { key: "plantCode", label: "Plant Code *" },
-    { key: "plantName", label: "Plant Name" },
-    { key: "plantCodeValue", label: "Plant Code Value" },
-    { key: "orderType", label: "Order Type" },
-    { key: "pinCode", label: "Pin Code" },
-    { key: "from", label: "From" },
-    { key: "to", label: "To" },
-    { key: "country", label: "Country" },
-    { key: "state", label: "State" },
-    { key: "district", label: "District" },
-    { key: "weight", label: "Weight" },
-    { key: "status", label: "Status" },
+    { key: "orderNo", label: "Order No", minWidth: "120px" },
+    { key: "partyName", label: "Party Name", minWidth: "150px" },
+    { key: "plantCode", label: "Plant Code *", minWidth: "120px" },
+    { key: "plantName", label: "Plant Name", minWidth: "120px" },
+    { key: "plantCodeValue", label: "Plant Code Value", minWidth: "120px" },
+    { key: "orderType", label: "Order Type", minWidth: "120px" },
+    { key: "pinCode", label: "Pin Code", minWidth: "100px" },
+    { key: "from", label: "From", minWidth: "120px" },
+    { key: "to", label: "To", minWidth: "120px" },
+    { key: "taluka", label: "Taluka", minWidth: "120px" },
+    { key: "country", label: "Country", minWidth: "100px" },
+    { key: "state", label: "State", minWidth: "100px" },
+    { key: "district", label: "District", minWidth: "100px" },
+    { key: "weight", label: "Weight", minWidth: "80px" },
+    { key: "status", label: "Status", minWidth: "100px" },
   ];
 
   return (
-    <div className="overflow-auto rounded-xl border border-yellow-300">
-      <table className="min-w-full w-full text-sm">
-        <thead className="sticky top-0 bg-yellow-400">
+    <div className="overflow-auto rounded-xl border border-yellow-300 max-h-[500px]">
+      <table className="min-w-max w-full text-sm">
+        <thead className="sticky top-0 bg-yellow-400 z-10">
           <tr>
             {columns.map((col) => (
               <th
                 key={col.key}
                 className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
+                style={{ minWidth: col.minWidth }}
               >
                 {col.label}
               </th>
@@ -1312,6 +1315,19 @@ function OrdersTable({ rows, onChange, onRemove, billingType, readOnly = false }
                   />
                 </td>
 
+                {/* Taluka */}
+                <td className="border border-yellow-300 px-2 py-2">
+                  <input
+                    value={row.talukaName || row.taluka || ""}
+                    onChange={(e) => onChange(row._id, 'talukaName', e.target.value)}
+                    readOnly={readOnly}
+                    className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                      readOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                    }`}
+                    placeholder="Enter Taluka"
+                  />
+                </td>
+
                 {/* Country */}
                 <td className="border border-yellow-300 px-2 py-2">
                   <input
@@ -1386,7 +1402,7 @@ function OrdersTable({ rows, onChange, onRemove, billingType, readOnly = false }
 
                 {/* Actions */}
                 <td className="border border-yellow-300 px-2 py-2 text-center">
-                  {billingType === "Multi - Order" && !readOnly && (
+                  {billingType === "Multi - Order" && !readOnly && rows.length > 1 && (
                     <button
                       onClick={() => onRemove(row._id)}
                       className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-600 transition"
@@ -1416,9 +1432,6 @@ function OrdersTable({ rows, onChange, onRemove, billingType, readOnly = false }
 /* =======================
   Vendors Table Component
 ========================= */
-/* =======================
-  Vendors Table Component with Supplier Dropdown
-========================= */
 function VendorsTable({ rows, onChange, onRemove, readOnly = false, suppliers = [] }) {
   const columns = [
     { key: "vendorName", label: "Supplier Name" },
@@ -1427,9 +1440,9 @@ function VendorsTable({ rows, onChange, onRemove, readOnly = false, suppliers = 
   ];
 
   return (
-    <div className="overflow-auto rounded-xl border border-yellow-300">
+    <div className="overflow-auto rounded-xl border border-yellow-300 max-h-[300px]">
       <table className="min-w-full w-full text-sm">
-        <thead className="sticky top-0 bg-yellow-400">
+        <thead className="sticky top-0 bg-yellow-400 z-10">
           <tr>
             {columns.map((col) => (
               <th
@@ -1449,7 +1462,6 @@ function VendorsTable({ rows, onChange, onRemove, readOnly = false, suppliers = 
           {rows.length > 0 ? (
             rows.map((row, index) => (
               <tr key={row._id} className="hover:bg-yellow-50 even:bg-slate-50">
-                {/* Supplier Name with Dropdown */}
                 <td className="border border-yellow-300 px-2 py-2">
                   <TableSearchableDropdown
                     items={suppliers || []}
@@ -1463,7 +1475,6 @@ function VendorsTable({ rows, onChange, onRemove, readOnly = false, suppliers = 
                           vendorCode: supplier.supplierCode || '',
                           marketRate: newVendors[index].marketRate || ''
                         };
-                        // Trigger onChange for the updated row
                         onChange(newVendors[index]._id, 'vendorName', newVendors[index].vendorName);
                         onChange(newVendors[index]._id, 'vendorCode', newVendors[index].vendorCode);
                       }
@@ -1476,7 +1487,6 @@ function VendorsTable({ rows, onChange, onRemove, readOnly = false, suppliers = 
                   />
                 </td>
                 
-                {/* Supplier Code - Auto-filled */}
                 <td className="border border-yellow-300 px-2 py-2">
                   <input
                     type="text"
@@ -1487,7 +1497,6 @@ function VendorsTable({ rows, onChange, onRemove, readOnly = false, suppliers = 
                   />
                 </td>
                 
-                {/* Market Rate */}
                 <td className="border border-yellow-300 px-2 py-2">
                   <input
                     type="number"
@@ -1501,7 +1510,6 @@ function VendorsTable({ rows, onChange, onRemove, readOnly = false, suppliers = 
                   />
                 </td>
                 
-                {/* Actions */}
                 <td className="border border-yellow-300 px-2 py-2 text-center">
                   {!readOnly && rows.length > 1 && (
                     <button
@@ -1644,171 +1652,157 @@ export default function EditVehicleNegotiation() {
     fetchBranches();
     fetchCountries();
     fetchPlants();
-    supplierSearch.searchSuppliers(); // Fetch suppliers
+    supplierSearch.searchSuppliers();
     fetchNegotiationData();
   }, []);
 
- const fetchNegotiationData = async () => {
-  setFetchLoading(true);
-  try {
-    const token = localStorage.getItem('token');
-    
-    // Fetch the vehicle negotiation
-    const res = await fetch(`/api/vehicle-negotiation?id=${negotiationId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    
-    const data = await res.json();
-    
-    if (!data.success) {
-      throw new Error(data.message || 'Failed to fetch vehicle negotiation');
-    }
-
-    const vn = data.data;
-    
-    // Set VNN number
-    setVnnNumber(vn.vnnNo || "");
-    
-    // Set header data
-    setHeader({
-      vnnNo: vn.vnnNo || "",
-      branch: vn.branch || "",
-      branchName: vn.branchName || "",
-      branchCode: vn.branchCode || "",
-      delivery: vn.delivery || "Urgent",
-      date: vn.date ? new Date(vn.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-      billingType: vn.billingType || "Multi - Order",
-      loadingPoints: vn.loadingPoints?.toString() || "",
-      dropPoints: vn.dropPoints?.toString() || "",
-      collectionCharges: vn.collectionCharges?.toString() || "",
-      cancellationCharges: vn.cancellationCharges || "",
-      loadingCharges: vn.loadingCharges || "",
-      otherCharges: vn.otherCharges || "",
-      partyName: vn.partyName || vn.customerName || "",
-      customerId: vn.customerId || ""
-    });
-
-    // Set customer data
-    if (vn.customerName) {
-      setSelectedCustomer({
-        _id: vn.customerId,
-        customerName: vn.customerName,
-        customerCode: vn.customerCode || "",
-        contactPersonName: vn.contactPerson || ""
+  const fetchNegotiationData = async () => {
+    setFetchLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      
+      const res = await fetch(`/api/vehicle-negotiation?id=${negotiationId}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-      setCustomerSearchQuery(vn.customerName);
-    }
+      
+      const data = await res.json();
+      
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to fetch vehicle negotiation');
+      }
 
-    // Set orders
-    if (vn.orders && vn.orders.length > 0) {
-      const processedOrders = vn.orders.map(order => ({
-        ...order,
-        _id: order._id || uid(),
-        weight: order.weight?.toString() || "",
-      }));
-      setOrders(processedOrders);
-    }
+      const vn = data.data;
+      
+      setVnnNumber(vn.vnnNo || "");
+      
+      setHeader({
+        vnnNo: vn.vnnNo || "",
+        branch: vn.branch || "",
+        branchName: vn.branchName || "",
+        branchCode: vn.branchCode || "",
+        delivery: vn.delivery || "Urgent",
+        date: vn.date ? new Date(vn.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        billingType: vn.billingType || "Multi - Order",
+        loadingPoints: vn.loadingPoints?.toString() || "",
+        dropPoints: vn.dropPoints?.toString() || "",
+        collectionCharges: vn.collectionCharges?.toString() || "",
+        cancellationCharges: vn.cancellationCharges || "",
+        loadingCharges: vn.loadingCharges || "",
+        otherCharges: vn.otherCharges || "",
+        partyName: vn.partyName || vn.customerName || "",
+        customerId: vn.customerId || ""
+      });
 
-    // Set order panels - IMPORTANT: Need to fetch full panel data
-    if (vn.selectedOrderPanels && vn.selectedOrderPanels.length > 0) {
-      // Fetch full panel details for each selected panel
-      const fullPanels = [];
-      for (const panel of vn.selectedOrderPanels) {
-        try {
-          const fullPanel = await orderPanelSearch.getOrderPanelById(panel._id);
-          if (fullPanel) {
-            fullPanels.push(fullPanel);
-          } else {
-            // If can't fetch, use the existing data
+      if (vn.customerName) {
+        setSelectedCustomer({
+          _id: vn.customerId,
+          customerName: vn.customerName,
+          customerCode: vn.customerCode || "",
+          contactPersonName: vn.contactPerson || ""
+        });
+        setCustomerSearchQuery(vn.customerName);
+      }
+
+      if (vn.orders && vn.orders.length > 0) {
+        const processedOrders = vn.orders.map(order => ({
+          ...order,
+          _id: order._id || uid(),
+          weight: order.weight?.toString() || "",
+        }));
+        setOrders(processedOrders);
+      }
+
+      if (vn.selectedOrderPanels && vn.selectedOrderPanels.length > 0) {
+        const fullPanels = [];
+        for (const panel of vn.selectedOrderPanels) {
+          try {
+            const fullPanel = await orderPanelSearch.getOrderPanelById(panel._id);
+            if (fullPanel) {
+              fullPanels.push(fullPanel);
+            } else {
+              fullPanels.push(panel);
+            }
+          } catch (err) {
+            console.error("Error fetching panel:", err);
             fullPanels.push(panel);
           }
-        } catch (err) {
-          console.error("Error fetching panel:", err);
-          fullPanels.push(panel);
         }
-      }
-      setSelectedOrderPanels(fullPanels);
-    }
-
-    // Set negotiation
-    if (vn.negotiation) {
-      setNegotiation({
-        maxRate: vn.negotiation.maxRate?.toString() || "",
-        targetRate: vn.negotiation.targetRate?.toString() || "",
-        purchaseType: vn.negotiation.purchaseType || "",
-        oldRatePercent: vn.negotiation.oldRatePercent || "",
-        remarks1: vn.negotiation.remarks1 || "",
-      });
-    }
-
-    // Set vendors
-    if (vn.vendors && vn.vendors.length > 0) {
-      const processedVendors = vn.vendors.map(vendor => ({
-        ...vendor,
-        _id: vendor._id || uid(),
-        marketRate: vendor.marketRate?.toString() || "",
-      }));
-      setVendors(processedVendors);
-    } else {
-      setVendors([defaultVendorRow()]);
-    }
-
-    // Set voice note
-    if (vn.voiceNote) {
-      setVoiceUrl(vn.voiceNote);
-    }
-    if (vn.voiceNoteFile) {
-      setVoiceFileInfo(vn.voiceNoteFile);
-    }
-
-    // Set approval
-    if (vn.approval) {
-      setApproval({
-        vendorName: vn.approval.vendorName || "",
-        vendorId: vn.approval.vendorId || null,
-        vendorCode: vn.approval.vendorCode || "",
-        vendorStatus: vn.approval.vendorStatus || "Active",
-        rateType: vn.approval.rateType || "",
-        finalPerMT: vn.approval.finalPerMT?.toString() || "",
-        finalFix: vn.approval.finalFix?.toString() || "",
-        vehicleNo: vn.approval.vehicleNo || "",
-        vehicleId: vn.approval.vehicleId || "",
-        vehicleData: vn.approval.vehicleData || null,
-        mobile: vn.approval.mobile || "",
-        purchaseType: vn.approval.purchaseType || "",
-        paymentTerms: vn.approval.paymentTerms || "",
-        approvalStatus: vn.approval.approvalStatus || "",
-        remarks: vn.approval.remarks || "",
-        memoStatus: vn.approval.memoStatus || "Pending",
-        memoFile: vn.approval.memoFile || null
-      });
-
-      // Set selected vehicle if exists
-      if (vn.approval.vehicleData) {
-        setSelectedVehicle(vn.approval.vehicleData);
-      } else if (vn.approval.vehicleId) {
-        const vehicle = await vehicleSearch.getVehicleById(vn.approval.vehicleId);
-        if (vehicle) {
-          setSelectedVehicle(vehicle);
-        }
+        setSelectedOrderPanels(fullPanels);
       }
 
-      // Set selected supplier if exists
-      if (vn.approval.vendorName && supplierSearch.suppliers.length > 0) {
-        const supplier = supplierSearch.suppliers.find(s => s.supplierName === vn.approval.vendorName);
-        if (supplier) {
-          setSelectedSupplier(supplier);
+      if (vn.negotiation) {
+        setNegotiation({
+          maxRate: vn.negotiation.maxRate?.toString() || "",
+          targetRate: vn.negotiation.targetRate?.toString() || "",
+          purchaseType: vn.negotiation.purchaseType || "",
+          oldRatePercent: vn.negotiation.oldRatePercent || "",
+          remarks1: vn.negotiation.remarks1 || "",
+        });
+      }
+
+      if (vn.vendors && vn.vendors.length > 0) {
+        const processedVendors = vn.vendors.map(vendor => ({
+          ...vendor,
+          _id: vendor._id || uid(),
+          marketRate: vendor.marketRate?.toString() || "",
+        }));
+        setVendors(processedVendors);
+      } else {
+        setVendors([defaultVendorRow()]);
+      }
+
+      if (vn.voiceNote) {
+        setVoiceUrl(vn.voiceNote);
+      }
+      if (vn.voiceNoteFile) {
+        setVoiceFileInfo(vn.voiceNoteFile);
+      }
+
+      if (vn.approval) {
+        setApproval({
+          vendorName: vn.approval.vendorName || "",
+          vendorId: vn.approval.vendorId || null,
+          vendorCode: vn.approval.vendorCode || "",
+          vendorStatus: vn.approval.vendorStatus || "Active",
+          rateType: vn.approval.rateType || "",
+          finalPerMT: vn.approval.finalPerMT?.toString() || "",
+          finalFix: vn.approval.finalFix?.toString() || "",
+          vehicleNo: vn.approval.vehicleNo || "",
+          vehicleId: vn.approval.vehicleId || "",
+          vehicleData: vn.approval.vehicleData || null,
+          mobile: vn.approval.mobile || "",
+          purchaseType: vn.approval.purchaseType || "",
+          paymentTerms: vn.approval.paymentTerms || "",
+          approvalStatus: vn.approval.approvalStatus || "",
+          remarks: vn.approval.remarks || "",
+          memoStatus: vn.approval.memoStatus || "Pending",
+          memoFile: vn.approval.memoFile || null
+        });
+
+        if (vn.approval.vehicleData) {
+          setSelectedVehicle(vn.approval.vehicleData);
+        } else if (vn.approval.vehicleId) {
+          const vehicle = await vehicleSearch.getVehicleById(vn.approval.vehicleId);
+          if (vehicle) {
+            setSelectedVehicle(vehicle);
+          }
+        }
+
+        if (vn.approval.vendorName && supplierSearch.suppliers.length > 0) {
+          const supplier = supplierSearch.suppliers.find(s => s.supplierName === vn.approval.vendorName);
+          if (supplier) {
+            setSelectedSupplier(supplier);
+          }
         }
       }
-    }
 
-  } catch (error) {
-    console.error('Error fetching vehicle negotiation:', error);
-    alert(`Failed to load vehicle negotiation: ${error.message}`);
-  } finally {
-    setFetchLoading(false);
-  }
-};
+    } catch (error) {
+      console.error('Error fetching vehicle negotiation:', error);
+      alert(`Failed to load vehicle negotiation: ${error.message}`);
+    } finally {
+      setFetchLoading(false);
+    }
+  };
 
   const fetchBranches = async () => {
     try {
@@ -1861,44 +1855,6 @@ export default function EditVehicleNegotiation() {
     } catch (error) {
       console.error('Error fetching plants:', error.message);
       setPlants([]);
-    }
-  };
-
-  const fetchStatesForCountry = async (countryCode) => {
-    if (!countryCode) return [];
-    
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/states?country=${countryCode}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        return data.data;
-      }
-      return [];
-    } catch (error) {
-      console.error('Error fetching states:', error.message);
-      return [];
-    }
-  };
-
-  const fetchDistrictsForState = async (stateId) => {
-    if (!stateId) return [];
-    
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/districts?state=${stateId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        return data.data;
-      }
-      return [];
-    } catch (error) {
-      console.error('Error fetching districts:', error.message);
-      return [];
     }
   };
 
@@ -1996,189 +1952,170 @@ export default function EditVehicleNegotiation() {
   }, [customerSearch.customers]);
 
   /** =========================
-   * Handle Order Panel Multi-Select - FIXED
+   * Handle Order Panel Multi-Select
    ========================= */
- /** =========================
- * Handle Order Panel Multi-Select - FIXED for Edit Page
- ========================= */
-const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
-  if (removePanelId) {
-    // Remove panel
-    setSelectedOrderPanels(prev => prev.filter(p => p._id !== removePanelId));
-    
-    // Remove all orders from this panel
-    setOrders(prev => prev.filter(order => order.orderPanelId !== removePanelId));
-    
-    // If no panels left, clear header
-    if (selectedOrderPanels.length === 1) {
-      setHeader(prev => ({
-        ...prev,
-        branch: "",
-        branchName: "",
-        branchCode: "",
-        partyName: "",
-        customerId: "",
-        collectionCharges: "",
-        cancellationCharges: "",
-        loadingCharges: "",
-        otherCharges: "",
-        loadingPoints: "",
-        dropPoints: ""
-      }));
-      setSelectedCustomer(null);
-      setCustomerSearchQuery("");
-    }
-  } else if (fullPanel) {
-    // Check if panel already selected
-    if (selectedOrderPanels.some(p => p._id === fullPanel._id)) {
-      alert("This order panel is already selected");
-      return;
-    }
-    
-    console.log("Adding order panel:", fullPanel);
-    
-    // Add new panel
-    setSelectedOrderPanels(prev => [...prev, fullPanel]);
-    
-    // Check if panel has plantRows
-    let plantRowsToUse = fullPanel.plantRows;
-    
-    // If plantRows is empty, check if the panel has direct order data
-    if (!plantRowsToUse || plantRowsToUse.length === 0) {
-      // Try to fetch the full panel data again
-      try {
-        const fetchedPanel = await orderPanelSearch.getOrderPanelById(fullPanel._id);
-        if (fetchedPanel && fetchedPanel.plantRows && fetchedPanel.plantRows.length > 0) {
-          plantRowsToUse = fetchedPanel.plantRows;
-          console.log("Fetched plantRows from API:", plantRowsToUse);
-        }
-      } catch (err) {
-        console.error("Error fetching panel details:", err);
-      }
-    }
-    
-    // Add orders from this panel
-    if (plantRowsToUse && plantRowsToUse.length > 0) {
-      const newOrders = plantRowsToUse.map((row, idx) => {
-        // Extract plant ID correctly
-        let plantId = '';
-        let plantName = '';
-        let plantCode = '';
-        
-        if (row.plantCode) {
-          if (typeof row.plantCode === 'object' && row.plantCode._id) {
-            plantId = row.plantCode._id;
-            plantName = row.plantCode.name || '';
-            plantCode = row.plantCode.code || '';
-          } else if (typeof row.plantCode === 'string') {
-            plantId = row.plantCode;
-            plantName = row.plantName || '';
-            plantCode = row.plantCodeValue || '';
-          }
-        }
-        
-        // Also check if plant data is in other fields
-        if (!plantId && row.plantCodeValue) {
-          const plant = plants.find(p => p.code === row.plantCodeValue);
-          if (plant) {
-            plantId = plant._id;
-            plantName = plant.name;
-            plantCode = plant.code;
-          }
-        }
-        
-        return {
-          _id: uid(),
-          orderNo: fullPanel.orderPanelNo || row.orderNo || "",
-          orderPanelId: fullPanel._id,
-          partyName: fullPanel.partyName || fullPanel.customerName || row.partyName || "",
-          customerId: fullPanel.customerId || row.customerId || null,
-          customerCode: fullPanel.customerCode || row.customerCode || "",
-          contactPerson: fullPanel.contactPerson || row.contactPerson || "",
-          plantCode: plantId,
-          plantName: plantName || row.plantName || "",
-          plantCodeValue: plantCode || row.plantCodeValue || "",
-          orderType: row.orderType || "Sales",
-          pinCode: row.pinCode || "",
-          from: row.from || "",
-          fromName: row.fromName || "",
-          to: row.to || "",
-          toName: row.toName || "",
-          country: row.country || "",
-          countryName: row.countryName || "",
-          state: row.state || "",
-          stateName: row.stateName || "",
-          district: row.district || "",
-          districtName: row.districtName || "",
-          weight: row.weight || "",
-          status: row.status || "Open",
-        };
-      });
+  const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
+    if (removePanelId) {
+      setSelectedOrderPanels(prev => prev.filter(p => p._id !== removePanelId));
+      setOrders(prev => prev.filter(order => order.orderPanelId !== removePanelId));
       
-      console.log("Adding new orders:", newOrders);
-      setOrders(prev => [...prev, ...newOrders]);
-    } else {
-      // If no plantRows, create a default order from panel data
-      const defaultOrder = {
-        _id: uid(),
-        orderNo: fullPanel.orderPanelNo || "",
-        orderPanelId: fullPanel._id,
-        partyName: fullPanel.partyName || fullPanel.customerName || "",
-        customerId: fullPanel.customerId || null,
-        customerCode: fullPanel.customerCode || "",
-        contactPerson: fullPanel.contactPerson || "",
-        plantCode: "",
-        plantName: "",
-        plantCodeValue: "",
-        orderType: "Sales",
-        pinCode: "",
-        from: "",
-        fromName: "",
-        to: "",
-        toName: "",
-        country: "",
-        countryName: "",
-        state: "",
-        stateName: "",
-        district: "",
-        districtName: "",
-        weight: fullPanel.totalWeight || "",
-        status: "Open",
-      };
-      console.log("No plantRows found, creating default order:", defaultOrder);
-      setOrders(prev => [...prev, defaultOrder]);
-    }
+      if (selectedOrderPanels.length === 1) {
+        setHeader(prev => ({
+          ...prev,
+          branch: "",
+          branchName: "",
+          branchCode: "",
+          partyName: "",
+          customerId: "",
+          collectionCharges: "",
+          cancellationCharges: "",
+          loadingCharges: "",
+          otherCharges: "",
+          loadingPoints: "",
+          dropPoints: ""
+        }));
+        setSelectedCustomer(null);
+        setCustomerSearchQuery("");
+      }
+    } else if (fullPanel) {
+      if (selectedOrderPanels.some(p => p._id === fullPanel._id)) {
+        alert("This order panel is already selected");
+        return;
+      }
+      
+      setSelectedOrderPanels(prev => [...prev, fullPanel]);
+      
+      let plantRowsToUse = fullPanel.plantRows;
+      
+      if (!plantRowsToUse || plantRowsToUse.length === 0) {
+        try {
+          const fetchedPanel = await orderPanelSearch.getOrderPanelById(fullPanel._id);
+          if (fetchedPanel && fetchedPanel.plantRows && fetchedPanel.plantRows.length > 0) {
+            plantRowsToUse = fetchedPanel.plantRows;
+          }
+        } catch (err) {
+          console.error("Error fetching panel details:", err);
+        }
+      }
+      
+      if (plantRowsToUse && plantRowsToUse.length > 0) {
+        const newOrders = plantRowsToUse.map((row) => {
+          let plantId = '';
+          let plantName = '';
+          let plantCode = '';
+          
+          if (row.plantCode) {
+            if (typeof row.plantCode === 'object' && row.plantCode._id) {
+              plantId = row.plantCode._id;
+              plantName = row.plantCode.name || '';
+              plantCode = row.plantCode.code || '';
+            } else if (typeof row.plantCode === 'string') {
+              plantId = row.plantCode;
+              plantName = row.plantName || '';
+              plantCode = row.plantCodeValue || '';
+            }
+          }
+          
+          if (!plantId && row.plantCodeValue) {
+            const plant = plants.find(p => p.code === row.plantCodeValue);
+            if (plant) {
+              plantId = plant._id;
+              plantName = plant.name;
+              plantCode = plant.code;
+            }
+          }
+          
+          return {
+            _id: uid(),
+            orderNo: fullPanel.orderPanelNo || row.orderNo || "",
+            orderPanelId: fullPanel._id,
+            partyName: fullPanel.partyName || fullPanel.customerName || row.partyName || "",
+            customerId: fullPanel.customerId || row.customerId || null,
+            customerCode: fullPanel.customerCode || row.customerCode || "",
+            contactPerson: fullPanel.contactPerson || row.contactPerson || "",
+            plantCode: plantId,
+            plantName: plantName || row.plantName || "",
+            plantCodeValue: plantCode || row.plantCodeValue || "",
+            orderType: row.orderType || "Sales",
+            pinCode: row.pinCode || "",
+            from: row.from || "",
+            fromName: row.fromName || "",
+            to: row.to || "",
+            toName: row.toName || "",
+            taluka: row.taluka || "",
+            talukaName: row.talukaName || "",
+            district: row.district || "",
+            districtName: row.districtName || "",
+            state: row.state || "",
+            stateName: row.stateName || "",
+            country: row.country || "",
+            countryName: row.countryName || "",
+            weight: row.weight || "",
+            status: row.status || "Open",
+          };
+        });
+        
+        setOrders(prev => [...prev, ...newOrders]);
+      } else {
+        const defaultOrder = {
+          _id: uid(),
+          orderNo: fullPanel.orderPanelNo || "",
+          orderPanelId: fullPanel._id,
+          partyName: fullPanel.partyName || fullPanel.customerName || "",
+          customerId: fullPanel.customerId || null,
+          customerCode: fullPanel.customerCode || "",
+          contactPerson: fullPanel.contactPerson || "",
+          plantCode: "",
+          plantName: "",
+          plantCodeValue: "",
+          orderType: "Sales",
+          pinCode: "",
+          from: "",
+          fromName: "",
+          to: "",
+          toName: "",
+          taluka: "",
+          talukaName: "",
+          district: "",
+          districtName: "",
+          state: "",
+          stateName: "",
+          country: "",
+          countryName: "",
+          weight: fullPanel.totalWeight || "",
+          status: "Open",
+        };
+        setOrders(prev => [...prev, defaultOrder]);
+      }
 
-    // Update header with data from first selected panel (if this is the first)
-    if (selectedOrderPanels.length === 0) {
-      setHeader(prev => ({
-        ...prev,
-        branch: fullPanel.branch || "",
-        branchName: fullPanel.branchName || "",
-        branchCode: fullPanel.branchCode || "",
-        delivery: fullPanel.delivery || "Urgent",
-        date: fullPanel.date ? new Date(fullPanel.date).toISOString().split('T')[0] : prev.date,
-        partyName: fullPanel.partyName || fullPanel.customerName || "",
-        customerId: fullPanel.customerId || "",
-        collectionCharges: fullPanel.collectionCharges || "",
-        cancellationCharges: fullPanel.cancellationCharges || "",
-        loadingCharges: fullPanel.loadingCharges || "",
-        otherCharges: fullPanel.otherCharges || "",
-        loadingPoints: fullPanel.loadingPoints || "",
-        dropPoints: fullPanel.dropPoints || ""
-      }));
+      if (selectedOrderPanels.length === 0) {
+        setHeader(prev => ({
+          ...prev,
+          branch: fullPanel.branch || "",
+          branchName: fullPanel.branchName || "",
+          branchCode: fullPanel.branchCode || "",
+          delivery: fullPanel.delivery || "Urgent",
+          date: fullPanel.date ? new Date(fullPanel.date).toISOString().split('T')[0] : prev.date,
+          partyName: fullPanel.partyName || fullPanel.customerName || "",
+          customerId: fullPanel.customerId || "",
+          collectionCharges: fullPanel.collectionCharges || "",
+          cancellationCharges: fullPanel.cancellationCharges || "",
+          loadingCharges: fullPanel.loadingCharges || "",
+          otherCharges: fullPanel.otherCharges || "",
+          loadingPoints: fullPanel.loadingPoints || "",
+          dropPoints: fullPanel.dropPoints || ""
+        }));
 
-      // Update customer selection
-      if (fullPanel.customerId) {
-        const customer = customerSearch.customers.find(c => c._id === fullPanel.customerId);
-        if (customer) {
-          setSelectedCustomer(customer);
-          setCustomerSearchQuery(customer.customerName);
+        if (fullPanel.customerId) {
+          const customer = customerSearch.customers.find(c => c._id === fullPanel.customerId);
+          if (customer) {
+            setSelectedCustomer(customer);
+            setCustomerSearchQuery(customer.customerName);
+          }
         }
       }
     }
-  }
-};
+  };
 
   /** =========================
    * ORDER ROW FUNCTIONS
@@ -2199,16 +2136,13 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
 
   const removeOrder = (id) => {
     if (orders.length > 1) {
-      // Find the order to remove
       const orderToRemove = orders.find(o => o._id === id);
       if (orderToRemove && orderToRemove.orderPanelId) {
-        // Check if this is the last order from this panel
         const otherOrdersFromSamePanel = orders.filter(o => 
           o.orderPanelId === orderToRemove.orderPanelId && o._id !== id
         );
         
         if (otherOrdersFromSamePanel.length === 0) {
-          // Remove the panel from selectedOrderPanels
           setSelectedOrderPanels(prev => 
             prev.filter(p => p._id !== orderToRemove.orderPanelId)
           );
@@ -2245,9 +2179,10 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
     }
   };
 
- const updateVendor = (id, key, value) => {
-  setVendors((p) => p.map((v) => (v._id === id ? { ...v, [key]: value } : v)));
-};
+  const updateVendor = (id, key, value) => {
+    setVendors((p) => p.map((v) => (v._id === id ? { ...v, [key]: value } : v)));
+  };
+
   /** =========================
    * HANDLE MEMO UPLOAD
    ========================= */
@@ -2379,7 +2314,6 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
    * UPDATE FUNCTION
    ========================= */
   const handleUpdate = async () => {
-    // Validation
     if (!header.branch) {
       alert("Please select a branch");
       return;
@@ -2407,7 +2341,6 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
         throw new Error("No authentication token found. Please login again.");
       }
 
-      // Prepare payload with all fields
       const payload = {
         id: negotiationId,
         header: {
@@ -2446,6 +2379,8 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
           fromName: order.fromName || '',
           to: order.to || '',
           toName: order.toName || '',
+          taluka: order.taluka || '',
+          talukaName: order.talukaName || '',
           country: order.country || '',
           countryName: order.countryName || '',
           state: order.state || '',
@@ -2465,7 +2400,7 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
         vendors: vendors.map(vendor => ({
           _id: vendor._id,
           vendorName: vendor.vendorName || '',
-		  vendorCode: vendor.vendorCode || '',
+          vendorCode: vendor.vendorCode || '',
           marketRate: num(vendor.marketRate)
         })),
         voiceUrl: voiceUrl || '',
@@ -2501,7 +2436,6 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
         body: JSON.stringify(payload),
       });
 
-      // Check if response is OK
       if (!res.ok) {
         const text = await res.text();
         console.error("Error response text:", text);
@@ -2513,7 +2447,6 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
         }
       }
 
-      // Try to parse JSON response
       let data;
       try {
         data = await res.json();
@@ -2528,7 +2461,6 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
       
       alert(`✅ Vehicle negotiation updated successfully!\nVNN Number: ${header.vnnNo}`);
       
-      // Redirect back to list after 2 seconds
       setTimeout(() => {
         router.push('/admin/vehicle-negotiation');
       }, 2000);
@@ -2571,6 +2503,9 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
       </div>
     );
   }
+
+  // Determine if charges should be read-only
+  const isChargesReadOnly = selectedOrderPanels.length > 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white">
@@ -2641,7 +2576,6 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
               </div>
             </div>
             
-            {/* Multi-Select Order Panel Field - FIXED */}
             <div className="col-span-12 md:col-span-6">
               <label className="text-xs font-bold text-slate-600">Select Order Panels (Multi-Select)</label>
               <MultiSelectOrderPanelDropdown
@@ -2689,8 +2623,7 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
               value={header.date}
               onChange={(v) => setHeader((p) => ({ ...p, date: v }))}
             />
-			
-            {/* Customer Search - Party Name Field */}
+            
             <div className="col-span-12 md:col-span-3 relative">
               <label className="text-xs font-bold text-slate-600">Party Name</label>
               <input
@@ -2736,7 +2669,7 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
             </div>
           </div>
 
-          {/* Billing Type / Charges */}
+          {/* Billing Type / Charges - With proper read-only for charges */}
           <div className="mb-4">
             <div className="text-sm font-bold text-slate-700 mb-2">Billing Type / Charges</div>
             <div className="overflow-auto rounded-xl border border-yellow-300">
@@ -2758,20 +2691,13 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
                   <tr className="hover:bg-yellow-50 even:bg-slate-50">
                     {billingColumns.map((col) => (
                       <td key={col.key} className="border border-yellow-300 px-2 py-2">
-                        {col.options ? (
+                        {col.key === "billingType" ? (
                           <select
-                            value={header[col.key] || ""}
-                            onChange={(e) => {
-                              if (col.key === "billingType") {
-                                handleBillingTypeChange(e.target.value);
-                              } else {
-                                setHeader(prev => ({ ...prev, [col.key]: e.target.value }));
-                              }
-                            }}
+                            value={header.billingType || "Multi - Order"}
+                            onChange={(e) => handleBillingTypeChange(e.target.value)}
                             className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
                           >
-                            <option value="">Select {col.label}</option>
-                            {col.options.map((opt) => (
+                            {BILLING_TYPES.map((opt) => (
                               <option key={opt} value={opt}>
                                 {opt}
                               </option>
@@ -2782,7 +2708,10 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
                             type={col.type || "text"}
                             value={header[col.key] || ""}
                             onChange={(e) => setHeader(prev => ({ ...prev, [col.key]: e.target.value }))}
-                            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                            readOnly={col.key !== "loadingPoints" && col.key !== "dropPoints" ? isChargesReadOnly : false}
+                            className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                              col.key !== "loadingPoints" && col.key !== "dropPoints" && isChargesReadOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                            }`}
                             placeholder={`Enter ${col.label}`}
                           />
                         )}
@@ -2792,6 +2721,11 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
                 </tbody>
               </table>
             </div>
+            {isChargesReadOnly && (
+              <div className="text-xs text-orange-500 mt-2 p-2 bg-orange-50 rounded">
+                * Loading Points and Drop Points are editable. Other charges are read-only (from selected panels).
+              </div>
+            )}
           </div>
 
           {/* Orders Table */}
@@ -2816,6 +2750,7 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
               onChange={updateOrder}
               onRemove={removeOrder}
               billingType={header.billingType}
+              readOnly={selectedOrderPanels.length > 0}
             />
           </div>
 
@@ -2858,25 +2793,25 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
             />
           </div>
 
-        {/* Vendors / Market Rates - Changed to Suppliers */}
-<div className="mb-4">
-  <div className="flex items-center justify-between mb-4">
-    <div className="text-sm font-bold text-slate-700">Suppliers / Market Rates</div>
-    <button
-      onClick={addVendor}
-      className="rounded-xl bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-700"
-    >
-      + Add Supplier
-    </button>
-  </div>
-  
-  <VendorsTable
-    rows={vendors}
-    onChange={updateVendor}
-    onRemove={removeVendor}
-    suppliers={supplierSearch.suppliers} // Pass suppliers here
-  />
-</div>
+          {/* Vendors / Market Rates */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-sm font-bold text-slate-700">Suppliers / Market Rates</div>
+              <button
+                onClick={addVendor}
+                className="rounded-xl bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-700"
+              >
+                + Add Supplier
+              </button>
+            </div>
+            
+            <VendorsTable
+              rows={vendors}
+              onChange={updateVendor}
+              onRemove={removeVendor}
+              suppliers={supplierSearch.suppliers}
+            />
+          </div>
 
           {/* Remarks & Voice Note */}
           <div className="grid grid-cols-12 gap-4">
@@ -2893,7 +2828,6 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
               </div>
             </div>
 
-            {/* Voice Note Section */}
             <div className="col-span-12 md:col-span-5">
               <div className="rounded-xl border border-slate-200 p-4">
                 <div className="text-sm font-extrabold text-slate-900 mb-3">Voice Note</div>
@@ -2926,7 +2860,6 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
         {/* ===== PART 3: VEHICLE APPROVAL - PART 3 - READ ONLY ===== */}
         <Card title="Vehicle - Approval - Part - 3 (Read Only)">
           <div className="grid grid-cols-12 gap-3 mb-4">
-            {/* Supplier Name Dropdown - Only editable field */}
             <div className="col-span-12 md:col-span-4">
               <label className="text-xs font-bold text-slate-600">Supplier Name</label>
               <SupplierSearchDropdown
@@ -2955,7 +2888,6 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
             />
           </div>
 
-          {/* A / B / A x B */}
           <div className="grid grid-cols-12 gap-3 mb-4">
             <Input
               col="col-span-12 md:col-span-4"
@@ -2991,7 +2923,6 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
               readOnly={true}
             />
             
-            {/* Vehicle Number Dropdown with Create Button - Read Only */}
             <div className="col-span-12 md:col-span-4">
               <label className="text-xs font-bold text-slate-600">Vehicle Number</label>
               <div className="flex items-center gap-2">
@@ -3053,7 +2984,6 @@ const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
             />
           </div>
 
-          {/* Remarks */}
           <div>
             <div className="text-sm font-extrabold text-slate-900 mb-3">Remarks</div>
             <textarea

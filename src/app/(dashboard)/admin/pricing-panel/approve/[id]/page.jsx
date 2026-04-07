@@ -102,7 +102,7 @@ function EditableInput({ label, value, onChange, col = "", type = "text", placeh
 }
 
 /* =========================
-  Orders Table Component (Read-only)
+  Orders Table Component (Read-only with Taluka)
 ========================= */
 function OrdersTable({ rows }) {
   const columns = [
@@ -116,6 +116,7 @@ function OrdersTable({ rows }) {
     { key: "country", label: "Country" },
     { key: "state", label: "State" },
     { key: "district", label: "District" },
+    { key: "taluka", label: "Taluka" },
     { key: "from", label: "From" },
     { key: "to", label: "To" },
     { key: "locationRate", label: "Location Rate" },
@@ -126,9 +127,9 @@ function OrdersTable({ rows }) {
   ];
 
   return (
-    <div className="overflow-auto rounded-xl border border-yellow-300">
-      <table className="min-w-full w-full text-sm">
-        <thead className="sticky top-0 bg-yellow-400">
+    <div className="overflow-auto rounded-xl border border-yellow-300 max-h-[500px]">
+      <table className="min-w-max w-full text-sm">
+        <thead className="sticky top-0 bg-yellow-400 z-10">
           <tr>
             {columns.map((col) => (
               <th
@@ -143,8 +144,8 @@ function OrdersTable({ rows }) {
 
         <tbody>
           {rows.length > 0 ? (
-            rows.map((row) => (
-              <tr key={row._id} className="hover:bg-yellow-50 even:bg-slate-50">
+            rows.map((row, idx) => (
+              <tr key={row._id || idx} className="hover:bg-yellow-50 even:bg-slate-50">
                 <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.orderNo || '-'}</td>
                 <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.partyName || '-'}</td>
                 <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.plantCode || '-'}</td>
@@ -155,6 +156,8 @@ function OrdersTable({ rows }) {
                 <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.countryName || row.country || '-'}</td>
                 <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.stateName || row.state || '-'}</td>
                 <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.districtName || row.district || '-'}</td>
+                {/* Taluka Column - Added */}
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.talukaName || row.taluka || '-'}</td>
                 <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.fromName || row.from || '-'}</td>
                 <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.toName || row.to || '-'}</td>
                 <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.locationRate || '0'}</td>
@@ -227,6 +230,7 @@ export default function ApprovePricingPanel() {
       }
 
       const panel = data.data;
+      console.log("Fetched panel data:", panel);
       
       // Set pricing serial number
       setPricingSerialNo(panel.pricingSerialNo || "");
@@ -254,9 +258,14 @@ export default function ApprovePricingPanel() {
         otherCharges: panel.otherCharges || 0,
       });
 
-      // Set orders
+      // Set orders with taluka field
       if (panel.orders && panel.orders.length > 0) {
-        setOrders(panel.orders);
+        const processedOrders = panel.orders.map(order => ({
+          ...order,
+          talukaName: order.talukaName || order.taluka || '',
+          taluka: order.taluka || '',
+        }));
+        setOrders(processedOrders);
       } else {
         setOrders([]);
       }
@@ -332,7 +341,6 @@ export default function ApprovePricingPanel() {
   };
 
   const handleApprove = async (autoApprove = false) => {
-    // If it's auto-approve from email link, set status to Approved
     const newStatus = autoApprove ? "Approved" : rateApproval.approvalStatus;
     
     if (!newStatus && !autoApprove) {
@@ -384,10 +392,8 @@ export default function ApprovePricingPanel() {
 
       if (data.success) {
         alert(`Pricing Panel ${newStatus} successfully!`);
-        // Update local state
         setRateApproval(prev => ({ ...prev, approvalStatus: newStatus }));
         
-        // If approved, redirect back to list after 2 seconds
         if (newStatus === "Approved") {
           setTimeout(() => {
             router.push('/admin/pricing-panel');
@@ -476,7 +482,6 @@ export default function ApprovePricingPanel() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Show Send Email button only when Mail Approval Rate is selected */}
             {rateApproval.approvalType === "Mail Approval Rate" && rateApproval.approvalStatus === "Pending" && (
               <button
                 onClick={() => setShowEmailModal(true)}
@@ -733,5 +738,3 @@ export default function ApprovePricingPanel() {
     </div>
   );
 }
-
-
