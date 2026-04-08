@@ -1134,7 +1134,7 @@ function OrdersTable({
                   />
                 </td>
 
-               // In OrdersTable component, update the location rate cell:
+              
 <td className="border border-yellow-300 px-2 py-2">
   <LocationRateDropdown
     locations={locations}
