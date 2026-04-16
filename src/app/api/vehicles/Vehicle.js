@@ -1,4 +1,3 @@
-// models/Vehicle.js
 import mongoose from 'mongoose';
 
 const vehicleSchema = new mongoose.Schema({
@@ -48,6 +47,43 @@ const vehicleSchema = new mongoose.Schema({
     uppercase: true,
     trim: true,
   },
+  vehicleType: {
+    type: String,
+    trim: true,
+  },
+  vehicleWeight: {
+    type: Number,
+    default: 0,
+  },
+  // Document arrays for multiple file uploads
+  rcDocuments: [{
+    type: String,
+    default: []
+  }],
+  pucDocuments: [{
+    type: String,
+    default: []
+  }],
+  fitnessDocuments: [{
+    type: String,
+    default: []
+  }],
+  weightSlipDocuments: [{
+    type: String,
+    default: []
+  }],
+  insuranceDocuments: [{
+    type: String,
+    default: []
+  }],
+  chasisDocuments: [{
+    type: String,
+    default: []
+  }],
+  vehiclePhotos: [{
+    type: String,
+    default: []
+  }],
   isActive: {
     type: Boolean,
     default: true,

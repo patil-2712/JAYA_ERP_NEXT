@@ -6,24 +6,28 @@ import { useRouter } from 'next/navigation';
 export default function RateMasterPage() {
   const router = useRouter();
   
-  // State for form data
+  // Form state
   const [title, setTitle] = useState('');
   const [customerId, setCustomerId] = useState('');
   const [branchId, setBranchId] = useState('');
-  const [locationId, setLocationId] = useState('');
-  const [rateSlabs, setRateSlabs] = useState([
-    { id: Date.now(), fromQty: '', toQty: '', rate: '' }
-  ]);
+  const [weightRule, setWeightRule] = useState('all_weights');
+  const [approvalOption, setApprovalOption] = useState('contract_rate');
+  
+  // Edit mode state
   const [editingId, setEditingId] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  
+  // Data state
+  const [customers, setCustomers] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [rateMasters, setRateMasters] = useState([]);
+  const [filteredMasters, setFilteredMasters] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // UI state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  
-  // Data from APIs
-  const [customers, setCustomers] = useState([]);
-  const [branches, setBranches] = useState([]);
-  const [locations, setLocations] = useState([]);
-  const [rateMasters, setRateMasters] = useState([]);
 
   // Fetch Customers
   const fetchCustomers = async () => {
@@ -57,22 +61,6 @@ export default function RateMasterPage() {
     }
   };
 
-  // Fetch Locations
-  const fetchLocations = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/locations', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        setLocations(data.data);
-      }
-    } catch (error) {
-      console.error('Error fetching locations:', error);
-    }
-  };
-
   // Fetch Rate Masters
   const fetchRateMasters = async () => {
     setLoading(true);
@@ -82,8 +70,13 @@ export default function RateMasterPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
+      
       if (data.success && Array.isArray(data.data)) {
         setRateMasters(data.data);
+        setFilteredMasters(data.data);
+      } else {
+        setRateMasters([]);
+        setFilteredMasters([]);
       }
     } catch (error) {
       console.error('Error fetching rate masters:', error);
@@ -93,112 +86,69 @@ export default function RateMasterPage() {
     }
   };
 
-  // Add new rate slab
-  const addRateSlab = () => {
-    setRateSlabs([
-      ...rateSlabs,
-      { id: Date.now(), fromQty: '', toQty: '', rate: '' }
-    ]);
-  };
-
-  // Remove rate slab
-  const removeRateSlab = (id) => {
-    if (rateSlabs.length > 1) {
-      setRateSlabs(rateSlabs.filter(slab => slab.id !== id));
+  // Search filter
+  useEffect(() => {
+    if (searchTerm) {
+      const filtered = rateMasters.filter(master =>
+        master.title?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredMasters(filtered);
     } else {
-      alert("At least one rate slab is required");
+      setFilteredMasters(rateMasters);
     }
-  };
+  }, [searchTerm, rateMasters]);
 
-  // Update rate slab
-  const updateRateSlab = (id, field, value) => {
-    setRateSlabs(rateSlabs.map(slab => 
-      slab.id === id ? { ...slab, [field]: value } : slab
-    ));
-  };
+  useEffect(() => {
+    fetchCustomers();
+    fetchBranches();
+    fetchRateMasters();
+  }, []);
 
   // Reset form
   const resetForm = () => {
     setTitle('');
     setCustomerId('');
     setBranchId('');
-    setLocationId('');
-    setRateSlabs([{ id: Date.now(), fromQty: '', toQty: '', rate: '' }]);
+    setWeightRule('all_weights');
+    setApprovalOption('contract_rate');
     setEditingId(null);
+    setIsEditing(false);
     setError(null);
-    setSuccess(null);
   };
 
-  // Check for overlaps in real-time
-  const checkForOverlaps = () => {
-    const sorted = [...rateSlabs].sort((a, b) => parseFloat(a.fromQty || 0) - parseFloat(b.fromQty || 0));
+  // Edit Rate Master - Load data into form
+  const handleEdit = (master) => {
+    setEditingId(master._id);
+    setTitle(master.title);
+    setCustomerId(master.customerId);
+    setBranchId(master.branchId);
+    setWeightRule(master.weightRule || 'all_weights');
+    setApprovalOption(master.approvalOption || 'contract_rate');
+    setIsEditing(true);
     
-    for (let i = 0; i < sorted.length - 1; i++) {
-      const current = sorted[i];
-      const next = sorted[i + 1];
-      
-      if (current.fromQty && current.toQty && next.fromQty && next.toQty) {
-        if (parseFloat(current.toQty) >= parseFloat(next.fromQty)) {
-          return `⚠️ Warning: Range ${current.fromQty}-${current.toQty} overlaps with ${next.fromQty}-${next.toQty}`;
-        }
-      }
-    }
-    return null;
+    // Scroll to form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const overlapWarning = checkForOverlaps();
-
-  // Handle Submit (Create/Update)
-  const handleSubmit = async (e) => {
+  // Update Rate Master
+  const handleUpdate = async (e) => {
     e.preventDefault();
     
     if (!title.trim()) {
       setError('Please enter rate master title');
       return;
     }
-    
     if (!customerId) {
       setError('Please select a customer');
       return;
     }
-    
     if (!branchId) {
       setError('Please select a branch');
       return;
     }
-    
-    if (!locationId) {
-      setError('Please select a location');
+    if (!approvalOption) {
+      setError('Please select approval option');
       return;
-    }
-    
-    // Validate rate slabs - check for empty values
-    for (let slab of rateSlabs) {
-      if (!slab.fromQty || !slab.toQty || !slab.rate) {
-        setError('Please fill all rate slab fields');
-        return;
-      }
-      if (parseFloat(slab.fromQty) >= parseFloat(slab.toQty)) {
-        setError('From quantity must be less than To quantity');
-        return;
-      }
-      if (parseFloat(slab.fromQty) < 0 || parseFloat(slab.toQty) < 0) {
-        setError('Quantities cannot be negative');
-        return;
-      }
-    }
-    
-    // Check for overlapping ranges
-    const sortedSlabs = [...rateSlabs].sort((a, b) => parseFloat(a.fromQty) - parseFloat(b.fromQty));
-    
-    for (let i = 0; i < sortedSlabs.length - 1; i++) {
-      const current = sortedSlabs[i];
-      const next = sortedSlabs[i + 1];
-      
-      if (parseFloat(current.toQty) >= parseFloat(next.fromQty)) {
-        setError(`Rate slabs overlap: Range ${current.fromQty} - ${current.toQty} overlaps with ${next.fromQty} - ${next.toQty}`);
-        return;
-      }
     }
     
     setLoading(true);
@@ -206,23 +156,16 @@ export default function RateMasterPage() {
     
     try {
       const token = localStorage.getItem('token');
-      const url = editingId ? `/api/rate-master?id=${editingId}` : '/api/rate-master';
-      const method = editingId ? 'PUT' : 'POST';
-      
       const payload = {
         title: title.trim(),
-        customerId,
-        branchId,
-        locationId,
-        rateSlabs: rateSlabs.map(slab => ({
-          fromQty: parseFloat(slab.fromQty),
-          toQty: parseFloat(slab.toQty),
-          rate: parseFloat(slab.rate)
-        }))
+        customerId: customerId,
+        branchId: branchId,
+        weightRule: weightRule,
+        approvalOption: approvalOption,
       };
       
-      const res = await fetch(url, {
-        method,
+      const res = await fetch(`/api/rate-master?id=${editingId}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
@@ -233,38 +176,89 @@ export default function RateMasterPage() {
       const data = await res.json();
       
       if (!res.ok) {
-        throw new Error(data.message || `Failed to ${editingId ? 'update' : 'create'} rate master`);
+        throw new Error(data.message || 'Failed to update rate master');
       }
       
-      setSuccess(`Rate master ${editingId ? 'updated' : 'created'} successfully!`);
+      setSuccess('Rate master updated successfully!');
       resetForm();
       fetchRateMasters();
       
-      setTimeout(() => setSuccess(null), 3000);
+      setTimeout(() => {
+        setSuccess(null);
+      }, 3000);
       
     } catch (error) {
-      console.error('Error saving rate master:', error);
+      console.error('Error updating rate master:', error);
       setError(error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Edit Rate Master
-  const editRateMaster = (rateMaster) => {
-    setTitle(rateMaster.title);
-    setCustomerId(rateMaster.customerId);
-    setBranchId(rateMaster.branchId);
-    setLocationId(rateMaster.locationId);
-    setRateSlabs(rateMaster.rateSlabs.map(slab => ({
-      id: Date.now() + Math.random(),
-      fromQty: slab.fromQty.toString(),
-      toQty: slab.toQty.toString(),
-      rate: slab.rate.toString()
-    })));
-    setEditingId(rateMaster._id);
+  // Create Rate Master
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!title.trim()) {
+      setError('Please enter rate master title');
+      return;
+    }
+    if (!customerId) {
+      setError('Please select a customer');
+      return;
+    }
+    if (!branchId) {
+      setError('Please select a branch');
+      return;
+    }
+    if (!approvalOption) {
+      setError('Please select approval option');
+      return;
+    }
+    
+    setLoading(true);
     setError(null);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    try {
+      const token = localStorage.getItem('token');
+      const payload = {
+        title: title.trim(),
+        customerId: customerId,
+        branchId: branchId,
+        weightRule: weightRule,
+        approvalOption: approvalOption,
+        locationRates: []
+      };
+      
+      const res = await fetch('/api/rate-master', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to create rate master');
+      }
+      
+      setSuccess('Rate master created successfully!');
+      resetForm();
+      fetchRateMasters();
+      
+      setTimeout(() => {
+        setSuccess(null);
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Error creating rate master:', error);
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Delete Rate Master
@@ -290,39 +284,45 @@ export default function RateMasterPage() {
     }
   };
 
-  useEffect(() => {
-    fetchCustomers();
-    fetchBranches();
-    fetchLocations();
-    fetchRateMasters();
-  }, []);
+  // Helper function to get weight rule label
+  const getWeightRuleLabel = (rule) => {
+    return rule === 'above_25' ? 'Above 25 kg' : 'All Weights';
+  };
+
+  // Helper function to get approval option label
+  const getApprovalLabel = (option) => {
+    return option === 'contract_rate' ? 'Contract Rate' : 'Mail Approval';
+  };
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Rate Master</h1>
-      
-      {error && (
-        <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-          {error}
+      {/* Create/Edit Form Section */}
+      <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">
+            {isEditing ? 'Edit Rate Master' : 'Create Rate Master'}
+          </h1>
+          <p className="text-gray-600">
+            {isEditing ? 'Update rate master information' : 'Enter basic information'}
+          </p>
         </div>
-      )}
-      
-      {success && (
-        <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
-          {success}
-        </div>
-      )}
-      
-      {/* Add/Edit Form */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">
-          {editingId ? 'Edit Rate Master' : 'Create New Rate Master'}
-        </h2>
         
-        <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+            {error}
+          </div>
+        )}
+        
+        {success && (
+          <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
+            {success}
+          </div>
+        )}
+        
+        <form onSubmit={isEditing ? handleUpdate : handleSubmit}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Title Field */}
-            <div className="mb-4">
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Title <span className="text-red-500">*</span>
               </label>
@@ -333,11 +333,12 @@ export default function RateMasterPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter rate master title"
                 required
+                autoFocus
               />
             </div>
-            
-            {/* Customer Dropdown */}
-            <div className="mb-4">
+
+            {/* Customer Name Field */}
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Customer Name <span className="text-red-500">*</span>
               </label>
@@ -355,9 +356,9 @@ export default function RateMasterPage() {
                 ))}
               </select>
             </div>
-            
-            {/* Branch Dropdown */}
-            <div className="mb-4">
+
+            {/* Branch Field */}
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Branch <span className="text-red-500">*</span>
               </label>
@@ -375,127 +376,51 @@ export default function RateMasterPage() {
                 ))}
               </select>
             </div>
-            
-            {/* Location Dropdown */}
-            <div className="mb-4">
+
+            {/* Weight Rule Dropdown */}
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Location <span className="text-red-500">*</span>
+                Weight Rule <span className="text-red-500">*</span>
               </label>
               <select
-                value={locationId}
-                onChange={(e) => setLocationId(e.target.value)}
+                value={weightRule}
+                onChange={(e) => setWeightRule(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
               >
-                <option value="">Select Location</option>
-                {locations.map((location) => (
-                  <option key={location._id} value={location._id}>
-                    {location.name}
-                  </option>
-                ))}
+                <option value="all_weights">All Weights</option>
+                <option value="above_25">Above 25 kg</option>
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                {weightRule === 'above_25' 
+                  ? 'Only applicable for weights above 25 kg (25, 26, 27...)' 
+                  : 'Applicable for all weight ranges'}
+              </p>
+            </div>
+
+            {/* Approval Option Dropdown */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Approval Option <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={approvalOption}
+                onChange={(e) => setApprovalOption(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                <option value="contract_rate">Contract Rate</option>
+                <option value="mail_approval">Mail Approval</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                {approvalOption === 'contract_rate' 
+                  ? 'Standard contract rate applies' 
+                  : 'Requires mail approval for this rate'}
+              </p>
             </div>
           </div>
-          
-          {/* Rate Slabs Section */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Rate Slabs <span className="text-red-500">*</span>
-            </label>
-            
-            {overlapWarning && (
-              <div className="mb-3 p-2 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded text-sm">
-                {overlapWarning}
-              </div>
-            )}
-            
-            <div className="overflow-x-auto">
-              <table className="min-w-full border border-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-2 border text-left text-sm font-medium text-gray-700">
-                      From Weight
-                    </th>
-                    <th className="px-4 py-2 border text-left text-sm font-medium text-gray-700">
-                      To Weight
-                    </th>
-                    <th className="px-4 py-2 border text-left text-sm font-medium text-gray-700">
-                      Rate
-                    </th>
-                    <th className="px-4 py-2 border text-left text-sm font-medium text-gray-700">
-                      Action
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rateSlabs.map((slab) => (
-                    <tr key={slab.id}>
-                      <td className="px-4 py-2 border">
-                        <input
-                          type="number"
-                          value={slab.fromQty}
-                          onChange={(e) => updateRateSlab(slab.id, 'fromQty', e.target.value)}
-                          className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="From"
-                          step="1"
-                          min="0"
-                          required
-                        />
-                      </td>
-                      <td className="px-4 py-2 border">
-                        <input
-                          type="number"
-                          value={slab.toQty}
-                          onChange={(e) => updateRateSlab(slab.id, 'toQty', e.target.value)}
-                          className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="To"
-                          step="1"
-                          min="0"
-                          required
-                        />
-                      </td>
-                      <td className="px-4 py-2 border">
-                        <input
-                          type="number"
-                          value={slab.rate}
-                          onChange={(e) => updateRateSlab(slab.id, 'rate', e.target.value)}
-                          className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="Rate"
-                          step="0.01"
-                          min="0"
-                          required
-                        />
-                      </td>
-                      <td className="px-4 py-2 border text-center">
-                        <button
-                          type="button"
-                          onClick={() => removeRateSlab(slab.id)}
-                          className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm"
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            
-            <button
-              type="button"
-              onClick={addRateSlab}
-              className="mt-3 bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm"
-            >
-              + Add 
-            </button>
-            
-            <p className="text-xs text-gray-500 mt-2">
-              Tip: Weight ranges should not overlap (e.g., 0-100, 101-500, 501-1000)
-            </p>
-          </div>
-          
-          {/* Form Buttons */}
-          <div className="flex gap-3">
+
+          <div className="mt-6 flex gap-3">
             <button
               type="submit"
               disabled={loading}
@@ -503,102 +428,120 @@ export default function RateMasterPage() {
                 loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'
               }`}
             >
-              {loading ? 'Saving...' : (editingId ? 'Update Rate Master' : 'Create Rate Master')}
+              {loading ? (isEditing ? 'Updating...' : 'Creating...') : (isEditing ? 'Update Rate Master' : 'Create Rate Master')}
             </button>
             
-            {editingId && (
+            {isEditing && (
               <button
                 type="button"
                 onClick={resetForm}
-                className="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600"
+                className="px-6 py-2 rounded text-gray-700 bg-gray-200 hover:bg-gray-300"
               >
-                Cancel
+                Cancel Edit
               </button>
             )}
           </div>
         </form>
       </div>
-      
-      {/* Rate Masters List - Table Format */}
+
+      {/* List Section */}
       <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-semibold mb-4">Rate Masters List</h2>
-        
+        <div className="mb-6">
+          <h2 className="text-xl font-bold">Rate Masters List</h2>
+          <p className="text-gray-600">All created rate masters</p>
+        </div>
+
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Search by Title
+          </label>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Type title to search..."
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
         {loading ? (
-          <div className="text-center py-4">Loading rate masters...</div>
-        ) : rateMasters.length === 0 ? (
-          <div className="text-center py-4 text-gray-500">No rate masters found</div>
+          <div className="text-center py-8">Loading rate masters...</div>
+        ) : filteredMasters.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            {searchTerm ? 'No rate masters found matching your search' : 'No rate masters found. Create your first rate master!'}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full border border-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 border text-left text-sm font-semibold text-gray-700">S.No</th>
-                  <th className="px-4 py-3 border text-left text-sm font-semibold text-gray-700">Title</th>
-                  <th className="px-4 py-3 border text-left text-sm font-semibold text-gray-700">Customer Name</th>
-                  <th className="px-4 py-3 border text-left text-sm font-semibold text-gray-700">Branch</th>
-                  <th className="px-4 py-3 border text-left text-sm font-semibold text-gray-700">Location</th>
-                  <th className="px-4 py-3 border text-left text-sm font-semibold text-gray-700">From Weight</th>
-                  <th className="px-4 py-3 border text-left text-sm font-semibold text-gray-700">To Weight</th>
-                  <th className="px-4 py-3 border text-left text-sm font-semibold text-gray-700">Rate</th>
-                  <th className="px-4 py-3 border text-left text-sm font-semibold text-gray-700">Actions</th>
+                  <th className="px-4 py-3 border text-left text-sm font-semibold">S.No</th>
+                  <th className="px-4 py-3 border text-left text-sm font-semibold">Title</th>
+                  <th className="px-4 py-3 border text-left text-sm font-semibold">Customer</th>
+                  <th className="px-4 py-3 border text-left text-sm font-semibold">Branch</th>
+                  <th className="px-4 py-3 border text-left text-sm font-semibold">Weight Rule</th>
+                  <th className="px-4 py-3 border text-left text-sm font-semibold">Approval</th>
+                  <th className="px-4 py-3 border text-left text-sm font-semibold">Status</th>
+                  <th className="px-4 py-3 border text-left text-sm font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {rateMasters.map((rateMaster, index) => (
-                  <React.Fragment key={rateMaster._id}>
-                    {/* Main row for Title, Customer, Branch, Location */}
-                    <tr className="hover:bg-gray-50">
-                      <td rowSpan={rateMaster.rateSlabs.length} className="px-4 py-2 border align-top text-sm">
-                        {index + 1}
-                       </td>
-                      <td rowSpan={rateMaster.rateSlabs.length} className="px-4 py-2 border align-top text-sm font-medium">
-                        {rateMaster.title}
-                       </td>
-                      <td rowSpan={rateMaster.rateSlabs.length} className="px-4 py-2 border align-top text-sm">
-                        {rateMaster.customerName || '-'}
-                       </td>
-                      <td rowSpan={rateMaster.rateSlabs.length} className="px-4 py-2 border align-top text-sm">
-                        {rateMaster.branchName || '-'}
-                       </td>
-                      <td rowSpan={rateMaster.rateSlabs.length} className="px-4 py-2 border align-top text-sm">
-                        {rateMaster.locationName || '-'}
-                       </td>
-                      {/* First rate slab row */}
-                      <td className="px-4 py-2 border text-sm text-center">
-                        {rateMaster.rateSlabs[0]?.fromQty}
-                       </td>
-                      <td className="px-4 py-2 border text-sm text-center">
-                        {rateMaster.rateSlabs[0]?.toQty}
-                       </td>
-                      <td className="px-4 py-2 border text-sm text-center">
-                        {rateMaster.rateSlabs[0]?.rate}
-                       </td>
-                      <td rowSpan={rateMaster.rateSlabs.length} className="px-4 py-2 border align-top text-center">
-                        <div className="flex gap-2 justify-center">
-                          <button
-                            onClick={() => editRateMaster(rateMaster)}
-                            className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 text-sm"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => deleteRateMaster(rateMaster._id)}
-                            className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                       </td>
-                    </tr>
-                    {/* Additional rate slab rows */}
-                    {rateMaster.rateSlabs.slice(1).map((slab, slabIndex) => (
-                      <tr key={`${rateMaster._id}-slab-${slabIndex}`} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 border text-sm text-center">{slab.fromQty}</td>
-                        <td className="px-4 py-2 border text-sm text-center">{slab.toQty}</td>
-                        <td className="px-4 py-2 border text-sm text-center">{slab.rate}</td>
-                      </tr>
-                    ))}
-                  </React.Fragment>
+                {filteredMasters.map((master, index) => (
+                  <tr key={master._id} className="hover:bg-gray-50">
+                    <td className="px-4 py-2 border text-sm">{index + 1}</td>
+                    <td className="px-4 py-2 border text-sm font-medium">{master.title}</td>
+                    <td className="px-4 py-2 border text-sm">{master.customerName}</td>
+                    <td className="px-4 py-2 border text-sm">{master.branchName}</td>
+                    <td className="px-4 py-2 border text-sm">
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        master.weightRule === 'above_25' 
+                          ? 'bg-orange-100 text-orange-800' 
+                          : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {getWeightRuleLabel(master.weightRule)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 border text-sm">
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        master.approvalOption === 'contract_rate' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-purple-100 text-purple-800'
+                      }`}>
+                        {getApprovalLabel(master.approvalOption)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 border text-sm">
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        master.locationRates?.length > 0 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {master.locationRates?.length || 0} Locations Added
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 border text-sm">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => router.push(`/admin/rate-master/rates/${master._id}`)}
+                          className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 text-xs"
+                        >
+                          Add/View Rates
+                        </button>
+                        <button
+                          onClick={() => handleEdit(master)}
+                          className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 text-xs"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => deleteRateMaster(master._id)}
+                          className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-xs"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
                 ))}
               </tbody>
             </table>
@@ -608,6 +551,3 @@ export default function RateMasterPage() {
     </div>
   );
 }
-
-// Add React import for Fragment
-import React from 'react';

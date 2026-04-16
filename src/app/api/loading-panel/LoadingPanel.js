@@ -46,7 +46,7 @@ const loadingPanelSchema = new mongoose.Schema({
   loadingCharges: String,
   otherCharges: String,
   
-  // Orders
+  // Orders with Taluka, District, State fields
   orderRows: [{
     _id: {
       type: mongoose.Schema.Types.ObjectId,
@@ -58,14 +58,24 @@ const loadingPanelSchema = new mongoose.Schema({
     plantName: String,
     orderType: String,
     pinCode: String,
-    state: String,
+    taluka: String,
+    talukaName: String,
     district: String,
+    districtName: String,
+    state: String,
+    stateName: String,
     from: String,
+    fromName: String,
     to: String,
-    weight: Number
+    toName: String,
+    weight: Number,
+    collectionCharges: Number,
+    cancellationCharges: String,
+    loadingCharges: String,
+    otherCharges: Number
   }],
   
-  // Vehicle & Driver
+  // Vehicle & Driver with Owner Aadhar
   vehicleInfo: {
     vehicleNo: {
       type: String,
@@ -78,6 +88,7 @@ const loadingPanelSchema = new mongoose.Schema({
     vehicleOwnerName: String,
     vehicleOwnerRC: String,
     ownerPanCard: String,
+    ownerAadharCard: String,
     verified: {
       type: Boolean,
       default: false
@@ -95,10 +106,33 @@ const loadingPanelSchema = new mongoose.Schema({
     rcDocument: String,
     panDocument: String,
     licenseDocument: String,
-    driverPhoto: String
+    driverPhoto: String,
+    aadharDocument: String
   },
   
-  // Pack Data (from Order Panel)
+  // Helper / Co-Driver Information
+  hasHelper: {
+    type: Boolean,
+    default: false
+  },
+  helperInfo: {
+    name: String,
+    mobileNo: String,
+    photo: [String],
+    aadharPhoto: [String]
+  },
+  
+  // Vehicle Photos
+  vehiclePhotos: [String],
+  
+  // Detention Information
+  detentionDays: String,
+  detentionNumber: String,
+  
+  // Loaded Vehicle Slip
+  loadedVehicleSlips: [String],
+  
+  // Pack Data (from Order Panel) - Updated with all 4 pack types
   packData: {
     PALLETIZATION: [{
       _id: {
@@ -147,11 +181,25 @@ const loadingPanelSchema = new mongoose.Schema({
       productName: String,
       actualWt: Number,
       chargedWt: Number
+    }],
+    'NON-UNIFORM - GENERAL CARGO': [{
+      _id: {
+        type: mongoose.Schema.Types.ObjectId,
+        default: () => new mongoose.Types.ObjectId()
+      },
+      nos: Number,
+      productName: String,
+      uom: String,
+      length: Number,
+      width: Number,
+      height: Number,
+      actualWt: Number,
+      chargedWt: Number
     }]
   },
   activePack: {
     type: String,
-    enum: ['PALLETIZATION', 'UNIFORM - BAGS/BOXES', 'LOOSE - CARGO'],
+    enum: ['PALLETIZATION', 'UNIFORM - BAGS/BOXES', 'LOOSE - CARGO', 'NON-UNIFORM - GENERAL CARGO'],
     default: 'PALLETIZATION'
   },
   
@@ -188,13 +236,18 @@ const loadingPanelSchema = new mongoose.Schema({
     approval: String
   },
   
-  // Upload sections - VL
-  vlUploads: {
-    vl1: String, vl2: String, vl3: String, vl4: String,
-    vl5: String, vl6: String, vl7: String, videoVl: String,
-    approval: String,
-    loadingStatus: String
-  },
+  // Upload sections - VL with min 5 / max 25 photos
+  // In the vlUploads section of your schema
+vlUploads: {
+  vl1: String, vl2: String, vl3: String, vl4: String,
+  vl5: String, vl6: String, vl7: String, videoVl: String,
+  approval: String,
+  loadingStatus: {
+    type: String,
+    enum: ['Loaded', 'Partially Loaded', 'Not Loaded', ''],
+    default: ''
+  }
+},
   
   // Loaded weighment
   loadedWeighment: {
@@ -231,10 +284,11 @@ const loadingPanelSchema = new mongoose.Schema({
     }
   },
   
-  // Arrival details
+  // Arrival details with Out Time
   arrivalDetails: {
     date: Date,
-    time: String
+    time: String,
+    outTime: String
   },
   
   // Totals
@@ -255,6 +309,17 @@ const loadingPanelSchema = new mongoose.Schema({
   consignmentNote: String,
   invoice: String,
   ewaybill: String,
+  
+  // Selected references
+  selectedVehicle: {
+    id: String,
+    vehicleNumber: String,
+    ownerName: String
+  },
+  selectedVehicleNegotiation: {
+    id: String,
+    vnnNo: String
+  },
   
   // Company & User Tracking
   companyId: {
@@ -282,6 +347,12 @@ loadingPanelSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();
 });
+
+// Index for better performance
+loadingPanelSchema.index({ companyId: 1, createdAt: -1 });
+loadingPanelSchema.index({ vehicleArrivalNo: 1, companyId: 1 });
+loadingPanelSchema.index({ vehicleNegotiationNo: 1 });
+loadingPanelSchema.index({ 'vehicleInfo.vehicleNo': 1 });
 
 const LoadingPanel = mongoose.models.LoadingPanel || 
   mongoose.model('LoadingPanel', loadingPanelSchema);

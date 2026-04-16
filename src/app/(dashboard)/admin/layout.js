@@ -436,7 +436,14 @@ export default function Layout({ children }) {
                 {/*<Item href="/admin/districts"              icon={<HiLocationMarker />}    label="Districts"                    onClick={closeSidebar} isActive={isActive("/admin/districts")} />*/}
              
                 <Item href="/admin/vehicles"               icon={<HiTruck />}             label="Vehicles"                     onClick={closeSidebar} isActive={isActive("/admin/vehicels")} />
-                <Item href="/admin/rate-master"   icon={<HiCurrencyRupee />}     label="Transport rate-master"         onClick={closeSidebar} isActive={isActive("/admin/rate-master")} />
+				<Item href="/admin/owners"               icon={<HiTruck />}             label="Vehicles-owner"                     onClick={closeSidebar} isActive={isActive("/admin/owners")} />
+                <Item href="/admin/rate-master/create"   icon={<HiCurrencyRupee />}     label="Rate-Location-Master-create"         onClick={closeSidebar} isActive={isActive("admin/rate-master/create")} />
+				     <Item href="/admin/rate-master/list"   icon={<HiCurrencyRupee />}     label="Rate-Location-Master-list"         onClick={closeSidebar} isActive={isActive("/admin/rate-master/list")} />
+ <Item href="/admin/rate-master/list"   icon={<HiCurrencyRupee />}     label="Rate-Location-Master-list"         onClick={closeSidebar} isActive={isActive("/admin/rate-master/list")} />
+ <Item href="/admin/UOM"   icon={<HiCurrencyRupee />}     label="UOM"         onClick={closeSidebar} isActive={isActive("/admin/UOM")} />
+ <Item href="/admin/sku-sizes"   icon={<HiCurrencyRupee />}     label="sku-sizes"         onClick={closeSidebar} isActive={isActive("/admin/sku-sizes")} />
+
+
               </Section>
 
               <Section title="Transactions View" icon={<HiOutlineCreditCard />} isOpen={openMenu === "transactionsView"} onToggle={() => toggleMenu("transactionsView")}>

@@ -1,4 +1,3 @@
-// app/api/vehicles/route.js
 import { NextResponse } from "next/server";
 import connectDb from "@/lib/db";
 import Vehicle from "./Vehicle";
@@ -75,7 +74,19 @@ export async function POST(req) {
   if (error) return NextResponse.json({ success: false, message: error }, { status });
 
   try {
-    const { vehicleNumber, rcNumber, pucNumber, fitnessNumber, ownerName, chasisNumber, insuranceNumber, isActive } = await req.json();
+    const { 
+      vehicleNumber, 
+      rcNumber, 
+      pucNumber, 
+      fitnessNumber, 
+      ownerName, 
+      chasisNumber, 
+      insuranceNumber,
+      vehicleType,
+      vehicleWeight,
+      vehiclePhoto,
+      isActive 
+    } = await req.json();
 
     // Validation
     if (!vehicleNumber || !rcNumber || !ownerName) {
@@ -107,6 +118,9 @@ export async function POST(req) {
       ownerName,
       chasisNumber: chasisNumber?.toUpperCase(),
       insuranceNumber: insuranceNumber?.toUpperCase(),
+      vehicleType: vehicleType || '',
+      vehicleWeight: vehicleWeight || 0,
+      vehiclePhoto: vehiclePhoto || '',
       isActive: isActive !== undefined ? isActive : true,
       companyId: user.companyId,
       createdBy: user.id,
@@ -193,6 +207,9 @@ export async function PUT(req) {
     if (updates.fitnessNumber) updates.fitnessNumber = updates.fitnessNumber.toUpperCase();
     if (updates.chasisNumber) updates.chasisNumber = updates.chasisNumber.toUpperCase();
     if (updates.insuranceNumber) updates.insuranceNumber = updates.insuranceNumber.toUpperCase();
+
+    // Handle vehicle weight as number
+    if (updates.vehicleWeight) updates.vehicleWeight = parseFloat(updates.vehicleWeight) || 0;
 
     const updatedVehicle = await Vehicle.findOneAndUpdate(
       { _id: vehicleId, companyId: user.companyId },

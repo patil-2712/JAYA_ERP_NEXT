@@ -11,6 +11,7 @@ const PACK_TYPES = [
   { key: "PALLETIZATION", label: "Palletization" },
   { key: "UNIFORM - BAGS/BOXES", label: "Uniform - Bags/Boxes" },
   { key: "LOOSE - CARGO", label: "Loose - Cargo" },
+  { key: "NON-UNIFORM - GENERAL CARGO", label: "Non-uniform - General Cargo" },
 ];
 
 const DELIVERY_OPTIONS = ["Urgent", "Normal", "Express", "Scheduled"];
@@ -110,7 +111,6 @@ function useVehicleSearch() {
     }
   };
 
-  // Auto-fetch on mount
   useEffect(() => {
     searchVehicles();
   }, []);
@@ -119,7 +119,7 @@ function useVehicleSearch() {
 }
 
 /* =======================
-  Vehicle Negotiation Hook - Shows only unused VNNs
+  Vehicle Negotiation Hook
 ========================= */
 function useVehicleNegotiation() {
   const [negotiations, setNegotiations] = useState([]);
@@ -132,7 +132,6 @@ function useVehicleNegotiation() {
     try {
       const token = localStorage.getItem('token');
       
-      // Fetch all vehicle negotiations
       const vnRes = await fetch('/api/vehicle-negotiation', {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -143,14 +142,12 @@ function useVehicleNegotiation() {
       
       const vnData = await vnRes.json();
       
-      // Fetch all loading info panels to see which VNNs are already used
       const loadingRes = await fetch('/api/loading-panel?format=table', {
         headers: { Authorization: `Bearer ${token}` },
       });
       
       const loadingData = await loadingRes.json();
       
-      // Create a Set of used VNNs
       const usedVnns = new Set();
       if (loadingData.success && Array.isArray(loadingData.data)) {
         loadingData.data.forEach(item => {
@@ -160,7 +157,6 @@ function useVehicleNegotiation() {
         });
       }
       
-      // Filter out VNNs that are already used in loading panels
       if (vnData.success && Array.isArray(vnData.data)) {
         const availableVNs = vnData.data.filter(vn => !usedVnns.has(vn.vnnNo));
         setNegotiations(availableVNs);
@@ -208,7 +204,6 @@ function useVehicleNegotiation() {
     }
   };
 
-  // Auto-fetch on mount
   useEffect(() => {
     fetchNegotiations();
   }, []);
@@ -217,7 +212,7 @@ function useVehicleNegotiation() {
 }
 
 /* =======================
-  Loading Info Hook - To check used VNNs
+  Loading Info Hook
 ========================= */
 function useLoadingInfo() {
   const [loadingInfos, setLoadingInfos] = useState([]);
@@ -248,7 +243,6 @@ function useLoadingInfo() {
     }
   };
 
-  // Auto-fetch on mount
   useEffect(() => {
     fetchLoadingInfos();
   }, []);
@@ -268,11 +262,21 @@ function defaultOrderRow() {
     plantName: "",
     orderType: "",
     pinCode: "",
-    state: "",
+    taluka: "",
+    talukaName: "",
     district: "",
+    districtName: "",
+    state: "",
+    stateName: "",
     from: "",
+    fromName: "",
     to: "",
+    toName: "",
     weight: "",
+    collectionCharges: "",
+    cancellationCharges: "",
+    loadingCharges: "",
+    otherCharges: "",
   };
 }
 
@@ -315,31 +319,72 @@ function defaultPackRow(packType) {
     };
   }
 
-  // LOOSE - CARGO
+  if (packType === "LOOSE - CARGO") {
+    return {
+      _id: uid(),
+      uom: "",
+      productName: "",
+      actualWt: "",
+      chargedWt: "",
+    };
+  }
+
   return {
     _id: uid(),
-    uom: "",
+    nos: "",
     productName: "",
+    uom: "",
+    length: "",
+    width: "",
+    height: "",
     actualWt: "",
     chargedWt: "",
   };
 }
 
-// File upload item component
-function FileUploadItem({ file, onRemove, index, label, isExisting = false, readOnly = false }) {
+/* =======================
+  UI Components
+========================= */
+
+function FileUploadItem({ file, onRemove, index, label, isExisting = false, readOnly = false, isCameraPhoto = false, photoTime = null }) {
+  const [imagePreview, setImagePreview] = useState(null);
+  
+  useEffect(() => {
+    if (file && file.type && file.type.startsWith('image/') && !isExisting) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  }, [file, isExisting]);
+
   return (
-    <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200">
+    <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 mt-1">
+      {imagePreview && !isExisting && (
+        <img src={imagePreview} alt="Preview" className="w-10 h-10 rounded object-cover" />
+      )}
+      {isExisting && (
+        <div className="w-10 h-10 bg-green-100 rounded flex items-center justify-center">
+          <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+      )}
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium text-slate-700 truncate">
-          {isExisting ? file.name || 'Existing file' : file.name}
+          {isExisting ? (file.name || 'Existing Document') : file.name}
         </p>
         <p className="text-xs text-slate-500">
-          {isExisting ? 'Previously uploaded' : `${(file.size / 1024).toFixed(1)} KB`}
+          {isExisting ? 'Already uploaded' : `${(file.size / 1024).toFixed(1)} KB`}
         </p>
+        {photoTime && (
+          <p className="text-xs text-green-600">Captured: {photoTime}</p>
+        )}
       </div>
       {!readOnly && (
         <button
-          onClick={() => onRemove(index)}
+          onClick={() => onRemove(index, isExisting)}
           className="text-red-500 hover:text-red-700 p-1"
           title="Remove"
         >
@@ -352,14 +397,7 @@ function FileUploadItem({ file, onRemove, index, label, isExisting = false, read
   );
 }
 
-// Vehicle Search Dropdown Component
-function VehicleSearchDropdown({ 
-  onSelect, 
-  placeholder = "Search vehicle...",
-  selectedVehicleId,
-  value = "",
-  readOnly = false
-}) {
+function VehicleSearchDropdown({ onSelect, placeholder = "Search vehicle...", selectedVehicleId, value = "", readOnly = false }) {
   const [searchQuery, setSearchQuery] = useState(value || "");
   const [showDropdown, setShowDropdown] = useState(false);
   const [filteredVehicles, setFilteredVehicles] = useState([]);
@@ -379,6 +417,7 @@ function VehicleSearchDropdown({
   }, [vehicleSearch.vehicles]);
 
   const handleSearch = (query) => {
+    if (readOnly) return;
     setSearchQuery(query);
     
     if (query.trim() === "") {
@@ -398,6 +437,7 @@ function VehicleSearchDropdown({
   };
 
   const handleSelectVehicle = (vehicle) => {
+    if (readOnly) return;
     setSearchQuery(vehicle.vehicleNumber);
     setShowDropdown(false);
     onSelect(vehicle);
@@ -418,7 +458,7 @@ function VehicleSearchDropdown({
       <input
         type="text"
         value={searchQuery}
-        onChange={(e) => !readOnly && handleSearch(e.target.value)}
+        onChange={(e) => handleSearch(e.target.value)}
         onFocus={handleInputFocus}
         onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
         className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
@@ -470,6 +510,437 @@ function VehicleSearchDropdown({
   );
 }
 
+function Card({ title, right, children }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm mb-4">
+      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+        <div className="text-sm font-extrabold text-slate-900">{title}</div>
+        {right || null}
+      </div>
+      <div className="p-4">{children}</div>
+    </div>
+  );
+}
+
+function Select({ label, value, onChange, options = [], col = "", readOnly = false }) {
+  return (
+    <div className={col}>
+      <label className="text-xs font-bold text-slate-600">{label}</label>
+      <select
+        value={value}
+        onChange={(e) => onChange?.(e.target.value)}
+        disabled={readOnly}
+        className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+          readOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+        }`}
+      >
+        <option value="">Select {label}</option>
+        {options.map((o) => (
+          <option key={o} value={o}>{o}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function SearchableDropdown({ items, selectedId, onSelect, placeholder = "Search...", displayField = 'name', codeField = 'code', disabled = false }) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredItems, setFilteredItems] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    setFilteredItems(items || []);
+    if (selectedId && items?.length > 0) {
+      const item = items.find(i => i._id === selectedId || i.name === selectedId);
+      setSelectedItem(item);
+      if (item) {
+        setSearchQuery(getDisplayValue(item));
+      }
+    } else {
+      setSelectedItem(null);
+      setSearchQuery("");
+    }
+  }, [items, selectedId]);
+
+  const getDisplayValue = (item) => {
+    if (!item) return "";
+    const display = item[displayField] || "";
+    const code = item[codeField] ? `(${item[codeField]})` : "";
+    return `${display} ${code}`.trim();
+  };
+
+  const handleSearch = (query) => {
+    if (disabled) return;
+    setSearchQuery(query);
+    if (!query.trim()) {
+      setFilteredItems(items || []);
+    } else {
+      const filtered = (items || []).filter(item =>
+        (item[displayField]?.toLowerCase().includes(query.toLowerCase())) ||
+        (item[codeField]?.toLowerCase().includes(query.toLowerCase()))
+      );
+      setFilteredItems(filtered);
+    }
+  };
+
+  const handleSelectItem = (item) => {
+    if (disabled) return;
+    setSelectedItem(item);
+    setSearchQuery(getDisplayValue(item));
+    setShowDropdown(false);
+    onSelect?.(item);
+  };
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <input
+        type="text"
+        value={searchQuery}
+        onChange={(e) => handleSearch(e.target.value)}
+        onFocus={() => !disabled && setShowDropdown(true)}
+        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+        className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+          disabled ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+        }`}
+        placeholder={placeholder}
+        disabled={disabled}
+      />
+      {showDropdown && !disabled && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+          {filteredItems?.length > 0 ? (
+            filteredItems.map((item) => (
+              <div
+                key={item._id}
+                onMouseDown={() => handleSelectItem(item)}
+                className={`p-2 hover:bg-slate-50 cursor-pointer border-b border-slate-100 ${
+                  selectedItem?._id === item._id ? 'bg-sky-50' : ''
+                }`}
+              >
+                <div className="font-medium text-slate-800 text-sm">
+                  {item[displayField]}
+                </div>
+                {item[codeField] && (
+                  <div className="text-xs text-slate-500">Code: {item[codeField]}</div>
+                )}
+              </div>
+            ))
+          ) : (
+            <div className="p-2 text-center text-sm text-slate-500">No items found</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TableSearchableDropdown({ items, selectedId, onSelect, placeholder = "Search...", displayField = 'name', codeField = 'code', disabled = false, cellId = "" }) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredItems, setFilteredItems] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    setFilteredItems(items || []);
+    if (selectedId && items?.length > 0) {
+      const item = items.find(i => i._id === selectedId || i.name === selectedId);
+      setSelectedItem(item);
+      if (item) {
+        setSearchQuery(getDisplayValue(item));
+      }
+    } else {
+      setSelectedItem(null);
+      setSearchQuery("");
+    }
+  }, [items, selectedId]);
+
+  const getDisplayValue = (item) => {
+    if (!item) return "";
+    const display = item[displayField] || "";
+    const code = item[codeField] ? `(${item[codeField]})` : "";
+    return `${display} ${code}`.trim();
+  };
+
+  const handleSearch = (query) => {
+    if (disabled) return;
+    setSearchQuery(query);
+    if (!query.trim()) {
+      setFilteredItems(items || []);
+    } else {
+      const filtered = (items || []).filter(item =>
+        (item[displayField]?.toLowerCase().includes(query.toLowerCase())) ||
+        (item[codeField]?.toLowerCase().includes(query.toLowerCase()))
+      );
+      setFilteredItems(filtered);
+    }
+  };
+
+  const handleInputFocus = () => {
+    if (!disabled && !showDropdown && inputRef.current) {
+      setFilteredItems(items || []);
+      const inputRect = inputRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: inputRect.bottom + window.scrollY + 4,
+        left: inputRect.left + window.scrollX,
+        width: inputRect.width
+      });
+      setShowDropdown(true);
+    }
+  };
+
+  const handleSelectItem = (item) => {
+    if (disabled) return;
+    setSelectedItem(item);
+    setSearchQuery(getDisplayValue(item));
+    setShowDropdown(false);
+    onSelect?.(item);
+  };
+
+  return (
+    <>
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type="text"
+          value={searchQuery}
+          onChange={(e) => handleSearch(e.target.value)}
+          onFocus={handleInputFocus}
+          onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 ${
+            disabled ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+          }`}
+          placeholder={placeholder}
+          disabled={disabled}
+        />
+      </div>
+      {showDropdown && !disabled && (
+        <div 
+          ref={dropdownRef}
+          className="fixed z-[9999] bg-white border border-slate-200 rounded-lg shadow-lg overflow-y-auto max-h-60"
+          style={{
+            top: `${dropdownPosition.top}px`,
+            left: `${dropdownPosition.left}px`,
+            width: `${dropdownPosition.width}px`
+          }}
+        >
+          {filteredItems?.length > 0 ? (
+            filteredItems.map((item) => (
+              <div
+                key={item._id}
+                onMouseDown={() => handleSelectItem(item)}
+                className="p-2 hover:bg-slate-50 cursor-pointer border-b border-slate-100"
+              >
+                <div className="font-medium text-slate-800 text-sm">
+                  {item[displayField]}
+                </div>
+                {item[codeField] && (
+                  <div className="text-xs text-slate-500">Code: {item[codeField]}</div>
+                )}
+              </div>
+            ))
+          ) : (
+            <div className="p-2 text-center text-sm text-slate-500">No items found</div>
+          )}
+        </div>
+      )}
+    </> 
+  );
+}
+
+function PackTypeTable({ packType, rows, onChange, onRemove, onDuplicate, onToggleUniform, readOnly = false }) {
+  const getColumns = (type) => {
+    if (type === "PALLETIZATION") {
+      return [
+        { key: "noOfPallets", label: "NO OF PALLETS", type: "number" },
+        { key: "unitPerPallets", label: "UNIT PER PALLETS", type: "number" },
+        { key: "totalPkgs", label: "TOTAL PKGS", type: "number", readOnly: true },
+        { key: "pkgsType", label: "PKGS TYPE", type: "text", options: PKGS_TYPE_OPTIONS },
+        { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
+        { key: "skuSize", label: "SKU - SIZE", type: "text", options: SKU_SIZE_OPTIONS },
+        { key: "packWeight", label: "PACK - WEIGHT", type: "number" },
+        { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS },
+        { key: "wtLtr", label: "WT (LTR)", type: "number", readOnly: true },
+        { key: "actualWt", label: "ACTUAL - WT", type: "number", readOnly: true },
+        { key: "chargedWt", label: "CHARGED - WT", type: "number" },
+        { key: "wtUom", label: "WT UOM", type: "text", readOnly: true },
+      ];
+    }
+
+    if (type === "UNIFORM - BAGS/BOXES") {
+      return [
+        { key: "totalPkgs", label: "TOTAL PKGS", type: "number" },
+        { key: "pkgsType", label: "PKGS TYPE", type: "text", options: PKGS_TYPE_OPTIONS },
+        { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
+        { key: "skuSize", label: "SKU - SIZE", type: "text", options: SKU_SIZE_OPTIONS },
+        { key: "packWeight", label: "PACK - WEIGHT", type: "number" },
+        { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS },
+        { key: "wtLtr", label: "WT (LTR)", type: "number", readOnly: true },
+        { key: "actualWt", label: "ACTUAL - WT", type: "number", readOnly: true },
+        { key: "chargedWt", label: "CHARGED - WT", type: "number" },
+        { key: "wtUom", label: "WT UOM", type: "text", readOnly: true },
+      ];
+    }
+
+    if (type === "LOOSE - CARGO") {
+      return [
+        { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
+        { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS },
+        { key: "actualWt", label: "ACTUAL - WT", type: "number" },
+        { key: "chargedWt", label: "CHARGED - WT", type: "number" },
+      ];
+    }
+
+    // NON-UNIFORM - GENERAL CARGO
+    return [
+      { key: "nos", label: "NOS", type: "number" },
+      { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS },
+      { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
+      { key: "length", label: "LENGTH", type: "number" },
+      { key: "width", label: "WIDTH", type: "number" },
+      { key: "height", label: "HEIGHT", type: "number" },
+      { key: "actualWt", label: "ACTUAL - WT", type: "number" },
+      { key: "chargedWt", label: "CHARGED - WT", type: "number" },
+    ];
+  };
+
+  const cols = useMemo(() => getColumns(packType), [packType]);
+
+  if (!rows || rows.length === 0) {
+    return (
+      <div className="overflow-auto rounded-xl border border-yellow-300">
+        <div className="p-8 text-center text-slate-400">
+          No rows yet. Click <b>Add Row</b> to add data.
+        </div>
+      </div>
+    );
+  }
+
+  const handleChange = (rowId, key, value) => {
+    if (!readOnly) {
+      onChange(rowId, key, value);
+    }
+  };
+
+  return (
+    <div className="overflow-auto rounded-xl border border-yellow-300">
+      <table className="min-w-full w-full text-sm">
+        <thead className="sticky top-0 bg-yellow-400">
+          <tr>
+            {packType === "PALLETIZATION" && (
+              <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
+                UNIFORM
+              </th>
+            )}
+            {cols.map((c) => (
+              <th
+                key={c.key}
+                className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
+              >
+                {c.label}
+                {c.readOnly && <span className="ml-1 text-xs text-blue-600">*Auto</span>}
+              </th>
+            ))}
+            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
+              Actions
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r._id} className="hover:bg-yellow-50 even:bg-slate-50">
+              {packType === "PALLETIZATION" && (
+                <td className="border border-yellow-300 px-2 py-2 text-center">
+                  <input
+                    type="checkbox"
+                    checked={r.isUniform || false}
+                    onChange={() => !readOnly && onToggleUniform(r._id)}
+                    disabled={readOnly}
+                    className={`h-4 w-4 rounded border-yellow-300 text-yellow-600 focus:ring-yellow-500 ${
+                      readOnly ? 'cursor-not-allowed opacity-50' : ''
+                    }`}
+                  />
+                </td>
+              )}
+              
+              {cols.map((c) => (
+                <td key={c.key} className="border border-yellow-300 px-2 py-2">
+                  {c.options ? (
+                    <select
+                      value={r[c.key] || ""}
+                      onChange={(e) => handleChange(r._id, c.key, e.target.value)}
+                      disabled={readOnly}
+                      className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                        readOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                      }`}
+                    >
+                      <option value="">Select {c.label}</option>
+                      {c.options.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type={c.type || "text"}
+                      value={r[c.key] || ""}
+                      readOnly={c.readOnly || readOnly}
+                      onChange={(e) => handleChange(r._id, c.key, e.target.value)}
+                      className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                        (c.readOnly || readOnly) ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                      }`}
+                      placeholder={c.readOnly ? "Auto-calculated" : `Enter ${c.label}`}
+                      step={c.type === "number" ? "0.001" : undefined}
+                    />
+                  )}
+                </td>
+              ))}
+              <td className="border border-yellow-300 px-2 py-2">
+                <div className="flex gap-2 justify-center">
+                  {!readOnly && (
+                    <>
+                      <button
+                        onClick={() => onDuplicate(r._id)}
+                        className="rounded-lg border border-yellow-500 bg-yellow-100 px-3 py-1.5 text-xs font-bold text-yellow-800 hover:bg-yellow-200 transition"
+                      >
+                        Duplicate
+                      </button>
+                      <button
+                        onClick={() => onRemove(r._id)}
+                        className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-600 transition"
+                      >
+                        Remove
+                      </button>
+                    </>
+                  )}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot className="bg-yellow-100">
+          <tr>
+            <td
+              colSpan={packType === "PALLETIZATION" ? cols.length + 1 : cols.length}
+              className="border border-yellow-300 px-3 py-2 text-right font-bold"
+            >
+              Total Actual Weight:
+            </td>
+            <td className="border border-yellow-300 px-3 py-2 font-bold">
+              {rows.reduce((sum, r) => sum + num(r.actualWt), 0).toFixed(2)}
+            </td>
+            <td className="border border-yellow-300 px-3 py-2"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
 export default function EditLoadingInfoPanel() {
   const router = useRouter();
   const params = useParams();
@@ -507,7 +978,7 @@ export default function EditLoadingInfoPanel() {
   const vehicleNegotiationDropdownRef = useRef(null);
 
   /** =========================
-   * HEADER STATE - Added vehicleNegotiationNo
+   * HEADER STATE
    ========================= */
   const [header, setHeader] = useState({
     vehicleArrivalNo: "",
@@ -543,6 +1014,7 @@ export default function EditLoadingInfoPanel() {
     vehicleOwnerName: "",
     vehicleOwnerRC: "",
     ownerPanCard: "",
+    ownerAadharCard: "",
     verified: false,
     vehicleType: "",
     message: "",
@@ -551,6 +1023,7 @@ export default function EditLoadingInfoPanel() {
     panDocument: "",
     licenseDocument: "",
     driverPhoto: "",
+    aadharDocument: "",
     vehicleId: "",
     insuranceNumber: "",
     chasisNumber: "",
@@ -566,6 +1039,7 @@ export default function EditLoadingInfoPanel() {
     PALLETIZATION: [],
     "UNIFORM - BAGS/BOXES": [],
     "LOOSE - CARGO": [],
+    "NON-UNIFORM - GENERAL CARGO": [],
   });
 
   /** =========================
@@ -601,11 +1075,27 @@ export default function EditLoadingInfoPanel() {
     rc: [],
     pan: [],
     license: [],
-    photo: []
+    photo: [],
+    aadhar: []
   });
 
   const [weighmentFiles, setWeighmentFiles] = useState({
     weighSlip: []
+  });
+
+  /** =========================
+   * ADDITIONAL STATE FOR NEW FIELDS
+   ========================= */
+  const [vehiclePhotoFiles, setVehiclePhotoFiles] = useState([]);
+  const [detentionDays, setDetentionDays] = useState("");
+  const [detentionNumber, setDetentionNumber] = useState("");
+  const [loadedVehicleSlipFiles, setLoadedVehicleSlipFiles] = useState([]);
+  const [hasHelper, setHasHelper] = useState(false);
+  const [helperInfo, setHelperInfo] = useState({
+    name: "",
+    mobileNo: "",
+    photo: [],
+    aadharPhoto: []
   });
 
   /** =========================
@@ -616,7 +1106,8 @@ export default function EditLoadingInfoPanel() {
       rc: [],
       pan: [],
       license: [],
-      photo: []
+      photo: [],
+      aadhar: []
     },
     vbp: {},
     vft: {},
@@ -624,7 +1115,9 @@ export default function EditLoadingInfoPanel() {
     vl: {},
     weighment: {
       weighSlip: []
-    }
+    },
+    loadedVehicleSlips: [],
+    vehiclePhotos: []
   });
 
   /** =========================
@@ -671,6 +1164,7 @@ export default function EditLoadingInfoPanel() {
   const [arrivalDetails, setArrivalDetails] = useState({
     date: new Date().toISOString().split('T')[0],
     time: "",
+    outTime: "",
   });
 
   /** =========================
@@ -709,12 +1203,11 @@ export default function EditLoadingInfoPanel() {
 
       const panel = data.data;
       
-      // Check if panel is approved/completed - set read-only mode
       if (panel.panelStatus === 'Approved' || panel.panelStatus === 'Completed') {
         setIsReadOnly(true);
       }
       
-      // Set header data - with vehicleNegotiationNo
+      // Set header data
       setHeader({
         vehicleArrivalNo: panel.vehicleArrivalNo || "",
         vehicleNegotiationNo: panel.vehicleNegotiationNo || "",
@@ -732,7 +1225,6 @@ export default function EditLoadingInfoPanel() {
         otherCharges: panel.otherCharges || "",
       });
 
-      // Set vehicle negotiation no
       if (panel.vehicleNegotiationNo) {
         setVehicleNegotiationNo(panel.vehicleNegotiationNo);
       }
@@ -760,6 +1252,7 @@ export default function EditLoadingInfoPanel() {
           vehicleOwnerName: panel.vehicleInfo.vehicleOwnerName || "",
           vehicleOwnerRC: panel.vehicleInfo.vehicleOwnerRC || "",
           ownerPanCard: panel.vehicleInfo.ownerPanCard || "",
+          ownerAadharCard: panel.vehicleInfo.ownerAadharCard || "",
           verified: panel.vehicleInfo.verified || false,
           vehicleType: panel.vehicleInfo.vehicleType || "",
           message: panel.vehicleInfo.message || "",
@@ -768,6 +1261,7 @@ export default function EditLoadingInfoPanel() {
           panDocument: panel.vehicleInfo.panDocument || "",
           licenseDocument: panel.vehicleInfo.licenseDocument || "",
           driverPhoto: panel.vehicleInfo.driverPhoto || "",
+          aadharDocument: panel.vehicleInfo.aadharDocument || "",
           vehicleId: panel.vehicleInfo.vehicleId || "",
           insuranceNumber: panel.vehicleInfo.insuranceNumber || "",
           chasisNumber: panel.vehicleInfo.chasisNumber || "",
@@ -779,37 +1273,31 @@ export default function EditLoadingInfoPanel() {
         if (panel.vehicleInfo.rcDocument) {
           setExistingFiles(prev => ({
             ...prev,
-            vehicle: {
-              ...prev.vehicle,
-              rc: [{ name: 'RC Document', path: panel.vehicleInfo.rcDocument }]
-            }
+            vehicle: { ...prev.vehicle, rc: [{ name: 'RC Document', path: panel.vehicleInfo.rcDocument }] }
           }));
         }
         if (panel.vehicleInfo.panDocument) {
           setExistingFiles(prev => ({
             ...prev,
-            vehicle: {
-              ...prev.vehicle,
-              pan: [{ name: 'PAN Document', path: panel.vehicleInfo.panDocument }]
-            }
+            vehicle: { ...prev.vehicle, pan: [{ name: 'PAN Document', path: panel.vehicleInfo.panDocument }] }
           }));
         }
         if (panel.vehicleInfo.licenseDocument) {
           setExistingFiles(prev => ({
             ...prev,
-            vehicle: {
-              ...prev.vehicle,
-              license: [{ name: 'License Document', path: panel.vehicleInfo.licenseDocument }]
-            }
+            vehicle: { ...prev.vehicle, license: [{ name: 'License Document', path: panel.vehicleInfo.licenseDocument }] }
           }));
         }
         if (panel.vehicleInfo.driverPhoto) {
           setExistingFiles(prev => ({
             ...prev,
-            vehicle: {
-              ...prev.vehicle,
-              photo: [{ name: 'Driver Photo', path: panel.vehicleInfo.driverPhoto }]
-            }
+            vehicle: { ...prev.vehicle, photo: [{ name: 'Driver Photo', path: panel.vehicleInfo.driverPhoto }] }
+          }));
+        }
+        if (panel.vehicleInfo.aadharDocument) {
+          setExistingFiles(prev => ({
+            ...prev,
+            vehicle: { ...prev.vehicle, aadhar: [{ name: 'Aadhar Document', path: panel.vehicleInfo.aadharDocument }] }
           }));
         }
       }
@@ -843,9 +1331,20 @@ export default function EditLoadingInfoPanel() {
             actualWt: row.actualWt?.toString() || "",
             chargedWt: row.chargedWt?.toString() || "",
           })),
+          "NON-UNIFORM - GENERAL CARGO": (panel.packData["NON-UNIFORM - GENERAL CARGO"] || []).map(row => ({
+            ...row,
+            _id: row._id || uid(),
+            nos: row.nos?.toString() || "",
+            productName: row.productName || "",
+            uom: row.uom || "",
+            length: row.length?.toString() || "",
+            width: row.width?.toString() || "",
+            height: row.height?.toString() || "",
+            actualWt: row.actualWt?.toString() || "",
+            chargedWt: row.chargedWt?.toString() || "",
+          })),
         };
         
-        // Ensure at least one row per pack type if empty
         if (processedPackData.PALLETIZATION.length === 0) {
           processedPackData.PALLETIZATION.push(defaultPackRow('PALLETIZATION'));
         }
@@ -854,6 +1353,9 @@ export default function EditLoadingInfoPanel() {
         }
         if (processedPackData['LOOSE - CARGO'].length === 0) {
           processedPackData['LOOSE - CARGO'].push(defaultPackRow('LOOSE - CARGO'));
+        }
+        if (processedPackData['NON-UNIFORM - GENERAL CARGO'].length === 0) {
+          processedPackData['NON-UNIFORM - GENERAL CARGO'].push(defaultPackRow('NON-UNIFORM - GENERAL CARGO'));
         }
         
         setPackData(processedPackData);
@@ -872,6 +1374,37 @@ export default function EditLoadingInfoPanel() {
         setTotalQuantity(panel.totalQuantity);
       }
 
+      // Set detention info
+      if (panel.detentionDays) setDetentionDays(panel.detentionDays);
+      if (panel.detentionNumber) setDetentionNumber(panel.detentionNumber);
+      
+      // Set helper info
+      if (panel.hasHelper !== undefined) setHasHelper(panel.hasHelper);
+      if (panel.helperInfo) {
+        setHelperInfo({
+          name: panel.helperInfo.name || "",
+          mobileNo: panel.helperInfo.mobileNo || "",
+          photo: panel.helperInfo.photo || [],
+          aadharPhoto: panel.helperInfo.aadharPhoto || []
+        });
+      }
+      
+      // Set vehicle photos
+      if (panel.vehiclePhotos && panel.vehiclePhotos.length > 0) {
+        setExistingFiles(prev => ({
+          ...prev,
+          vehiclePhotos: panel.vehiclePhotos.map(path => ({ name: 'Vehicle Photo', path }))
+        }));
+      }
+      
+      // Set loaded vehicle slips
+      if (panel.loadedVehicleSlips && panel.loadedVehicleSlips.length > 0) {
+        setExistingFiles(prev => ({
+          ...prev,
+          loadedVehicleSlips: panel.loadedVehicleSlips.map(path => ({ name: 'Loaded Vehicle Slip', path }))
+        }));
+      }
+
       // Set upload sections
       if (panel.vbpUploads) {
         setVbpUploads({
@@ -879,7 +1412,6 @@ export default function EditLoadingInfoPanel() {
           remark: panel.vbpUploads.remark || "",
         });
         
-        // Set existing VBP files
         const vbpExisting = {};
         ['vbp1','vbp2','vbp3','vbp4','vbp5','vbp6','vbp7','videoVbp'].forEach(key => {
           if (panel.vbpUploads[key]) {
@@ -894,7 +1426,6 @@ export default function EditLoadingInfoPanel() {
           approval: panel.vftUploads.approval || "",
         });
         
-        // Set existing VFT files
         const vftExisting = {};
         ['vft1','vft2','vft3','vft4','vft5','vft6','vft7','videoVft'].forEach(key => {
           if (panel.vftUploads[key]) {
@@ -909,7 +1440,6 @@ export default function EditLoadingInfoPanel() {
           approval: panel.votUploads.approval || "",
         });
         
-        // Set existing VOT files
         const votExisting = {};
         ['vot1','vot2','vot3','vot4','vot5','vot6','vot7','videoVot'].forEach(key => {
           if (panel.votUploads[key]) {
@@ -925,7 +1455,6 @@ export default function EditLoadingInfoPanel() {
           loadingStatus: panel.vlUploads.loadingStatus || "",
         });
         
-        // Set existing VL files
         const vlExisting = {};
         ['vl1','vl2','vl3','vl4','vl5','vl6','vl7','videoVl'].forEach(key => {
           if (panel.vlUploads[key]) {
@@ -966,6 +1495,7 @@ export default function EditLoadingInfoPanel() {
         setArrivalDetails({
           date: panel.arrivalDetails.date ? new Date(panel.arrivalDetails.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
           time: panel.arrivalDetails.time || "",
+          outTime: panel.arrivalDetails.outTime || "",
         });
       }
 
@@ -1067,8 +1597,88 @@ export default function EditLoadingInfoPanel() {
   };
 
   /** =========================
-   * VEHICLE SELECT HANDLER
+   * HANDLER FUNCTIONS
    ========================= */
+  
+  const handleVehiclePhotoSelect = () => {
+    if (isReadOnly) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.multiple = true;
+    
+    input.onchange = async (e) => {
+      const files = Array.from(e.target.files);
+      const newTotalPhotos = vehiclePhotoFiles.length + files.length;
+      if (newTotalPhotos > 10) {
+        alert("Maximum 10 vehicle photos allowed!");
+        return;
+      }
+      setVehiclePhotoFiles(prev => [...prev, ...files]);
+    };
+    
+    input.click();
+  };
+
+  const removeVehiclePhoto = (index, isExisting = false) => {
+    if (isReadOnly) return;
+    if (isExisting) {
+      setExistingFiles(prev => ({
+        ...prev,
+        vehiclePhotos: prev.vehiclePhotos.filter((_, i) => i !== index)
+      }));
+    } else {
+      setVehiclePhotoFiles(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleLoadedVehicleSlipSelect = () => {
+    if (isReadOnly) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*,.pdf';
+    input.multiple = true;
+    
+    input.onchange = async (e) => {
+      const files = Array.from(e.target.files);
+      setLoadedVehicleSlipFiles(prev => [...prev, ...files]);
+    };
+    
+    input.click();
+  };
+
+  const removeLoadedVehicleSlip = (index, isExisting = false) => {
+    if (isReadOnly) return;
+    if (isExisting) {
+      setExistingFiles(prev => ({
+        ...prev,
+        loadedVehicleSlips: prev.loadedVehicleSlips.filter((_, i) => i !== index)
+      }));
+    } else {
+      setLoadedVehicleSlipFiles(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleHelperFileSelect = (field, isVideo = false) => {
+    if (isReadOnly) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = isVideo ? 'video/*' : 'image/*';
+    input.multiple = false;
+    
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      setHelperInfo(prev => ({
+        ...prev,
+        [field]: [...prev[field], file]
+      }));
+    };
+    
+    input.click();
+  };
+
   const handleVehicleSelect = (vehicle) => {
     if (isReadOnly) return;
     
@@ -1092,17 +1702,11 @@ export default function EditLoadingInfoPanel() {
     alert(`✅ Vehicle ${vehicle.vehicleNumber} loaded successfully`);
   };
 
-  /** =========================
-   * CREATE VEHICLE FUNCTION
-   ========================= */
   const handleCreateVehicle = () => {
     if (isReadOnly) return;
     router.push('/admin/vehicle2');
   };
 
-  /** =========================
-   * VEHICLE NEGOTIATION HANDLERS
-   ========================= */
   const handleVehicleNegotiationSearch = (query) => {
     if (isReadOnly) return;
     setVehicleNegotiationNo(query);
@@ -1158,6 +1762,7 @@ export default function EditLoadingInfoPanel() {
             vehicleOwnerName: vInfo.vehicleOwnerName || "",
             vehicleOwnerRC: vInfo.vehicleOwnerRC || "",
             ownerPanCard: vInfo.ownerPanCard || "",
+            ownerAadharCard: vInfo.ownerAadharCard || "",
             verified: vInfo.verified || false,
             vehicleType: vInfo.vehicleType || "",
             message: vInfo.message || "",
@@ -1166,6 +1771,7 @@ export default function EditLoadingInfoPanel() {
             panDocument: vInfo.panDocument || "",
             licenseDocument: vInfo.licenseDocument || "",
             driverPhoto: vInfo.driverPhoto || "",
+            aadharDocument: vInfo.aadharDocument || "",
             vehicleId: vInfo.vehicleId || "",
             insuranceNumber: vInfo.insuranceNumber || "",
             chasisNumber: vInfo.chasisNumber || "",
@@ -1183,140 +1789,137 @@ export default function EditLoadingInfoPanel() {
             plantName: order.plantName || "",
             orderType: order.orderType || "",
             pinCode: order.pinCode || "",
-            state: order.stateName || order.state || "",
+            taluka: order.talukaName || order.taluka || "",
+            talukaName: order.talukaName || order.taluka || "",
             district: order.districtName || order.district || "",
+            districtName: order.districtName || order.district || "",
+            state: order.stateName || order.state || "",
+            stateName: order.stateName || order.state || "",
             from: order.fromName || order.from || "",
+            fromName: order.fromName || order.from || "",
             to: order.toName || order.to || "",
+            toName: order.toName || order.to || "",
             weight: order.weight?.toString() || "",
+            collectionCharges: order.collectionCharges?.toString() || "",
+            cancellationCharges: order.cancellationCharges || "",
+            loadingCharges: order.loadingCharges || "",
+            otherCharges: order.otherCharges?.toString() || "",
           }));
           
           setOrderRows(newOrderRows);
         }
 
+        // Fetch pack data from order panels
         let mergedPackData = {
           PALLETIZATION: [],
           'UNIFORM - BAGS/BOXES': [],
-          'LOOSE - CARGO': []
+          'LOOSE - CARGO': [],
+          'NON-UNIFORM - GENERAL CARGO': []
         };
         
         let packDataFound = false;
         const token = localStorage.getItem('token');
-        
-        if (fullNegotiation.orders && fullNegotiation.orders.length > 0) {
-          const allOrdersRes = await fetch('/api/order-panel', {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          
-          if (allOrdersRes.ok) {
-            const allOrdersData = await allOrdersRes.json();
-            
-            if (allOrdersData.success && allOrdersData.data) {
-              const orderPanelMap = {};
-              allOrdersData.data.forEach(op => {
-                orderPanelMap[op.orderPanelNo] = op._id;
-              });
-              
-              for (let i = 0; i < fullNegotiation.orders.length; i++) {
-                const order = fullNegotiation.orders[i];
-                const orderNo = order.orderNo;
+        const selectedOrderPanels = fullNegotiation.selectedOrderPanels || [];
+
+        if (selectedOrderPanels.length > 0) {
+          for (const panel of selectedOrderPanels) {
+            const orderPanelId = panel._id;
+            if (orderPanelId) {
+              try {
+                const orderRes = await fetch(`/api/order-panel?id=${orderPanelId}`, {
+                  headers: { Authorization: `Bearer ${token}` },
+                });
                 
-                if (orderNo) {
-                  const orderPanelId = orderPanelMap[orderNo];
+                if (orderRes.ok) {
+                  const orderData = await orderRes.json();
                   
-                  if (orderPanelId) {
-                    try {
-                      const fullOrderRes = await fetch(`/api/order-panel?id=${orderPanelId}`, {
-                        headers: { Authorization: `Bearer ${token}` },
-                      });
-                      
-                      if (fullOrderRes.ok) {
-                        const fullOrderData = await fullOrderRes.json();
-                        
-                        if (fullOrderData.success && fullOrderData.data) {
-                          const orderPanel = fullOrderData.data;
-                          
-                          if (orderPanel.packData) {
-                            packDataFound = true;
-                            
-                            if (orderPanel.packData.PALLETIZATION && orderPanel.packData.PALLETIZATION.length > 0) {
-                              const newPalletRows = orderPanel.packData.PALLETIZATION.map(item => ({
-                                _id: uid(),
-                                noOfPallets: item.noOfPallets?.toString() || "",
-                                unitPerPallets: item.unitPerPallets?.toString() || "",
-                                totalPkgs: item.totalPkgs?.toString() || "",
-                                pkgsType: item.pkgsType || "",
-                                uom: item.uom || "",
-                                skuSize: item.skuSize || "",
-                                packWeight: item.packWeight?.toString() || "",
-                                productName: item.productName || "",
-                                wtLtr: item.wtLtr?.toString() || "",
-                                actualWt: item.actualWt?.toString() || "",
-                                chargedWt: item.chargedWt?.toString() || "",
-                                wtUom: item.wtUom || "",
-                                isUniform: item.isUniform || false,
-                              }));
-                              mergedPackData.PALLETIZATION = [...mergedPackData.PALLETIZATION, ...newPalletRows];
-                            }
-                            
-                            if (orderPanel.packData['UNIFORM - BAGS/BOXES'] && orderPanel.packData['UNIFORM - BAGS/BOXES'].length > 0) {
-                              const newUniformRows = orderPanel.packData['UNIFORM - BAGS/BOXES'].map(item => ({
-                                _id: uid(),
-                                totalPkgs: item.totalPkgs?.toString() || "",
-                                pkgsType: item.pkgsType || "",
-                                uom: item.uom || "",
-                                skuSize: item.skuSize || "",
-                                packWeight: item.packWeight?.toString() || "",
-                                productName: item.productName || "",
-                                wtLtr: item.wtLtr?.toString() || "",
-                                actualWt: item.actualWt?.toString() || "",
-                                chargedWt: item.chargedWt?.toString() || "",
-                                wtUom: item.wtUom || "",
-                              }));
-                              mergedPackData['UNIFORM - BAGS/BOXES'] = [...mergedPackData['UNIFORM - BAGS/BOXES'], ...newUniformRows];
-                            }
-                            
-                            if (orderPanel.packData['LOOSE - CARGO'] && orderPanel.packData['LOOSE - CARGO'].length > 0) {
-                              const newLooseRows = orderPanel.packData['LOOSE - CARGO'].map(item => ({
-                                _id: uid(),
-                                uom: item.uom || "",
-                                productName: item.productName || "",
-                                actualWt: item.actualWt?.toString() || "",
-                                chargedWt: item.chargedWt?.toString() || "",
-                              }));
-                              mergedPackData['LOOSE - CARGO'] = [...mergedPackData['LOOSE - CARGO'], ...newLooseRows];
-                            }
-                          }
-                        }
-                      }
-                    } catch (error) {
-                      console.error(`Error fetching full order panel for ${orderNo}:`, error);
+                  if (orderData.success && orderData.data && orderData.data.packData) {
+                    const orderPackData = orderData.data.packData;
+                    packDataFound = true;
+                    
+                    if (orderPackData.PALLETIZATION && orderPackData.PALLETIZATION.length > 0) {
+                      const newPalletRows = orderPackData.PALLETIZATION.map(item => ({
+                        _id: uid(),
+                        noOfPallets: item.noOfPallets?.toString() || "",
+                        unitPerPallets: item.unitPerPallets?.toString() || "",
+                        totalPkgs: item.totalPkgs?.toString() || "",
+                        pkgsType: item.pkgsType || "",
+                        uom: item.uom || "",
+                        skuSize: item.skuSize || "",
+                        packWeight: item.packWeight?.toString() || "",
+                        productName: item.productName || "",
+                        wtLtr: item.wtLtr?.toString() || "",
+                        actualWt: item.actualWt?.toString() || "",
+                        chargedWt: item.chargedWt?.toString() || "",
+                        wtUom: item.wtUom || "",
+                        isUniform: item.isUniform || false,
+                      }));
+                      mergedPackData.PALLETIZATION = [...mergedPackData.PALLETIZATION, ...newPalletRows];
+                    }
+                    
+                    if (orderPackData['UNIFORM - BAGS/BOXES'] && orderPackData['UNIFORM - BAGS/BOXES'].length > 0) {
+                      const newUniformRows = orderPackData['UNIFORM - BAGS/BOXES'].map(item => ({
+                        _id: uid(),
+                        totalPkgs: item.totalPkgs?.toString() || "",
+                        pkgsType: item.pkgsType || "",
+                        uom: item.uom || "",
+                        skuSize: item.skuSize || "",
+                        packWeight: item.packWeight?.toString() || "",
+                        productName: item.productName || "",
+                        wtLtr: item.wtLtr?.toString() || "",
+                        actualWt: item.actualWt?.toString() || "",
+                        chargedWt: item.chargedWt?.toString() || "",
+                        wtUom: item.wtUom || "",
+                      }));
+                      mergedPackData['UNIFORM - BAGS/BOXES'] = [...mergedPackData['UNIFORM - BAGS/BOXES'], ...newUniformRows];
+                    }
+                    
+                    if (orderPackData['LOOSE - CARGO'] && orderPackData['LOOSE - CARGO'].length > 0) {
+                      const newLooseRows = orderPackData['LOOSE - CARGO'].map(item => ({
+                        _id: uid(),
+                        uom: item.uom || "",
+                        productName: item.productName || "",
+                        actualWt: item.actualWt?.toString() || "",
+                        chargedWt: item.chargedWt?.toString() || "",
+                      }));
+                      mergedPackData['LOOSE - CARGO'] = [...mergedPackData['LOOSE - CARGO'], ...newLooseRows];
+                    }
+                    
+                    if (orderPackData['NON-UNIFORM - GENERAL CARGO'] && orderPackData['NON-UNIFORM - GENERAL CARGO'].length > 0) {
+                      const newNonUniformRows = orderPackData['NON-UNIFORM - GENERAL CARGO'].map(item => ({
+                        _id: uid(),
+                        nos: item.nos?.toString() || "",
+                        productName: item.productName || "",
+                        uom: item.uom || "",
+                        length: item.length?.toString() || "",
+                        width: item.width?.toString() || "",
+                        height: item.height?.toString() || "",
+                        actualWt: item.actualWt?.toString() || "",
+                        chargedWt: item.chargedWt?.toString() || "",
+                      }));
+                      mergedPackData['NON-UNIFORM - GENERAL CARGO'] = [...mergedPackData['NON-UNIFORM - GENERAL CARGO'], ...newNonUniformRows];
                     }
                   }
                 }
+              } catch (err) {
+                console.error(`Error fetching order panel:`, err);
               }
             }
           }
         }
         
-        if (!packDataFound || 
-            (mergedPackData.PALLETIZATION.length === 0 && 
-             mergedPackData['UNIFORM - BAGS/BOXES'].length === 0 && 
-             mergedPackData['LOOSE - CARGO'].length === 0)) {
+        if (!packDataFound) {
           mergedPackData = {
             PALLETIZATION: [defaultPackRow('PALLETIZATION')],
             'UNIFORM - BAGS/BOXES': [defaultPackRow('UNIFORM - BAGS/BOXES')],
-            'LOOSE - CARGO': [defaultPackRow('LOOSE - CARGO')]
+            'LOOSE - CARGO': [defaultPackRow('LOOSE - CARGO')],
+            'NON-UNIFORM - GENERAL CARGO': [defaultPackRow('NON-UNIFORM - GENERAL CARGO')]
           };
         } else {
-          if (mergedPackData.PALLETIZATION.length === 0) {
-            mergedPackData.PALLETIZATION.push(defaultPackRow('PALLETIZATION'));
-          }
-          if (mergedPackData['UNIFORM - BAGS/BOXES'].length === 0) {
-            mergedPackData['UNIFORM - BAGS/BOXES'].push(defaultPackRow('UNIFORM - BAGS/BOXES'));
-          }
-          if (mergedPackData['LOOSE - CARGO'].length === 0) {
-            mergedPackData['LOOSE - CARGO'].push(defaultPackRow('LOOSE - CARGO'));
-          }
+          if (mergedPackData.PALLETIZATION.length === 0) mergedPackData.PALLETIZATION.push(defaultPackRow('PALLETIZATION'));
+          if (mergedPackData['UNIFORM - BAGS/BOXES'].length === 0) mergedPackData['UNIFORM - BAGS/BOXES'].push(defaultPackRow('UNIFORM - BAGS/BOXES'));
+          if (mergedPackData['LOOSE - CARGO'].length === 0) mergedPackData['LOOSE - CARGO'].push(defaultPackRow('LOOSE - CARGO'));
+          if (mergedPackData['NON-UNIFORM - GENERAL CARGO'].length === 0) mergedPackData['NON-UNIFORM - GENERAL CARGO'].push(defaultPackRow('NON-UNIFORM - GENERAL CARGO'));
         }
         
         setPackData(mergedPackData);
@@ -1403,7 +2006,9 @@ export default function EditLoadingInfoPanel() {
   /** =========================
    * PACK DATA FUNCTIONS
    ========================= */
-  const rows = packData[activePack] || [];
+  const rows = useMemo(() => {
+    return packData[activePack] || [];
+  }, [packData, activePack]);
 
   const updatePackRow = (rowId, key, value) => {
     if (!isReadOnly) {
@@ -1499,18 +2104,12 @@ export default function EditLoadingInfoPanel() {
     }
   };
 
-  /** =========================
-   * BILLING TYPE CHANGE HANDLER
-   ========================= */
   const handleBillingTypeChange = (value) => {
     if (!isReadOnly) {
       setHeader((prev) => ({ ...prev, billingType: value }));
     }
   };
 
-  /** =========================
-   * GPS TRACKING HANDLER
-   ========================= */
   const handleActivateTracking = () => {
     if (isReadOnly) return;
     if (!gpsTracking.driverMobileNumber) {
@@ -1521,9 +2120,6 @@ export default function EditLoadingInfoPanel() {
     alert(`✅ Tracking activated for mobile: ${gpsTracking.driverMobileNumber}`);
   };
 
-  /** =========================
-   * CALCULATED VALUES
-   ========================= */
   const calculateTotalWeight = () => {
     return orderRows.reduce((sum, row) => sum + num(row.weight), 0);
   };
@@ -1542,17 +2138,11 @@ export default function EditLoadingInfoPanel() {
     );
   };
 
-  /** =========================
-   * BILLING COLUMNS FOR TABLE
-   ========================= */
   const billingColumns = [
     { key: "billingType", label: "Billing Type", options: BILLING_TYPES },
     { key: "noOfLoadingPoints", label: "No. of Loading Points", type: "number" },
-    { key: "noOfDroppingPoint", label: "No. of Droping Point", type: "number" },
-    { key: "collectionCharges", label: "Collection Charges", type: "text" },
-    { key: "cancellationCharges", label: "Cancellation Charges", type: "text" },
-    { key: "loadingCharges", label: "Loading Charges", type: "text" },
-    { key: "otherCharges", label: "Other Charges", type: "text" },
+    { key: "noOfDroppingPoint", label: "No. of Dropping Point", type: "number" },
+    
   ];
 
   /** =========================
@@ -1577,35 +2167,30 @@ export default function EditLoadingInfoPanel() {
             [field]: [...prev[field], file]
           }));
           break;
-          
         case 'vbp':
           setVbpFiles(prev => ({
             ...prev,
             [field]: [...prev[field], file]
           }));
           break;
-          
         case 'vft':
           setVftFiles(prev => ({
             ...prev,
             [field]: [...prev[field], file]
           }));
           break;
-          
         case 'vot':
           setVotFiles(prev => ({
             ...prev,
             [field]: [...prev[field], file]
           }));
           break;
-          
         case 'vl':
           setVlFiles(prev => ({
             ...prev,
             [field]: [...prev[field], file]
           }));
           break;
-          
         case 'weighment':
           setWeighmentFiles(prev => ({
             ...prev,
@@ -1618,9 +2203,6 @@ export default function EditLoadingInfoPanel() {
     input.click();
   };
 
-  /** =========================
-   * REMOVE SELECTED FILE
-   ========================= */
   const removeFile = (section, field, index, isExisting = false) => {
     if (isReadOnly) return;
     
@@ -1629,7 +2211,7 @@ export default function EditLoadingInfoPanel() {
         ...prev,
         [section]: {
           ...prev[section],
-          [field]: []
+          [field]: prev[section][field].filter((_, i) => i !== index)
         }
       }));
       
@@ -1638,6 +2220,7 @@ export default function EditLoadingInfoPanel() {
         if (field === 'pan') setVehicleInfo(prev => ({ ...prev, panDocument: '' }));
         if (field === 'license') setVehicleInfo(prev => ({ ...prev, licenseDocument: '' }));
         if (field === 'photo') setVehicleInfo(prev => ({ ...prev, driverPhoto: '' }));
+        if (field === 'aadhar') setVehicleInfo(prev => ({ ...prev, aadharDocument: '' }));
       }
     } else {
       switch(section) {
@@ -1647,35 +2230,30 @@ export default function EditLoadingInfoPanel() {
             [field]: prev[field].filter((_, i) => i !== index)
           }));
           break;
-          
         case 'vbp':
           setVbpFiles(prev => ({
             ...prev,
             [field]: prev[field].filter((_, i) => i !== index)
           }));
           break;
-          
         case 'vft':
           setVftFiles(prev => ({
             ...prev,
             [field]: prev[field].filter((_, i) => i !== index)
           }));
           break;
-          
         case 'vot':
           setVotFiles(prev => ({
             ...prev,
             [field]: prev[field].filter((_, i) => i !== index)
           }));
           break;
-          
         case 'vl':
           setVlFiles(prev => ({
             ...prev,
             [field]: prev[field].filter((_, i) => i !== index)
           }));
           break;
-          
         case 'weighment':
           setWeighmentFiles(prev => ({
             ...prev,
@@ -1690,6 +2268,42 @@ export default function EditLoadingInfoPanel() {
    * UPLOAD ALL FILES DURING SAVE
    ========================= */
   const uploadAllFiles = async (token) => {
+    const uploadFile = async (file, section, field) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('section', section);
+      formData.append('field', field);
+
+      try {
+        const response = await fetch('/api/upload/excel', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const text = await response.text();
+          console.error(`Upload failed: ${response.status}`, text);
+          throw new Error(`Upload failed with status ${response.status}`);
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await response.json();
+          return data;
+        } else {
+          const text = await response.text();
+          console.error('Response is not JSON:', text.substring(0, 200));
+          throw new Error('Server returned non-JSON response');
+        }
+      } catch (error) {
+        console.error(`Error uploading ${section}/${field}:`, error);
+        throw error;
+      }
+    };
+
     const uploadPromises = [];
     const uploadedPaths = {
       vehicle: {},
@@ -1697,41 +2311,80 @@ export default function EditLoadingInfoPanel() {
       vft: {},
       vot: {},
       vl: {},
-      weighment: {}
+      weighment: {},
+      helper: {},
+      vehiclePhotos: [],
+      loadedVehicleSlips: []
     };
 
-    // Upload vehicle files
-    for (const [field, files] of Object.entries(vehicleFiles)) {
-      for (const file of files) {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('section', 'vehicle');
-        formData.append('field', field);
-
-        uploadPromises.push(
-          fetch('/api/upload/excel', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData
-          })
-          .then(async res => {
-            if (!res.ok) {
-              const text = await res.text();
-              console.error('Upload response:', text);
-              throw new Error(`Upload failed with status ${res.status}`);
-            }
-            return res.json();
-          })
+    // Upload vehicle photos
+    for (const file of vehiclePhotoFiles) {
+      uploadPromises.push(
+        uploadFile(file, 'vehicle', 'vehiclePhotos')
           .then(data => {
             if (data.success) {
-              uploadedPaths.vehicle[field] = data.filePath;
+              uploadedPaths.vehiclePhotos.push(data.filePath);
             }
             return data;
           })
           .catch(error => {
-            console.error(`Error uploading ${field}:`, error);
-            throw error;
+            console.error(`Failed to upload vehicle photo:`, error);
+            return null;
           })
+      );
+    }
+
+    // Upload loaded vehicle slips
+    for (const file of loadedVehicleSlipFiles) {
+      uploadPromises.push(
+        uploadFile(file, 'weighment', 'loadedVehicleSlip')
+          .then(data => {
+            if (data.success) {
+              uploadedPaths.loadedVehicleSlips.push(data.filePath);
+            }
+            return data;
+          })
+          .catch(error => {
+            console.error(`Failed to upload loaded vehicle slip:`, error);
+            return null;
+          })
+      );
+    }
+
+    // Upload helper files
+    for (const [field, files] of Object.entries(helperInfo)) {
+      if (Array.isArray(files)) {
+        for (const file of files) {
+          uploadPromises.push(
+            uploadFile(file, 'helper', field)
+              .then(data => {
+                if (data.success) {
+                  uploadedPaths.helper[field] = data.filePath;
+                }
+                return data;
+              })
+              .catch(error => {
+                console.error(`Failed to upload helper/${field}:`, error);
+                return null;
+              })
+          );
+        }
+      }
+    }
+
+    // Upload vehicle files (RC, PAN, License, Photo, Aadhar)
+    for (const [field, files] of Object.entries(vehicleFiles)) {
+      for (const file of files) {
+        uploadPromises.push(
+          uploadFile(file, 'vehicle', field)
+            .then(data => {
+              if (data.success) uploadedPaths.vehicle[field] = data.filePath;
+              return data;
+            })
+            .catch(error => {
+              console.error(`Failed to upload vehicle/${field}:`, error);
+              return null;
+            })
         );
       }
     }
@@ -1739,27 +2392,16 @@ export default function EditLoadingInfoPanel() {
     // Upload VBP files
     for (const [field, files] of Object.entries(vbpFiles)) {
       for (const file of files) {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('section', 'vbp');
-        formData.append('field', field);
-
         uploadPromises.push(
-          fetch('/api/upload/excel', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData
-          })
-          .then(async res => {
-            if (!res.ok) throw new Error(`Upload failed with status ${res.status}`);
-            return res.json();
-          })
-          .then(data => {
-            if (data.success) {
-              uploadedPaths.vbp[field] = data.filePath;
-            }
-            return data;
-          })
+          uploadFile(file, 'vbp', field)
+            .then(data => {
+              if (data.success) uploadedPaths.vbp[field] = data.filePath;
+              return data;
+            })
+            .catch(error => {
+              console.error(`Failed to upload vbp/${field}:`, error);
+              return null;
+            })
         );
       }
     }
@@ -1767,24 +2409,16 @@ export default function EditLoadingInfoPanel() {
     // Upload VFT files
     for (const [field, files] of Object.entries(vftFiles)) {
       for (const file of files) {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('section', 'vft');
-        formData.append('field', field);
-
         uploadPromises.push(
-          fetch('/api/upload/excel', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData
-          })
-          .then(res => res.json())
-          .then(data => {
-            if (data.success) {
-              uploadedPaths.vft[field] = data.filePath;
-            }
-            return data;
-          })
+          uploadFile(file, 'vft', field)
+            .then(data => {
+              if (data.success) uploadedPaths.vft[field] = data.filePath;
+              return data;
+            })
+            .catch(error => {
+              console.error(`Failed to upload vft/${field}:`, error);
+              return null;
+            })
         );
       }
     }
@@ -1792,24 +2426,16 @@ export default function EditLoadingInfoPanel() {
     // Upload VOT files
     for (const [field, files] of Object.entries(votFiles)) {
       for (const file of files) {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('section', 'vot');
-        formData.append('field', field);
-
         uploadPromises.push(
-          fetch('/api/upload/excel', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData
-          })
-          .then(res => res.json())
-          .then(data => {
-            if (data.success) {
-              uploadedPaths.vot[field] = data.filePath;
-            }
-            return data;
-          })
+          uploadFile(file, 'vot', field)
+            .then(data => {
+              if (data.success) uploadedPaths.vot[field] = data.filePath;
+              return data;
+            })
+            .catch(error => {
+              console.error(`Failed to upload vot/${field}:`, error);
+              return null;
+            })
         );
       }
     }
@@ -1817,24 +2443,16 @@ export default function EditLoadingInfoPanel() {
     // Upload VL files
     for (const [field, files] of Object.entries(vlFiles)) {
       for (const file of files) {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('section', 'vl');
-        formData.append('field', field);
-
         uploadPromises.push(
-          fetch('/api/upload/excel', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData
-          })
-          .then(res => res.json())
-          .then(data => {
-            if (data.success) {
-              uploadedPaths.vl[field] = data.filePath;
-            }
-            return data;
-          })
+          uploadFile(file, 'vl', field)
+            .then(data => {
+              if (data.success) uploadedPaths.vl[field] = data.filePath;
+              return data;
+            })
+            .catch(error => {
+              console.error(`Failed to upload vl/${field}:`, error);
+              return null;
+            })
         );
       }
     }
@@ -1842,30 +2460,22 @@ export default function EditLoadingInfoPanel() {
     // Upload weighment files
     for (const [field, files] of Object.entries(weighmentFiles)) {
       for (const file of files) {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('section', 'weighment');
-        formData.append('field', field);
-
         uploadPromises.push(
-          fetch('/api/upload/excel', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData
-          })
-          .then(res => res.json())
-          .then(data => {
-            if (data.success) {
-              uploadedPaths.weighment[field] = data.filePath;
-            }
-            return data;
-          })
+          uploadFile(file, 'weighment', field)
+            .then(data => {
+              if (data.success) uploadedPaths.weighment[field] = data.filePath;
+              return data;
+            })
+            .catch(error => {
+              console.error(`Failed to upload weighment/${field}:`, error);
+              return null;
+            })
         );
       }
     }
 
-    await Promise.all(uploadPromises);
-    
+    await Promise.allSettled(uploadPromises);
+    console.log('Upload results completed');
     return uploadedPaths;
   };
 
@@ -1897,11 +2507,13 @@ export default function EditLoadingInfoPanel() {
       const uploadedPaths = await uploadAllFiles(token);
       setUploading(false);
 
+      // Combine existing and new file paths
       const finalVehicleFiles = {
-        rcDocument: vehicleInfo.rcDocument || uploadedPaths.vehicle.rc || '',
-        panDocument: vehicleInfo.panDocument || uploadedPaths.vehicle.pan || '',
-        licenseDocument: vehicleInfo.licenseDocument || uploadedPaths.vehicle.license || '',
-        driverPhoto: vehicleInfo.driverPhoto || uploadedPaths.vehicle.photo || '',
+        rcDocument: vehicleInfo.rcDocument || uploadedPaths.vehicle.rc || (existingFiles.vehicle?.rc?.[0]?.path || ''),
+        panDocument: vehicleInfo.panDocument || uploadedPaths.vehicle.pan || (existingFiles.vehicle?.pan?.[0]?.path || ''),
+        licenseDocument: vehicleInfo.licenseDocument || uploadedPaths.vehicle.license || (existingFiles.vehicle?.license?.[0]?.path || ''),
+        driverPhoto: vehicleInfo.driverPhoto || uploadedPaths.vehicle.photo || (existingFiles.vehicle?.photo?.[0]?.path || ''),
+        aadharDocument: vehicleInfo.aadharDocument || uploadedPaths.vehicle.aadhar || (existingFiles.vehicle?.aadhar?.[0]?.path || ''),
       };
 
       const finalVbpUploads = {
@@ -1957,6 +2569,16 @@ export default function EditLoadingInfoPanel() {
         weighSlip: existingFiles.weighment?.weighSlip?.[0]?.path || uploadedPaths.weighment.weighSlip || '',
       };
 
+      const finalVehiclePhotos = [
+        ...(existingFiles.vehiclePhotos?.map(p => p.path) || []),
+        ...(uploadedPaths.vehiclePhotos || [])
+      ];
+
+      const finalLoadedVehicleSlips = [
+        ...(existingFiles.loadedVehicleSlips?.map(p => p.path) || []),
+        ...(uploadedPaths.loadedVehicleSlips || [])
+      ];
+
       const payload = {
         id: panelId,
         header: {
@@ -1991,7 +2613,18 @@ export default function EditLoadingInfoPanel() {
         selectedVehicleNegotiation: selectedVehicleNegotiation ? {
           id: selectedVehicleNegotiation._id,
           vnnNo: selectedVehicleNegotiation.vnnNo
-        } : null
+        } : null,
+        detentionDays,
+        detentionNumber,
+        vehiclePhotos: finalVehiclePhotos,
+        loadedVehicleSlips: finalLoadedVehicleSlips,
+        hasHelper,
+        helperInfo: {
+          name: helperInfo.name,
+          mobileNo: helperInfo.mobileNo,
+          photo: uploadedPaths.helper?.photo || helperInfo.photo,
+          aadharPhoto: uploadedPaths.helper?.aadharPhoto || helperInfo.aadharPhoto
+        }
       };
 
       console.log("Updating loading panel:", payload);
@@ -2122,7 +2755,7 @@ export default function EditLoadingInfoPanel() {
 
       {/* Main Content */}
       <div className="mx-auto max-w-full p-4">
-        {/* Vehicle Arrival Information */}
+        {/* Vehicle Arrival Information Card */}
         <Card title="Vehicle Arrival Information">
           <div className="grid grid-cols-12 gap-3">
             <div className="col-span-12 md:col-span-3">
@@ -2135,7 +2768,6 @@ export default function EditLoadingInfoPanel() {
               />
             </div>
 
-            {/* Vehicle Negotiation No with Dropdown */}
             <div className="col-span-12 md:col-span-3 relative" ref={vehicleNegotiationDropdownRef}>
               <label className="text-xs font-bold text-slate-600">Vehicle Negotiation No</label>
               <div className="relative">
@@ -2202,7 +2834,35 @@ export default function EditLoadingInfoPanel() {
               <div className="text-xs text-slate-400 mt-1">Select to auto-fill vehicle data</div>
             </div>
 
-            <div className="col-span-12 md:col-span-3">
+            <div className="col-span-12 md:col-span-2">
+              <label className="text-xs font-bold text-slate-600">Vehicle Number</label>
+              <input
+                type="text"
+                value={vehicleInfo.vehicleNo}
+                onChange={(e) => !isReadOnly && setVehicleInfo({ ...vehicleInfo, vehicleNo: e.target.value })}
+                readOnly={isReadOnly}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none ${
+                  isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                }`}
+                placeholder="Enter vehicle number"
+              />
+            </div>
+
+            <div className="col-span-12 md:col-span-2">
+              <label className="text-xs font-bold text-slate-600">Mobile Number</label>
+              <input
+                type="text"
+                value={vehicleInfo.driverMobileNo}
+                onChange={(e) => !isReadOnly && setVehicleInfo({ ...vehicleInfo, driverMobileNo: e.target.value })}
+                readOnly={isReadOnly}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none ${
+                  isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                }`}
+                placeholder="Enter mobile number"
+              />
+            </div>
+
+            <div className="col-span-12 md:col-span-2">
               <label className="text-xs font-bold text-slate-600">Branch *</label>
               <SearchableDropdown
                 items={branches}
@@ -2220,16 +2880,16 @@ export default function EditLoadingInfoPanel() {
               />
             </div>
 
-            <div className="col-span-12 md:col-span-3">
+            <div className="col-span-12 md:col-span-2">
               <label className="text-xs font-bold text-slate-600">Date</label>
               <input
                 type="date"
                 value={header.date}
                 onChange={(e) => !isReadOnly && setHeader({ ...header, date: e.target.value })}
-                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                readOnly={isReadOnly}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none ${
                   isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
                 }`}
-                readOnly={isReadOnly}
               />
             </div>
 
@@ -2242,10 +2902,56 @@ export default function EditLoadingInfoPanel() {
                 readOnly={isReadOnly}
               />
             </div>
+
+            <div className="col-span-12 md:col-span-2">
+              <label className="text-xs font-bold text-slate-600">Owner Aadhar Card</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={vehicleInfo.ownerAadharCard}
+                  onChange={(e) => !isReadOnly && setVehicleInfo({ ...vehicleInfo, ownerAadharCard: e.target.value })}
+                  readOnly={isReadOnly}
+                  className={`mt-1 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
+                    isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                  }`}
+                  placeholder="Enter Aadhar Number"
+                />
+                {!isReadOnly && (
+                  <button 
+                    onClick={() => handleFileSelect('vehicle', 'aadhar')}
+                    className="mt-1 rounded-lg bg-purple-50 px-3 py-2 text-xs font-bold text-purple-700 border border-purple-200 hover:bg-purple-100 whitespace-nowrap"
+                  >
+                    {vehicleFiles.aadhar.length > 0 ? `✓ ${vehicleFiles.aadhar.length}` : 'Upload'}
+                  </button>
+                )}
+              </div>
+              {existingFiles.vehicle?.aadhar?.map((file, idx) => (
+                <FileUploadItem 
+                  key={`existing-aadhar-${idx}`}
+                  file={file}
+                  index={idx}
+                  onRemove={() => removeFile('vehicle', 'aadhar', idx, true)}
+                  label="Aadhar"
+                  isExisting={true}
+                  readOnly={isReadOnly}
+                />
+              ))}
+              {vehicleFiles.aadhar.map((file, idx) => (
+                <FileUploadItem 
+                  key={`new-aadhar-${idx}`}
+                  file={file}
+                  index={idx}
+                  onRemove={() => removeFile('vehicle', 'aadhar', idx)}
+                  label="Aadhar"
+                  readOnly={isReadOnly}
+                />
+              ))}
+              <p className="text-xs text-slate-400 mt-1">Upload Owner's Aadhar Card (PDF/Image)</p>
+            </div>
           </div>
         </Card>
 
-        {/* Billing Type / Charges Table */}
+        {/* Billing Type / Charges Card - Fixed with all 7 columns */}
         <div className="mt-4">
           <Card title="Billing Type / Charges">
             <div className="overflow-auto rounded-xl border border-yellow-300">
@@ -2255,14 +2961,13 @@ export default function EditLoadingInfoPanel() {
                     {billingColumns.map((col) => (
                       <th
                         key={col.key}
-                        className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
+                        className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center whitespace-nowrap"
                       >
                         {col.label}
                       </th>
                     ))}
                   </tr>
                 </thead>
-
                 <tbody>
                   <tr className="hover:bg-yellow-50 even:bg-slate-50">
                     {billingColumns.map((col) => (
@@ -2312,7 +3017,7 @@ export default function EditLoadingInfoPanel() {
           </Card>
         </div>
 
-        {/* Orders Table */}
+        {/* Order Details Card - Made Scrollable */}
         <div className="mt-4">
           <Card 
             title="Order Details"
@@ -2327,21 +3032,26 @@ export default function EditLoadingInfoPanel() {
               )
             }
           >
-            <div className="overflow-auto rounded-xl border border-yellow-300">
-              <table className="min-w-full w-full text-sm">
+            <div className="overflow-x-auto rounded-xl border border-yellow-300">
+              <table className="min-w-max w-full text-sm">
                 <thead className="sticky top-0 bg-yellow-400 z-10">
                   <tr>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Order</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Party Name</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Plant</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Order Type</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Pin Code</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">State</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">District</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">From</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">To</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Weight</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Actions</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">Order No</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[150px]">Party Name</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[150px]">Plant</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">Order Type</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[100px]">Pin Code</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">From</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">To</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">Taluka</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">District</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[100px]">State</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[100px]">Weight (MT)</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[130px]">Collection Charges</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[140px]">Cancellation Charges</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[130px]">Loading Charges</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[130px]">Other Charges</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[80px]">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2380,7 +3090,7 @@ export default function EditLoadingInfoPanel() {
                               updateOrderRow(row._id, 'plantCode', plant._id);
                               updateOrderRow(row._id, 'plantName', plant.name);
                               if (plant.address || plant.city) {
-                                updateOrderRow(row._id, 'from', plant.address || plant.city || '');
+                                updateOrderRow(row._id, 'fromName', plant.address || plant.city || '');
                               }
                             }
                           }}
@@ -2421,32 +3131,8 @@ export default function EditLoadingInfoPanel() {
                       <td className="border border-yellow-300 px-2 py-2">
                         <input
                           type="text"
-                          value={row.state || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'state', e.target.value)}
-                          readOnly={isReadOnly}
-                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
-                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                          }`}
-                          placeholder="State"
-                        />
-                      </td>
-                      <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="text"
-                          value={row.district || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'district', e.target.value)}
-                          readOnly={isReadOnly}
-                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
-                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                          }`}
-                          placeholder="District"
-                        />
-                      </td>
-                      <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="text"
-                          value={row.from || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'from', e.target.value)}
+                          value={row.fromName || row.from || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'fromName', e.target.value)}
                           readOnly={isReadOnly}
                           className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
                             isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
@@ -2457,8 +3143,8 @@ export default function EditLoadingInfoPanel() {
                       <td className="border border-yellow-300 px-2 py-2">
                         <input
                           type="text"
-                          value={row.to || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'to', e.target.value)}
+                          value={row.toName || row.to || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'toName', e.target.value)}
                           readOnly={isReadOnly}
                           className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
                             isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
@@ -2468,14 +3154,98 @@ export default function EditLoadingInfoPanel() {
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
                         <input
+                          type="text"
+                          value={row.talukaName || row.taluka || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'talukaName', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
+                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                          }`}
+                          placeholder="Taluka"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.districtName || row.district || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'districtName', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
+                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                          }`}
+                          placeholder="District"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.stateName || row.state || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'stateName', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
+                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                          }`}
+                          placeholder="State"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
                           type="number"
                           value={row.weight || ""}
                           onChange={(e) => updateOrderRow(row._id, 'weight', e.target.value)}
                           readOnly={isReadOnly}
-                          className={`w-20 rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
+                          className={`w-24 rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
                             isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
                           }`}
                           placeholder="Weight"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.collectionCharges || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'collectionCharges', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
+                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                          }`}
+                          placeholder="Collection Charges"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.cancellationCharges || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'cancellationCharges', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
+                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                          }`}
+                          placeholder="Cancellation Charges"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.loadingCharges || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'loadingCharges', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
+                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                          }`}
+                          placeholder="Loading Charges"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.otherCharges || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'otherCharges', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
+                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                          }`}
+                          placeholder="Other Charges"
                         />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
@@ -2493,19 +3263,21 @@ export default function EditLoadingInfoPanel() {
                 </tbody>
                 <tfoot className="bg-yellow-100">
                   <tr>
-                    <td colSpan="9" className="border border-yellow-300 px-3 py-2 text-right font-bold">
+                    <td colSpan="10" className="border border-yellow-300 px-3 py-2 text-right font-bold">
                       Total Quantity (MT):
                     </td>
                     <td className="border border-yellow-300 px-3 py-2 font-bold">
                       {calculateTotalWeight()}
                     </td>
-                    <td className="border border-yellow-300 px-3 py-2"></td>
+                    <td colSpan="5" className="border border-yellow-300 px-3 py-2"></td>
                   </tr>
                 </tfoot>
               </table>
             </div>
           </Card>
         </div>
+
+    
 
         {/* Vehicle & Driver Details */}
         <div className="mt-4">
@@ -2561,6 +3333,55 @@ export default function EditLoadingInfoPanel() {
                             <div className="text-xs text-green-600">Owner: {selectedVehicle.ownerName}</div>
                           </div>
                         )}
+
+                        {/* Vehicle Photos Upload */}
+                        <div className="pt-2 border-t border-slate-200">
+                          <label className="text-xs font-bold text-slate-600">Vehicle Photos</label>
+                          <p className="text-xs text-slate-400 mb-1">Upload vehicle photos (Max 10)</p>
+                          {!isReadOnly && (
+                            <button 
+                              onClick={handleVehiclePhotoSelect}
+                              className="w-full rounded-lg bg-cyan-50 px-3 py-2 text-xs font-bold text-cyan-700 border border-cyan-200 hover:bg-cyan-100 transition flex items-center justify-center gap-2"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                              {vehiclePhotoFiles.length > 0 ? `✓ ${vehiclePhotoFiles.length} new` : '+ Upload Vehicle Photos'}
+                            </button>
+                          )}
+                          <div className="mt-2 max-h-40 overflow-y-auto">
+                            {existingFiles.vehiclePhotos?.map((file, idx) => (
+                              <FileUploadItem 
+                                key={`existing-vehiclePhoto-${idx}`}
+                                file={file}
+                                index={idx}
+                                onRemove={() => removeVehiclePhoto(idx, true)}
+                                label={`Vehicle Photo`}
+                                isExisting={true}
+                                readOnly={isReadOnly}
+                              />
+                            ))}
+                            {vehiclePhotoFiles.map((file, idx) => (
+                              <FileUploadItem 
+                                key={`new-vehiclePhoto-${idx}`}
+                                file={file}
+                                index={idx}
+                                onRemove={() => removeVehiclePhoto(idx)}
+                                label={`Vehicle Photo ${idx + 1}`}
+                                readOnly={isReadOnly}
+                              />
+                            ))}
+                          </div>
+                          {vehiclePhotoFiles.length > 0 && (
+                            <div className="w-full bg-slate-200 rounded-full h-1.5 mt-2">
+                              <div 
+                                className="bg-cyan-500 h-1.5 rounded-full transition-all"
+                                style={{ width: `${(vehiclePhotoFiles.length / 10) * 100}%` }}
+                              />
+                            </div>
+                          )}
+                        </div>
 
                         <div>
                           <label className="text-xs font-bold text-slate-600">Insurance Number</label>
@@ -2710,7 +3531,21 @@ export default function EditLoadingInfoPanel() {
                           />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs font-bold text-slate-600">Owner Aadhar Card</label>
+                          <input
+                            type="text"
+                            value={vehicleInfo.ownerAadharCard}
+                            onChange={(e) => !isReadOnly && setVehicleInfo({ ...vehicleInfo, ownerAadharCard: e.target.value })}
+                            readOnly={isReadOnly}
+                            className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
+                              isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                            }`}
+                            placeholder="Enter Aadhar number"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2">
                           <div>
                             <label className="text-xs font-bold text-slate-600">Owner RC Doc</label>
                             {!isReadOnly && (
@@ -2718,7 +3553,7 @@ export default function EditLoadingInfoPanel() {
                                 onClick={() => handleFileSelect('vehicle', 'rc')}
                                 className="mt-1 w-full rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 border border-blue-200 hover:bg-blue-100"
                               >
-                                {vehicleFiles.rc.length > 0 ? `✓ ${vehicleFiles.rc.length} new` : '+ Select File'}
+                                {vehicleFiles.rc.length > 0 ? `✓ ${vehicleFiles.rc.length} new` : '+ Select'}
                               </button>
                             )}
                             {existingFiles.vehicle?.rc?.map((file, idx) => (
@@ -2750,7 +3585,7 @@ export default function EditLoadingInfoPanel() {
                                 onClick={() => handleFileSelect('vehicle', 'pan')}
                                 className="mt-1 w-full rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 border border-blue-200 hover:bg-blue-100"
                               >
-                                {vehicleFiles.pan.length > 0 ? `✓ ${vehicleFiles.pan.length} new` : '+ Select File'}
+                                {vehicleFiles.pan.length > 0 ? `✓ ${vehicleFiles.pan.length} new` : '+ Select'}
                               </button>
                             )}
                             {existingFiles.vehicle?.pan?.map((file, idx) => (
@@ -2771,6 +3606,38 @@ export default function EditLoadingInfoPanel() {
                                 index={idx}
                                 onRemove={() => removeFile('vehicle', 'pan', idx)}
                                 label="PAN"
+                                readOnly={isReadOnly}
+                              />
+                            ))}
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold text-slate-600">Owner Aadhar Doc</label>
+                            {!isReadOnly && (
+                              <button 
+                                onClick={() => handleFileSelect('vehicle', 'aadhar')}
+                                className="mt-1 w-full rounded-lg bg-purple-50 px-3 py-2 text-xs font-bold text-purple-700 border border-purple-200 hover:bg-purple-100"
+                              >
+                                {vehicleFiles.aadhar.length > 0 ? `✓ ${vehicleFiles.aadhar.length} new` : '+ Select'}
+                              </button>
+                            )}
+                            {existingFiles.vehicle?.aadhar?.map((file, idx) => (
+                              <FileUploadItem 
+                                key={`existing-aadhar-${idx}`}
+                                file={file}
+                                index={idx}
+                                onRemove={() => removeFile('vehicle', 'aadhar', idx, true)}
+                                label="Aadhar"
+                                isExisting={true}
+                                readOnly={isReadOnly}
+                              />
+                            ))}
+                            {vehicleFiles.aadhar.map((file, idx) => (
+                              <FileUploadItem 
+                                key={`new-aadhar-${idx}`}
+                                file={file}
+                                index={idx}
+                                onRemove={() => removeFile('vehicle', 'aadhar', idx)}
+                                label="Aadhar"
                                 readOnly={isReadOnly}
                               />
                             ))}
@@ -2878,7 +3745,7 @@ export default function EditLoadingInfoPanel() {
                               onClick={() => handleFileSelect('vehicle', 'photo')}
                               className="mt-1 w-full rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 border border-blue-200 hover:bg-blue-100"
                             >
-                              {vehicleFiles.photo.length > 0 ? `✓ ${vehicleFiles.photo.length} new` : '+ Select Photo'}
+                              {vehicleFiles.photo.length > 0 ? `✓ ${vehicleFiles.photo.length} new` : '+ Select'}
                             </button>
                           )}
                           {existingFiles.vehicle?.photo?.map((file, idx) => (
@@ -2903,6 +3770,102 @@ export default function EditLoadingInfoPanel() {
                             />
                           ))}
                         </div>
+
+                        {/* Helper Section */}
+                        <div className="pt-3 border-t border-slate-200">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={hasHelper}
+                              onChange={(e) => !isReadOnly && setHasHelper(e.target.checked)}
+                              className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                            />
+                            <span className="text-xs font-bold text-slate-700">Helper / Co-Driver Available?</span>
+                          </label>
+                        </div>
+
+                        {hasHelper && (
+                          <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200 space-y-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                              </svg>
+                              <span className="text-xs font-bold text-blue-800">Helper / Co-Driver Details</span>
+                            </div>
+
+                            <div>
+                              <label className="text-xs font-bold text-slate-600">Helper Name</label>
+                              <input
+                                type="text"
+                                value={helperInfo.name}
+                                onChange={(e) => !isReadOnly && setHelperInfo({ ...helperInfo, name: e.target.value })}
+                                readOnly={isReadOnly}
+                                className={`mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 ${
+                                  isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                                }`}
+                                placeholder="Enter helper name"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-xs font-bold text-slate-600">Helper Mobile Number</label>
+                              <input
+                                type="tel"
+                                value={helperInfo.mobileNo}
+                                onChange={(e) => !isReadOnly && setHelperInfo({ ...helperInfo, mobileNo: e.target.value })}
+                                readOnly={isReadOnly}
+                                className={`mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 ${
+                                  isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                                }`}
+                                placeholder="Enter mobile number"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-xs font-bold text-slate-600">Helper Photo</label>
+                              {!isReadOnly && (
+                                <button 
+                                  onClick={() => handleHelperFileSelect('photo')}
+                                  className="mt-1 w-full rounded-lg bg-green-50 px-3 py-2 text-xs font-bold text-green-700 border border-green-200 hover:bg-green-100"
+                                >
+                                  {helperInfo.photo.length > 0 ? `✓ ${helperInfo.photo.length} file(s)` : '+ Upload Photo'}
+                                </button>
+                              )}
+                              {helperInfo.photo.map((file, idx) => (
+                                <FileUploadItem 
+                                  key={`helper-photo-${idx}`}
+                                  file={file}
+                                  index={idx}
+                                  onRemove={() => removeFile('helper', 'photo', idx)}
+                                  label="Helper Photo"
+                                  readOnly={isReadOnly}
+                                />
+                              ))}
+                            </div>
+
+                            <div>
+                              <label className="text-xs font-bold text-slate-600">Helper Aadhar Photo</label>
+                              {!isReadOnly && (
+                                <button 
+                                  onClick={() => handleHelperFileSelect('aadharPhoto')}
+                                  className="mt-1 w-full rounded-lg bg-purple-50 px-3 py-2 text-xs font-bold text-purple-700 border border-purple-200 hover:bg-purple-100"
+                                >
+                                  {helperInfo.aadharPhoto.length > 0 ? `✓ ${helperInfo.aadharPhoto.length} file(s)` : '+ Upload Aadhar'}
+                                </button>
+                              )}
+                              {helperInfo.aadharPhoto.map((file, idx) => (
+                                <FileUploadItem 
+                                  key={`helper-aadhar-${idx}`}
+                                  file={file}
+                                  index={idx}
+                                  onRemove={() => removeFile('helper', 'aadharPhoto', idx)}
+                                  label="Helper Aadhar"
+                                  readOnly={isReadOnly}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </td>
 
@@ -2943,6 +3906,89 @@ export default function EditLoadingInfoPanel() {
               </table>
             </div>
           </Card>
+        </div>
+
+        {/* Detention Information Card */}
+        <div className="mt-4">
+          <Card title="Detention Information">
+            <div className="grid grid-cols-12 gap-4">
+              <div className="col-span-12 md:col-span-6">
+                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
+                  <label className="text-xs font-bold text-orange-700">Detention Days</label>
+                  <input
+                    type="number"
+                    value={detentionDays}
+                    onChange={(e) => !isReadOnly && setDetentionDays(e.target.value)}
+                    readOnly={isReadOnly}
+                    className={`mt-1 w-full rounded-lg border border-orange-200 px-3 py-2 text-sm outline-none ${
+                      isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                    }`}
+                    placeholder="Enter number of detention days"
+                    min="0"
+                  />
+                  <p className="text-xs text-orange-600 mt-1">Number of days vehicle is detained</p>
+                </div>
+              </div>
+              <div className="col-span-12 md:col-span-6">
+                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
+                  <label className="text-xs font-bold text-orange-700">Detention Number / Reference</label>
+                  <input
+                    type="text"
+                    value={detentionNumber}
+                    onChange={(e) => !isReadOnly && setDetentionNumber(e.target.value)}
+                    readOnly={isReadOnly}
+                    className={`mt-1 w-full rounded-lg border border-orange-200 px-3 py-2 text-sm outline-none ${
+                      isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                    }`}
+                    placeholder="Enter detention reference number"
+                  />
+                  <p className="text-xs text-orange-600 mt-1">Reference number or ID for detention</p>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Loaded Vehicle Slip Upload */}
+        <div className="mt-4">
+          <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
+            <label className="text-xs font-bold text-indigo-700">Loaded Vehicle Slip</label>
+            <p className="text-xs text-slate-400 mb-1">Upload loaded vehicle slip (Image/PDF)</p>
+            {!isReadOnly && (
+              <button 
+                onClick={handleLoadedVehicleSlipSelect}
+                className="w-full rounded-lg bg-indigo-100 px-3 py-2 text-xs font-bold text-indigo-700 border border-indigo-300 hover:bg-indigo-200 transition flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                {loadedVehicleSlipFiles.length > 0 ? `✓ ${loadedVehicleSlipFiles.length} file(s)` : '+ Upload Loaded Vehicle Slip'}
+              </button>
+            )}
+            <div className="mt-2">
+              {existingFiles.loadedVehicleSlips?.map((file, idx) => (
+                <FileUploadItem 
+                  key={`existing-loadedSlip-${idx}`}
+                  file={file}
+                  index={idx}
+                  onRemove={() => removeLoadedVehicleSlip(idx, true)}
+                  label="Loaded Vehicle Slip"
+                  isExisting={true}
+                  readOnly={isReadOnly}
+                />
+              ))}
+              {loadedVehicleSlipFiles.map((file, idx) => (
+                <FileUploadItem 
+                  key={`new-loadedSlip-${idx}`}
+                  file={file}
+                  index={idx}
+                  onRemove={() => removeLoadedVehicleSlip(idx)}
+                  label="Loaded Vehicle Slip"
+                  readOnly={isReadOnly}
+                />
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Pack Type Section */}
@@ -2988,139 +4034,133 @@ export default function EditLoadingInfoPanel() {
           </Card>
         </div>
 
-        {/* VEHICLE BODY PICTURES (VBP) */}
+        {/* VBP Panel */}
         <div className="mt-4">
           <Card title="VBP - PANEL (Vehicle Body Pictures)">
-            <div className="grid grid-cols-12 gap-4">
-              <div className="col-span-12">
-                <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200">
-                  <h3 className="text-sm font-bold text-slate-800 mb-3">Vehicle - Body Pictures (VBP)</h3>
-                  
-                  <div className="grid grid-cols-8 gap-3">
-                    {[1,2,3,4,5,6,7].map((num) => (
-                      <div key={num} className="col-span-1">
-                        <div className="text-xs font-bold text-slate-600 mb-1">VBP - {num}</div>
-                        {!isReadOnly && (
-                          <button 
-                            onClick={() => handleFileSelect('vbp', `vbp${num}`)}
-                            className={`w-full rounded-lg px-2 py-3 text-xs font-bold border hover:bg-opacity-80 ${
-                              vbpFiles[`vbp${num}`].length > 0 
-                                ? 'bg-green-50 text-green-700 border-green-200' 
-                                : existingFiles.vbp?.[`vbp${num}`]?.length > 0
-                                  ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                  : 'bg-gray-50 text-gray-700 border-gray-200'
-                            }`}
-                          >
-                            {vbpFiles[`vbp${num}`].length > 0 
-                              ? `✓ ${vbpFiles[`vbp${num}`].length} new` 
-                              : existingFiles.vbp?.[`vbp${num}`]?.length > 0
-                                ? '✓ Existing'
-                                : 'Select'}
-                          </button>
-                        )}
-                        {existingFiles.vbp?.[`vbp${num}`]?.map((file, idx) => (
-                          <FileUploadItem 
-                            key={`existing-vbp${num}-${idx}`}
-                            file={file}
-                            index={idx}
-                            onRemove={() => removeFile('vbp', `vbp${num}`, idx, true)}
-                            label={`VBP-${num}`}
-                            isExisting={true}
-                            readOnly={isReadOnly}
-                          />
-                        ))}
-                        {vbpFiles[`vbp${num}`].map((file, idx) => (
-                          <FileUploadItem 
-                            key={`new-vbp${num}-${idx}`}
-                            file={file}
-                            index={idx}
-                            onRemove={() => removeFile('vbp', `vbp${num}`, idx)}
-                            label={`VBP-${num}`}
-                            readOnly={isReadOnly}
-                          />
-                        ))}
-                      </div>
-                    ))}
-                    <div className="col-span-1">
-                      <div className="text-xs font-bold text-slate-600 mb-1">Video - VBP</div>
-                      {!isReadOnly && (
-                        <button 
-                          onClick={() => handleFileSelect('vbp', 'videoVbp', true)}
-                          className={`w-full rounded-lg px-2 py-3 text-xs font-bold border hover:bg-opacity-80 ${
-                            vbpFiles.videoVbp.length > 0 
-                              ? 'bg-green-50 text-green-700 border-green-200' 
-                              : existingFiles.vbp?.videoVbp?.length > 0
-                                ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                : 'bg-purple-50 text-purple-700 border-purple-200'
-                          }`}
-                        >
-                          {vbpFiles.videoVbp.length > 0 
-                            ? `✓ ${vbpFiles.videoVbp.length} new` 
-                            : existingFiles.vbp?.videoVbp?.length > 0
-                              ? '✓ Existing'
-                              : 'Select'}
-                        </button>
-                      )}
-                      {existingFiles.vbp?.videoVbp?.map((file, idx) => (
-                        <FileUploadItem 
-                          key={`existing-videoVbp-${idx}`}
-                          file={file}
-                          index={idx}
-                          onRemove={() => removeFile('vbp', 'videoVbp', idx, true)}
-                          label="Video"
-                          isExisting={true}
-                          readOnly={isReadOnly}
-                        />
-                      ))}
-                      {vbpFiles.videoVbp.map((file, idx) => (
-                        <FileUploadItem 
-                          key={`new-videoVbp-${idx}`}
-                          file={file}
-                          index={idx}
-                          onRemove={() => removeFile('vbp', 'videoVbp', idx)}
-                          label="Video"
-                          readOnly={isReadOnly}
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-bold text-slate-600">Approval:</span>
-                      <select
-                        value={vbpUploads.approval}
-                        onChange={(e) => !isReadOnly && setVbpUploads({ ...vbpUploads, approval: e.target.value })}
-                        disabled={isReadOnly}
-                        className={`rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                          isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+            <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200">
+              <div className="grid grid-cols-8 gap-3">
+                {[1,2,3,4,5,6,7].map((num) => (
+                  <div key={num} className="col-span-1">
+                    <div className="text-xs font-bold text-slate-600 mb-1">VBP - {num}</div>
+                    {!isReadOnly && (
+                      <button 
+                        onClick={() => handleFileSelect('vbp', `vbp${num}`)}
+                        className={`w-full rounded-lg px-2 py-3 text-xs font-bold border hover:bg-opacity-80 ${
+                          vbpFiles[`vbp${num}`].length > 0 
+                            ? 'bg-green-50 text-green-700 border-green-200' 
+                            : existingFiles.vbp?.[`vbp${num}`]?.length > 0
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : 'bg-gray-50 text-gray-700 border-gray-200'
                         }`}
                       >
-                        <option value="">Select</option>
-                        <option value="Approved">Approved</option>
-                        <option value="Rejected">Rejected</option>
-                        <option value="Pending">Pending</option>
-                      </select>
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      <span className="font-bold">Note:</span> Vehicle Negotiation Entry will be cancelled if the Vehicle is rejected because of Vehicle Body.
-                    </div>
+                        {vbpFiles[`vbp${num}`].length > 0 
+                          ? `✓ ${vbpFiles[`vbp${num}`].length} new` 
+                          : existingFiles.vbp?.[`vbp${num}`]?.length > 0
+                            ? '✓ Existing'
+                            : 'Select'}
+                      </button>
+                    )}
+                    {existingFiles.vbp?.[`vbp${num}`]?.map((file, idx) => (
+                      <FileUploadItem 
+                        key={`existing-vbp${num}-${idx}`}
+                        file={file}
+                        index={idx}
+                        onRemove={() => removeFile('vbp', `vbp${num}`, idx, true)}
+                        label={`VBP-${num}`}
+                        isExisting={true}
+                        readOnly={isReadOnly}
+                      />
+                    ))}
+                    {vbpFiles[`vbp${num}`].map((file, idx) => (
+                      <FileUploadItem 
+                        key={`new-vbp${num}-${idx}`}
+                        file={file}
+                        index={idx}
+                        onRemove={() => removeFile('vbp', `vbp${num}`, idx)}
+                        label={`VBP-${num}`}
+                        readOnly={isReadOnly}
+                      />
+                    ))}
                   </div>
-
-                  <div className="mt-3">
-                    <label className="text-xs font-bold text-slate-600">Remark</label>
-                    <input
-                      type="text"
-                      className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                        isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                ))}
+                <div className="col-span-1">
+                  <div className="text-xs font-bold text-slate-600 mb-1">Video - VBP</div>
+                  {!isReadOnly && (
+                    <button 
+                      onClick={() => handleFileSelect('vbp', 'videoVbp', true)}
+                      className={`w-full rounded-lg px-2 py-3 text-xs font-bold border hover:bg-opacity-80 ${
+                        vbpFiles.videoVbp.length > 0 
+                          ? 'bg-green-50 text-green-700 border-green-200' 
+                          : existingFiles.vbp?.videoVbp?.length > 0
+                            ? 'bg-blue-50 text-blue-700 border-blue-200'
+                            : 'bg-purple-50 text-purple-700 border-purple-200'
                       }`}
-                      placeholder="Enter remark"
-                      value={vbpUploads.remark || ""}
-                      onChange={(e) => !isReadOnly && setVbpUploads({ ...vbpUploads, remark: e.target.value })}
+                    >
+                      {vbpFiles.videoVbp.length > 0 
+                        ? `✓ ${vbpFiles.videoVbp.length} new` 
+                        : existingFiles.vbp?.videoVbp?.length > 0
+                          ? '✓ Existing'
+                          : 'Select'}
+                    </button>
+                  )}
+                  {existingFiles.vbp?.videoVbp?.map((file, idx) => (
+                    <FileUploadItem 
+                      key={`existing-videoVbp-${idx}`}
+                      file={file}
+                      index={idx}
+                      onRemove={() => removeFile('vbp', 'videoVbp', idx, true)}
+                      label="Video"
+                      isExisting={true}
                       readOnly={isReadOnly}
                     />
-                  </div>
+                  ))}
+                  {vbpFiles.videoVbp.map((file, idx) => (
+                    <FileUploadItem 
+                      key={`new-videoVbp-${idx}`}
+                      file={file}
+                      index={idx}
+                      onRemove={() => removeFile('vbp', 'videoVbp', idx)}
+                      label="Video"
+                      readOnly={isReadOnly}
+                    />
+                  ))}
                 </div>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-bold text-slate-600">Approval:</span>
+                  <select
+                    value={vbpUploads.approval}
+                    onChange={(e) => !isReadOnly && setVbpUploads({ ...vbpUploads, approval: e.target.value })}
+                    disabled={isReadOnly}
+                    className={`rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
+                      isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                    }`}
+                  >
+                    <option value="">Select</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Rejected">Rejected</option>
+                    <option value="Pending">Pending</option>
+                  </select>
+                </div>
+                <div className="text-xs text-slate-500">
+                  <span className="font-bold">Note:</span> Vehicle Negotiation Entry will be cancelled if the Vehicle is rejected because of Vehicle Body.
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <label className="text-xs font-bold text-slate-600">Remark</label>
+                <input
+                  type="text"
+                  className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
+                    isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                  }`}
+                  placeholder="Enter remark"
+                  value={vbpUploads.remark || ""}
+                  onChange={(e) => !isReadOnly && setVbpUploads({ ...vbpUploads, remark: e.target.value })}
+                  readOnly={isReadOnly}
+                />
               </div>
             </div>
           </Card>
@@ -3442,6 +4482,37 @@ export default function EditLoadingInfoPanel() {
                   ))}
                 </div>
               </div>
+
+              <div className="mt-4 flex items-center gap-3">
+                <span className="text-xs font-bold text-slate-600">Vehicle - Loading Approval:</span>
+                <select
+                  value={vlUploads.approval}
+                  onChange={(e) => !isReadOnly && setVlUploads({ ...vlUploads, approval: e.target.value })}
+                  disabled={isReadOnly}
+                  className={`rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
+                    isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                  }`}
+                >
+                  <option value="">Select</option>
+                  <option value="Approved">Approved</option>
+                  <option value="Rejected">Rejected</option>
+                </select>
+              </div>
+              <div className="mt-2 flex items-center gap-3">
+                <span className="text-xs font-bold text-slate-600">Loading Status:</span>
+                <select
+                  value={vlUploads.loadingStatus}
+                  onChange={(e) => !isReadOnly && setVlUploads({ ...vlUploads, loadingStatus: e.target.value })}
+                  disabled={isReadOnly}
+                  className={`rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
+                    isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                  }`}
+                >
+                  <option value="Not Loaded">Not Loaded</option>
+                  <option value="Partially Loaded">Partially Loaded</option>
+                  <option value="Loaded">Loaded</option>
+                </select>
+              </div>
             </div>
           </Card>
         </div>
@@ -3513,15 +4584,6 @@ export default function EditLoadingInfoPanel() {
                         <option value="Rejected">Rejected</option>
                       </select>
                     </div>
-                  </div>
-
-                  <div className="mt-4 p-3 bg-white rounded-lg border border-yellow-100">
-                    <p className="text-xs text-slate-600">
-                      <span className="font-bold text-red-600">⚠️ Note:</span> Documents - LR & Ewaybill is required for Vehicle to do the Loaded Vehicle Weighment and this could be a loophole - Try to Fix this.
-                    </p>
-                    <p className="text-xs text-slate-600 mt-2">
-                      <span className="font-bold text-amber-600">⚠️ Note:</span> Unless the Tracking of Driver of loaded Vehicle is activated the LR Option should not be available.
-                    </p>
                   </div>
                 </div>
               </div>
@@ -3691,7 +4753,7 @@ export default function EditLoadingInfoPanel() {
           </Card>
         </div>
 
-        {/* Arrival Details */}
+        {/* Arrival Details with Out Time */}
         <div className="mt-4">
           <Card title="Arrival Details">
             <div className="grid grid-cols-12 gap-4">
@@ -3724,7 +4786,22 @@ export default function EditLoadingInfoPanel() {
                   />
                 </div>
               </div>
-              <div className="col-span-12 md:col-span-6">
+              <div className="col-span-12 md:col-span-3">
+                <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                  <label className="text-xs font-bold text-orange-700">Out Time</label>
+                  <input
+                    type="time"
+                    value={arrivalDetails.outTime}
+                    onChange={(e) => !isReadOnly && setArrivalDetails({ ...arrivalDetails, outTime: e.target.value })}
+                    readOnly={isReadOnly}
+                    className={`mt-1 w-full rounded-lg border border-orange-200 px-3 py-2 text-sm outline-none ${
+                      isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                    }`}
+                    placeholder="HH:MM"
+                  />
+                </div>
+              </div>
+              <div className="col-span-12 md:col-span-3">
                 <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
                   <p className="text-xs text-blue-800">
                     <span className="font-bold">Note:</span> JV need for making the payment in Driver or Motor Owner Account.
@@ -3736,445 +4813,6 @@ export default function EditLoadingInfoPanel() {
         </div>
       </div>
     </div>
-  );
-}
-
-/** =========================
- * Pack Type Table Component
- ========================= */
-function PackTypeTable({ packType, rows, onChange, onRemove, onDuplicate, onToggleUniform, readOnly = false }) {
-  const cols = useMemo(() => {
-    if (packType === "PALLETIZATION") {
-      return [
-        { key: "noOfPallets", label: "NO OF PALLETS", type: "number", options: null },
-        { key: "unitPerPallets", label: "UNIT PER PALLETS", type: "number", options: null },
-        { key: "totalPkgs", label: "TOTAL PKGS", type: "number", options: null, readOnly: true },
-        { key: "pkgsType", label: "PKGS TYPE", type: "text", options: PKGS_TYPE_OPTIONS },
-        { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
-        { key: "skuSize", label: "SKU - SIZE", type: "text", options: SKU_SIZE_OPTIONS },
-        { key: "packWeight", label: "PACK - WEIGHT", type: "number", options: null },
-        { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS },
-        { key: "wtLtr", label: "WT (LTR)", type: "number", options: null },
-        { key: "actualWt", label: "ACTUAL - WT", type: "number", options: null },
-        { key: "chargedWt", label: "CHARGED - WT", type: "number", options: null },
-        { key: "wtUom", label: "UOM", type: "text", options: UOM_OPTIONS },
-      ];
-    }
-
-    if (packType === "UNIFORM - BAGS/BOXES") {
-      return [
-        { key: "totalPkgs", label: "TOTAL PKGS", type: "number", options: null },
-        { key: "pkgsType", label: "PKGS TYPE", type: "text", options: PKGS_TYPE_OPTIONS },
-        { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
-        { key: "skuSize", label: "SKU - SIZE", type: "text", options: SKU_SIZE_OPTIONS },
-        { key: "packWeight", label: "PACK - WEIGHT", type: "number", options: null },
-        { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS },
-        { key: "wtLtr", label: "WT (LTR)", type: "number", options: null },
-        { key: "actualWt", label: "ACTUAL - WT", type: "number", options: null },
-        { key: "chargedWt", label: "CHARGED - WT", type: "number", options: null },
-        { key: "wtUom", label: "UOM", type: "text", options: UOM_OPTIONS },
-      ];
-    }
-
-    // LOOSE - CARGO
-    return [
-      { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
-      { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS },
-      { key: "actualWt", label: "ACTUAL - WT", type: "number", options: null },
-      { key: "chargedWt", label: "CHARGED - WT", type: "number", options: null },
-    ];
-  }, [packType]);
-
-  const handleChange = (rowId, key, value) => {
-    if (!readOnly) {
-      onChange(rowId, key, value);
-    }
-  };
-
-  return (
-    <div className="overflow-auto rounded-xl border border-yellow-300">
-      <table className="min-w-full w-full text-sm">
-        <thead className="sticky top-0 bg-yellow-400">
-          <tr>
-            {packType === "PALLETIZATION" && (
-              <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
-                UNIFORM
-              </th>
-            )}
-            {cols.map((c) => (
-              <th
-                key={c.key}
-                className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
-              >
-                {c.label}
-              </th>
-            ))}
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
-              Actions
-            </th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {rows.length ? (
-            rows.map((r) => (
-              <tr key={r._id} className="hover:bg-yellow-50 even:bg-slate-50">
-                {packType === "PALLETIZATION" && (
-                  <td className="border border-yellow-300 px-2 py-2 text-center">
-                    <input
-                      type="checkbox"
-                      checked={r.isUniform || false}
-                      onChange={() => !readOnly && onToggleUniform(r._id)}
-                      disabled={readOnly}
-                      className={`h-4 w-4 rounded border-yellow-300 text-yellow-600 focus:ring-yellow-500 ${
-                        readOnly ? 'cursor-not-allowed opacity-50' : ''
-                      }`}
-                    />
-                  </td>
-                )}
-                
-                {cols.map((c) => (
-                  <td key={c.key} className="border border-yellow-300 px-2 py-2">
-                    {c.options ? (
-                      <select
-                        value={r[c.key] || ""}
-                        onChange={(e) => handleChange(r._id, c.key, e.target.value)}
-                        disabled={readOnly}
-                        className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
-                          readOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                        }`}
-                      >
-                        <option value="">Select {c.label}</option>
-                        {c.options.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        type={c.type || "text"}
-                        value={r[c.key] || ""}
-                        readOnly={c.readOnly || readOnly}
-                        onChange={(e) => handleChange(r._id, c.key, e.target.value)}
-                        className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
-                          (c.readOnly || readOnly) ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                        }`}
-                        placeholder={`Enter ${c.label}`}
-                      />
-                    )}
-                  </td>
-                ))}
-                <td className="border border-yellow-300 px-2 py-2">
-                  <div className="flex gap-2 justify-center">
-                    {!readOnly && (
-                      <>
-                        <button
-                          onClick={() => onDuplicate(r._id)}
-                          className="rounded-lg border border-yellow-500 bg-yellow-100 px-3 py-1.5 text-xs font-bold text-yellow-800 hover:bg-yellow-200 transition"
-                        >
-                          Duplicate
-                        </button>
-                        <button
-                          onClick={() => onRemove(r._id)}
-                          className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-600 transition"
-                        >
-                          Remove
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td
-                colSpan={cols.length + (packType === "PALLETIZATION" ? 2 : 1)}
-                className="border border-yellow-300 px-4 py-10 text-center text-slate-400 font-semibold"
-              >
-                No rows yet. Click <b>Add Row</b> to add data.
-              </td>
-            </tr>
-          )}
-        </tbody>
-        <tfoot className="bg-yellow-100">
-          <tr>
-            <td
-              colSpan={packType === "PALLETIZATION" ? cols.length + 1 : cols.length}
-              className="border border-yellow-300 px-3 py-2 text-right font-bold"
-            >
-              Total Actual Weight:
-            </td>
-            <td className="border border-yellow-300 px-3 py-2 font-bold">
-              {rows.reduce((sum, r) => sum + num(r.actualWt), 0).toFixed(2)}
-            </td>
-            <td className="border border-yellow-300 px-3 py-2"></td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  );
-}
-
-/** =========================
- * REUSABLE COMPONENTS
- ========================= */
-
-function Card({ title, right, children }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm mb-4">
-      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-        <div className="text-sm font-extrabold text-slate-900">{title}</div>
-        {right || null}
-      </div>
-      <div className="p-4">{children}</div>
-    </div>
-  );
-}
-
-function Select({ label, value, onChange, options = [], col = "", readOnly = false }) {
-  return (
-    <div className={col}>
-      <label className="text-xs font-bold text-slate-600">{label}</label>
-      <select
-        value={value}
-        onChange={(e) => onChange?.(e.target.value)}
-        disabled={readOnly}
-        className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
-          readOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-        }`}
-      >
-        <option value="">Select {label}</option>
-        {options.map((o) => (
-          <option key={o} value={o}>{o}</option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-function SearchableDropdown({ 
-  items, 
-  selectedId, 
-  onSelect, 
-  placeholder = "Search...",
-  displayField = 'name',
-  codeField = 'code',
-  disabled = false
-}) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filteredItems, setFilteredItems] = useState([]);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    setFilteredItems(items || []);
-    if (selectedId && items?.length > 0) {
-      const item = items.find(i => i._id === selectedId || i.name === selectedId);
-      setSelectedItem(item);
-      if (item) {
-        setSearchQuery(getDisplayValue(item));
-      }
-    } else {
-      setSelectedItem(null);
-      setSearchQuery("");
-    }
-  }, [items, selectedId]);
-
-  const getDisplayValue = (item) => {
-    if (!item) return "";
-    const display = item[displayField] || "";
-    const code = item[codeField] ? `(${item[codeField]})` : "";
-    return `${display} ${code}`.trim();
-  };
-
-  const handleSearch = (query) => {
-    if (disabled) return;
-    setSearchQuery(query);
-    if (!query.trim()) {
-      setFilteredItems(items || []);
-    } else {
-      const filtered = (items || []).filter(item =>
-        (item[displayField]?.toLowerCase().includes(query.toLowerCase())) ||
-        (item[codeField]?.toLowerCase().includes(query.toLowerCase()))
-      );
-      setFilteredItems(filtered);
-    }
-  };
-
-  const handleSelectItem = (item) => {
-    if (disabled) return;
-    setSelectedItem(item);
-    setSearchQuery(getDisplayValue(item));
-    setShowDropdown(false);
-    onSelect?.(item);
-  };
-
-  return (
-    <div className="relative" ref={dropdownRef}>
-      <input
-        type="text"
-        value={searchQuery}
-        onChange={(e) => handleSearch(e.target.value)}
-        onFocus={() => !disabled && setShowDropdown(true)}
-        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-        className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
-          disabled ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-        }`}
-        placeholder={placeholder}
-        disabled={disabled}
-      />
-      {showDropdown && !disabled && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-          {filteredItems?.length > 0 ? (
-            filteredItems.map((item) => (
-              <div
-                key={item._id}
-                onMouseDown={() => handleSelectItem(item)}
-                className={`p-2 hover:bg-slate-50 cursor-pointer border-b border-slate-100 ${
-                  selectedItem?._id === item._id ? 'bg-sky-50' : ''
-                }`}
-              >
-                <div className="font-medium text-slate-800 text-sm">
-                  {item[displayField]}
-                </div>
-                {item[codeField] && (
-                  <div className="text-xs text-slate-500">Code: {item[codeField]}</div>
-                )}
-              </div>
-            ))
-          ) : (
-            <div className="p-2 text-center text-sm text-slate-500">No items found</div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TableSearchableDropdown({ 
-  items, 
-  selectedId, 
-  onSelect, 
-  placeholder = "Search...",
-  displayField = 'name',
-  codeField = 'code',
-  disabled = false,
-  cellId = ""
-}) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filteredItems, setFilteredItems] = useState([]);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
-  const inputRef = useRef(null);
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    setFilteredItems(items || []);
-    if (selectedId && items?.length > 0) {
-      const item = items.find(i => i._id === selectedId || i.name === selectedId);
-      setSelectedItem(item);
-      if (item) {
-        setSearchQuery(getDisplayValue(item));
-      }
-    } else {
-      setSelectedItem(null);
-      setSearchQuery("");
-    }
-  }, [items, selectedId]);
-
-  const getDisplayValue = (item) => {
-    if (!item) return "";
-    const display = item[displayField] || "";
-    const code = item[codeField] ? `(${item[codeField]})` : "";
-    return `${display} ${code}`.trim();
-  };
-
-  const handleSearch = (query) => {
-    if (disabled) return;
-    setSearchQuery(query);
-    if (!query.trim()) {
-      setFilteredItems(items || []);
-    } else {
-      const filtered = (items || []).filter(item =>
-        (item[displayField]?.toLowerCase().includes(query.toLowerCase())) ||
-        (item[codeField]?.toLowerCase().includes(query.toLowerCase()))
-      );
-      setFilteredItems(filtered);
-    }
-  };
-
-  const handleInputFocus = () => {
-    if (!disabled && !showDropdown && inputRef.current) {
-      setFilteredItems(items || []);
-      const inputRect = inputRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        top: inputRect.bottom + window.scrollY + 4,
-        left: inputRect.left + window.scrollX,
-        width: inputRect.width
-      });
-      setShowDropdown(true);
-    }
-  };
-
-  const handleSelectItem = (item) => {
-    if (disabled) return;
-    setSelectedItem(item);
-    setSearchQuery(getDisplayValue(item));
-    setShowDropdown(false);
-    onSelect?.(item);
-  };
-
-  return (
-    <>
-      <div className="relative">
-        <input
-          ref={inputRef}
-          type="text"
-          value={searchQuery}
-          onChange={(e) => handleSearch(e.target.value)}
-          onFocus={handleInputFocus}
-          onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 ${
-            disabled ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-          }`}
-          placeholder={placeholder}
-          disabled={disabled}
-        />
-      </div>
-      {showDropdown && !disabled && (
-        <div 
-          ref={dropdownRef}
-          className="fixed z-[9999] bg-white border border-slate-200 rounded-lg shadow-lg overflow-y-auto max-h-60"
-          style={{
-            top: `${dropdownPosition.top}px`,
-            left: `${dropdownPosition.left}px`,
-            width: `${dropdownPosition.width}px`
-          }}
-        >
-          {filteredItems?.length > 0 ? (
-            filteredItems.map((item) => (
-              <div
-                key={item._id}
-                onMouseDown={() => handleSelectItem(item)}
-                className="p-2 hover:bg-slate-50 cursor-pointer border-b border-slate-100"
-              >
-                <div className="font-medium text-slate-800 text-sm">
-                  {item[displayField]}
-                </div>
-                {item[codeField] && (
-                  <div className="text-xs text-slate-500">Code: {item[codeField]}</div>
-                )}
-              </div>
-            ))
-          ) : (
-            <div className="p-2 text-center text-sm text-slate-500">No items found</div>
-          )}
-        </div>
-      )}
-    </> 
+	
   );
 }

@@ -10,6 +10,7 @@ const PACK_TYPES = [
   { key: "PALLETIZATION", label: "Palletization" },
   { key: "UNIFORM - BAGS/BOXES", label: "Uniform - Bags/Boxes" },
   { key: "LOOSE - CARGO", label: "Loose - Cargo" },
+  { key: "NON-UNIFORM - GENERAL CARGO", label: "Non-uniform - General Cargo" },
 ];
 
 const ORDER_TYPES = ["Sales", "STO Order", "Export", "Import"];
@@ -36,18 +37,19 @@ function defaultRow(packType) {
   if (packType === "PALLETIZATION") {
     return {
       _id: uid(),
+      packType: "PALLETIZATION",
       noOfPallets: "",
       unitPerPallets: "",
       totalPkgs: "",
       pkgsType: "",
-      uom: "",
+      uom: "MT",
       skuSize: "",
       packWeight: "",
       productName: "",
       wtLtr: "",
       actualWt: "",
       chargedWt: "",
-      wtUom: "",
+      wtUom: "MT",
       isUniform: false,
     };
   }
@@ -55,6 +57,7 @@ function defaultRow(packType) {
   if (packType === "UNIFORM - BAGS/BOXES") {
     return {
       _id: uid(),
+      packType: "UNIFORM - BAGS/BOXES",
       totalPkgs: "",
       pkgsType: "",
       uom: "",
@@ -64,15 +67,31 @@ function defaultRow(packType) {
       wtLtr: "",
       actualWt: "",
       chargedWt: "",
-      wtUom: "",
+      wtUom: "MT",
     };
   }
 
-  // LOOSE - CARGO
+  if (packType === "LOOSE - CARGO") {
+    return {
+      _id: uid(),
+      packType: "LOOSE - CARGO",
+      uom: "MT",
+      productName: "",
+      actualWt: "",
+      chargedWt: "",
+    };
+  }
+
+  // NON-UNIFORM - GENERAL CARGO
   return {
     _id: uid(),
-    uom: "",
+    packType: "NON-UNIFORM - GENERAL CARGO",
+    nos: "",
     productName: "",
+    uom: "MT",
+    length: "",
+    width: "",
+    height: "",
     actualWt: "",
     chargedWt: "",
   };
@@ -100,6 +119,10 @@ function defaultPlantRow() {
     countryName: "",
     weight: "",
     status: "",
+    collectionCharges: "",
+    cancellationCharges: "",
+    loadingCharges: "",
+    otherCharges: "",
   };
 }
 
@@ -137,7 +160,6 @@ function useCustomerSearch() {
 
   return { customers, loading, error, searchCustomers };
 }
-
 
 /** =========================
  * External Pincode API Hook with Multiple Cities Support
@@ -247,8 +269,11 @@ export default function CreateOrderPanel() {
   const [saveError, setSaveError] = useState(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [orderNumber, setOrderNumber] = useState("");
-const [locations, setLocations] = useState([]);
-const [pkgTypes, setPkgTypes] = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [pkgTypes, setPkgTypes] = useState([]);
+  const [uoms, setUoms] = useState([]);
+  const [skuSizes, setSkuSizes] = useState([]);
+  
   /** =========================
    * CUSTOMER SEARCH STATE
    ========================= */
@@ -265,28 +290,104 @@ const [pkgTypes, setPkgTypes] = useState([]);
   const [pincodeInput, setPincodeInput] = useState({});
   const [showCityDropdown, setShowCityDropdown] = useState({});
   const [cityOptionsByRow, setCityOptionsByRow] = useState({});
+  const [items, setItems] = useState([]);
+  const [showProductDropdown, setShowProductDropdown] = useState({});
+
+  const fetchItems = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/items', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setItems(data.data);
+      } else {
+        setItems([]);
+      }
+    } catch (error) {
+      console.error('Error fetching items:', error.message);
+      setItems([]);
+    }
+  };
 
   /** =========================
    * CHARGES VISIBILITY STATE
    ========================= */
   const [showCharges, setShowCharges] = useState(false);
-const fetchLocations = async () => {
-  try {
-    const token = localStorage.getItem('token');
-    const res = await fetch('/api/locations', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await res.json();
-    if (data.success && Array.isArray(data.data)) {
-      setLocations(data.data);
-    } else {
+
+  const fetchLocations = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/locations', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setLocations(data.data);
+      } else {
+        setLocations([]);
+      }
+    } catch (error) {
+      console.error('Error fetching locations:', error.message);
       setLocations([]);
     }
-  } catch (error) {
-    console.error('Error fetching locations:', error.message);
-    setLocations([]);
-  }
-};
+  };
+
+  const fetchPkgTypes = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/pkg-types', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setPkgTypes(data.data);
+      } else {
+        setPkgTypes([]);
+      }
+    } catch (error) {
+      console.error('Error fetching PKG types:', error.message);
+      setPkgTypes([]);
+    }
+  };
+
+  const fetchUOMs = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/uoms', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setUoms(data.data);
+      } else {
+        setUoms([]);
+      }
+    } catch (error) {
+      console.error('Error fetching UOMs:', error.message);
+      setUoms([]);
+    }
+  };
+
+  const fetchSKUSizes = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/sku-sizes', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setSkuSizes(data.data);
+      } else {
+        setSkuSizes([]);
+      }
+    } catch (error) {
+      console.error('Error fetching SKU sizes:', error.message);
+      setSkuSizes([]);
+    }
+  };
+
   /** =========================
    * HEADER - EMPTY INITIAL STATE
    ========================= */
@@ -307,37 +408,19 @@ const fetchLocations = async () => {
     customerName: "",
     contactPerson: "",
   });
-const fetchPkgTypes = async () => {
-  try {
-    const token = localStorage.getItem('token');
-    const res = await fetch('/api/pkg-types', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await res.json();
-    if (data.success && Array.isArray(data.data)) {
-      setPkgTypes(data.data);
-    } else {
-      setPkgTypes([]);
-    }
-  } catch (error) {
-    console.error('Error fetching PKG types:', error.message);
-    setPkgTypes([]);
-  }
-};
+
   /** =========================
    * PLANT GRID TABLE DATA
    ========================= */
   const [plantRows, setPlantRows] = useState([defaultPlantRow()]);
 
   /** =========================
-   * PACK DATA
+   * PACK DATA - Single array for all pack types
    ========================= */
   const [activePack, setActivePack] = useState("PALLETIZATION");
-  const [packData, setPackData] = useState({
-    PALLETIZATION: [defaultRow("PALLETIZATION")],
-    "UNIFORM - BAGS/BOXES": [defaultRow("UNIFORM - BAGS/BOXES")],
-    "LOOSE - CARGO": [defaultRow("LOOSE - CARGO")],
-  });
+  const [packRows, setPackRows] = useState([
+    { ...defaultRow("PALLETIZATION"), packType: "PALLETIZATION" }
+  ]);
 
   /** =========================
    * FETCH DATA FROM APIs
@@ -346,8 +429,11 @@ const fetchPkgTypes = async () => {
     fetchBranches();
     fetchCountries();
     fetchPlants();
-	 fetchLocations();
-	 fetchPkgTypes();
+    fetchLocations();
+    fetchPkgTypes();
+    fetchUOMs();
+    fetchSKUSizes();
+    fetchItems(); 
   }, []);
 
   const fetchBranches = async () => {
@@ -509,43 +595,41 @@ const fetchPkgTypes = async () => {
   };
 
   /** =========================
-   * PINCODE API INTEGRATION with Multiple Cities Support - FIXED
+   * PINCODE API INTEGRATION with Multiple Cities Support
    ========================= */
- const handlePincodeChange = async (rowId, pincode) => {
-  updatePlantRow(rowId, 'pinCode', pincode);
-  setPincodeInput(prev => ({ ...prev, [rowId]: pincode }));
-  
-  if (pincode && pincode.length === 6) {
-    const result = await pincodeAPI.fetchPincodeDetails(pincode);
+  const handlePincodeChange = async (rowId, pincode) => {
+    updatePlantRow(rowId, 'pinCode', pincode);
+    setPincodeInput(prev => ({ ...prev, [rowId]: pincode }));
     
-    if (result) {
-      if (result.hasMultiple && result.allLocations && result.allLocations.length > 0) {
-        // Store the cities for this specific row
-        setCityOptionsByRow(prev => ({ 
-          ...prev, 
-          [rowId]: result.allLocations 
-        }));
-        // Also show a message that cities are available
-        console.log(`✅ ${result.allLocations.length} locations found for pincode ${pincode}`);
-      } else {
-        setCityOptionsByRow(prev => ({ ...prev, [rowId]: [] }));
-        // Auto-fill with single location
-        updatePlantRow(rowId, 'taluka', result.taluka);
-        updatePlantRow(rowId, 'talukaName', result.talukaName);
-        updatePlantRow(rowId, 'district', result.district);
-        updatePlantRow(rowId, 'districtName', result.districtName);
-        updatePlantRow(rowId, 'state', result.state);
-        updatePlantRow(rowId, 'stateName', result.stateName);
-        updatePlantRow(rowId, 'country', result.country);
-        updatePlantRow(rowId, 'countryName', result.countryName);
-        updatePlantRow(rowId, 'toName', result.cityName);
-        updatePlantRow(rowId, 'to', null);
+    if (pincode && pincode.length === 6) {
+      const result = await pincodeAPI.fetchPincodeDetails(pincode);
+      
+      if (result) {
+        if (result.hasMultiple && result.allLocations && result.allLocations.length > 0) {
+          setCityOptionsByRow(prev => ({ 
+            ...prev, 
+            [rowId]: result.allLocations 
+          }));
+          console.log(`✅ ${result.allLocations.length} locations found for pincode ${pincode}`);
+        } else {
+          setCityOptionsByRow(prev => ({ ...prev, [rowId]: [] }));
+          updatePlantRow(rowId, 'taluka', result.taluka);
+          updatePlantRow(rowId, 'talukaName', result.talukaName);
+          updatePlantRow(rowId, 'district', result.district);
+          updatePlantRow(rowId, 'districtName', result.districtName);
+          updatePlantRow(rowId, 'state', result.state);
+          updatePlantRow(rowId, 'stateName', result.stateName);
+          updatePlantRow(rowId, 'country', result.country);
+          updatePlantRow(rowId, 'countryName', result.countryName);
+          updatePlantRow(rowId, 'toName', result.cityName);
+          updatePlantRow(rowId, 'to', null);
+        }
       }
+    } else {
+      setCityOptionsByRow(prev => ({ ...prev, [rowId]: [] }));
     }
-  } else {
-    setCityOptionsByRow(prev => ({ ...prev, [rowId]: [] }));
-  }
-};
+  };
+
   const handleSelectCity = (rowId, location) => {
     updatePlantRow(rowId, 'taluka', location.taluka);
     updatePlantRow(rowId, 'talukaName', location.talukaName);
@@ -580,128 +664,117 @@ const fetchPkgTypes = async () => {
   };
 
   /** =========================
-   * PACK DATA FUNCTIONS
+   * PACK DATA FUNCTIONS - Single array
    ========================= */
-  const rows = packData[activePack] || [];
-
+  
   const recalculatePalletizationWeights = (row) => {
-    const noOfPallets = num(row.noOfPallets);
-    const unitPerPallets = num(row.unitPerPallets);
-    const totalPkgs = num(row.totalPkgs);
-    const packWeight = num(row.packWeight);
-    const uom = (row.uom || "").toUpperCase();
+    const updatedRow = { ...row };
+    
+    const noOfPallets = num(updatedRow.noOfPallets);
+    const unitPerPallets = num(updatedRow.unitPerPallets);
+    const packWeight = num(updatedRow.packWeight);
+    const uom = (updatedRow.uom || "").toUpperCase().trim();
+    
+    let totalPkgs = num(updatedRow.totalPkgs);
     
     if (noOfPallets > 0 && unitPerPallets > 0) {
       const calculatedTotalPkgs = noOfPallets * unitPerPallets;
-      row.totalPkgs = calculatedTotalPkgs > 0 ? String(calculatedTotalPkgs) : "";
+      totalPkgs = calculatedTotalPkgs;
+      updatedRow.totalPkgs = String(calculatedTotalPkgs);
     }
     
-    const currentTotalPkgs = num(row.totalPkgs);
-    
-    if (currentTotalPkgs > 0 && packWeight > 0) {
-      if (uom === "LTR" || uom === "L") {
-        const wtLtr = currentTotalPkgs * packWeight;
-        row.wtLtr = wtLtr > 0 ? String(wtLtr.toFixed(2)) : "";
-        const actualWt = wtLtr / 1000;
-        row.actualWt = actualWt > 0 ? String(actualWt.toFixed(3)) : "";
-      } else if (uom === "KG" || uom === "KGS") {
-        const actualWt = (currentTotalPkgs * packWeight) / 1000;
-        row.actualWt = actualWt > 0 ? String(actualWt.toFixed(3)) : "";
-        row.wtLtr = "";
+    if (totalPkgs > 0 && packWeight > 0) {
+      if (uom === "LTR" || uom === "L" || uom === "LITRE" || uom === "LITRES") {
+        const wtLtr = totalPkgs * packWeight;
+        updatedRow.wtLtr = wtLtr.toFixed(2);
+        const actualWt = wtLtr / 1000 * 2;
+        updatedRow.actualWt = actualWt.toFixed(3);
+      } else if (uom === "KG" || uom === "KGS" || uom === "KILOGRAM" || uom === "KILOGRAMS") {
+        const actualWt = totalPkgs * packWeight;
+        updatedRow.actualWt = actualWt.toFixed(3);
+        updatedRow.wtLtr = "";
       } else {
-        row.wtLtr = "";
-        row.actualWt = "";
+        updatedRow.wtLtr = "";
+        updatedRow.actualWt = "";
       }
+    } else {
+      if (!updatedRow.wtLtr) updatedRow.wtLtr = "";
+      if (!updatedRow.actualWt) updatedRow.actualWt = "";
     }
     
-    return row;
+    return updatedRow;
+  };
+  
+  const recalculateUniformWeights = (row) => {
+    const updatedRow = { ...row };
+    
+    const totalPkgs = num(updatedRow.totalPkgs);
+    const packWeight = num(updatedRow.packWeight);
+    const uom = (updatedRow.uom || "").toUpperCase().trim();
+    
+    if (totalPkgs > 0 && packWeight > 0) {
+      if (uom === "LTR" || uom === "L" || uom === "LITRE" || uom === "LITRES") {
+        const wtLtr = totalPkgs * packWeight;
+        updatedRow.wtLtr = wtLtr.toFixed(2);
+        const actualWt = (wtLtr / 1000) * 2;
+        updatedRow.actualWt = actualWt.toFixed(3);
+      } else if (uom === "KG" || uom === "KGS" || uom === "KILOGRAM" || uom === "KILOGRAMS") {
+        const actualWt = totalPkgs * packWeight;
+        updatedRow.actualWt = actualWt.toFixed(3);
+        updatedRow.wtLtr = "";
+      } else {
+        updatedRow.wtLtr = "";
+        updatedRow.actualWt = "";
+      }
+    } else {
+      if (!updatedRow.wtLtr) updatedRow.wtLtr = "";
+      if (!updatedRow.actualWt) updatedRow.actualWt = "";
+    }
+    
+    return updatedRow;
   };
 
-  const recalculateUniformWeights = (row) => {
-  const totalPkgs = num(row.totalPkgs);
-  const packWeight = num(row.packWeight);
-  const uom = (row.uom || "").toUpperCase();
-  
-  if (totalPkgs > 0 && packWeight > 0) {
-    if (uom === "LTR" || uom === "L") {
-      const wtLtr = totalPkgs * packWeight;
-      row.wtLtr = wtLtr > 0 ? String(wtLtr.toFixed(2)) : "";
-      let actualWt = wtLtr / 1000;
-      // Multiply by 2 for LTR/L
-      actualWt = actualWt * 2;
-      row.actualWt = actualWt > 0 ? String(actualWt.toFixed(3)) : "";
-    } else if (uom === "KG" || uom === "KGS") {
-      const actualWt = (totalPkgs * packWeight) / 1000;
-      row.actualWt = actualWt > 0 ? String(actualWt.toFixed(3)) : "";
-      row.wtLtr = "";
-    } else {
-      row.wtLtr = "";
-      row.actualWt = "";
-    }
-  }
-  
-  return row;
-};
-
-  const updatePackRow = (rowId, key, value, packType = activePack) => {
-    setPackData((prev) => {
-      const updatedPack = prev[packType].map((r) => {
+  const updatePackRow = (rowId, key, value) => {
+    setPackRows((prev) =>
+      prev.map((r) => {
         if (r._id === rowId) {
-          const updatedRow = { ...r, [key]: value };
+          let updatedRow = { ...r, [key]: value };
           
-          if (packType === "PALLETIZATION") {
-            return recalculatePalletizationWeights(updatedRow);
-          } else if (packType === "UNIFORM - BAGS/BOXES") {
-            return recalculateUniformWeights(updatedRow);
+          if (r.packType === "PALLETIZATION") {
+            updatedRow = recalculatePalletizationWeights(updatedRow);
+          } else if (r.packType === "UNIFORM - BAGS/BOXES") {
+            updatedRow = recalculateUniformWeights(updatedRow);
           }
           
           return updatedRow;
         }
         return r;
-      });
-      
-      return {
-        ...prev,
-        [packType]: updatedPack,
-      };
-    });
+      })
+    );
+  };
+  
+  const addRow = () => {
+    setPackRows((prev) => [
+      ...prev,
+      { ...defaultRow(activePack), packType: activePack }
+    ]);
   };
 
-  const addRow = (packType = activePack) => {
-    setPackData((prev) => {
-      const updatedPack = [...prev[packType], defaultRow(packType)];
-      return {
-        ...prev,
-        [packType]: updatedPack,
-      };
-    });
-  };
-
-  const removeRow = (packType, id) => {
-    const currentRows = packData[packType] || [];
-    if (currentRows.length > 1) {
-      setPackData((prev) => {
-        const updatedPack = prev[packType].filter((r) => r._id !== id);
-        return {
-          ...prev,
-          [packType]: updatedPack,
-        };
-      });
+  const removeRow = (id) => {
+    if (packRows.length > 1) {
+      setPackRows((prev) => prev.filter((r) => r._id !== id));
     } else {
       alert("At least one row is required");
     }
   };
 
-  const duplicateRow = (packType, id) => {
-    const row = (packData[packType] || []).find((r) => r._id === id);
+  const duplicateRow = (id) => {
+    const row = packRows.find((r) => r._id === id);
     if (!row) return;
-    setPackData((prev) => {
-      const updatedPack = [...prev[packType], { ...row, _id: uid() }];
-      return {
-        ...prev,
-        [packType]: updatedPack,
-      };
-    });
+    setPackRows((prev) => [
+      ...prev,
+      { ...row, _id: uid() }
+    ]);
   };
 
   /** =========================
@@ -765,43 +838,66 @@ const fetchPkgTypes = async () => {
           weight: num(row.weight) || 0,
           status: row.status || "Open",
           rate: 0,
-          locationRate: 0
+          locationRate: 0,
+          collectionCharges: num(row.collectionCharges) || 0,
+          cancellationCharges: row.cancellationCharges || 'Nil',
+          loadingCharges: row.loadingCharges || 'Nil',
+          otherCharges: num(row.otherCharges) || 0
         })),
-        packData: {
-          PALLETIZATION: packData.PALLETIZATION.map(row => ({
-            noOfPallets: num(row.noOfPallets),
-            unitPerPallets: num(row.unitPerPallets),
-            totalPkgs: num(row.totalPkgs),
-            pkgsType: row.pkgsType || "",
-            uom: row.uom || "",
-            skuSize: row.skuSize || "",
-            packWeight: num(row.packWeight),
-            productName: row.productName || "",
-            wtLtr: num(row.wtLtr),
-            actualWt: num(row.actualWt),
-            chargedWt: num(row.chargedWt),
-            wtUom: row.wtUom || "",
-            isUniform: row.isUniform || false
-          })),
-          "UNIFORM - BAGS/BOXES": packData["UNIFORM - BAGS/BOXES"].map(row => ({
-            totalPkgs: num(row.totalPkgs),
-            pkgsType: row.pkgsType || "",
-            uom: row.uom || "",
-            skuSize: row.skuSize || "",
-            packWeight: num(row.packWeight),
-            productName: row.productName || "",
-            wtLtr: num(row.wtLtr),
-            actualWt: num(row.actualWt),
-            chargedWt: num(row.chargedWt),
-            wtUom: row.wtUom || ""
-          })),
-          "LOOSE - CARGO": packData["LOOSE - CARGO"].map(row => ({
-            uom: row.uom || "",
-            productName: row.productName || "",
-            actualWt: num(row.actualWt),
-            chargedWt: num(row.chargedWt)
-          }))
-        },
+        packRows: packRows.map(row => {
+          if (row.packType === "PALLETIZATION") {
+            return {
+              packType: row.packType,
+              noOfPallets: num(row.noOfPallets),
+              unitPerPallets: num(row.unitPerPallets),
+              totalPkgs: num(row.totalPkgs),
+              pkgsType: row.pkgsType || "",
+              uom: row.uom || "MT",
+              skuSize: row.skuSize || "",
+              packWeight: num(row.packWeight),
+              productName: row.productName || "",
+              wtLtr: num(row.wtLtr),
+              actualWt: num(row.actualWt),
+              chargedWt: num(row.chargedWt),
+              wtUom: row.wtUom || "MT",
+              isUniform: row.isUniform || false
+            };
+          } else if (row.packType === "UNIFORM - BAGS/BOXES") {
+            return {
+              packType: row.packType,
+              totalPkgs: num(row.totalPkgs),
+              pkgsType: row.pkgsType || "",
+              uom: row.uom || "MT",
+              skuSize: row.skuSize || "",
+              packWeight: num(row.packWeight),
+              productName: row.productName || "",
+              wtLtr: num(row.wtLtr),
+              actualWt: num(row.actualWt),
+              chargedWt: num(row.chargedWt),
+              wtUom: row.wtUom || "MT"
+            };
+          } else if (row.packType === "LOOSE - CARGO") {
+            return {
+              packType: row.packType,
+              uom: row.uom || "MT",
+              productName: row.productName || "",
+              actualWt: num(row.actualWt),
+              chargedWt: num(row.chargedWt)
+            };
+          } else {
+            return {
+              packType: row.packType,
+              nos: num(row.nos),
+              productName: row.productName || "",
+              uom: row.uom || "MT",
+              length: num(row.length),
+              width: num(row.width),
+              height: num(row.height),
+              actualWt: num(row.actualWt),
+              chargedWt: num(row.chargedWt)
+            };
+          }
+        }),
         branches: branches,
         plants: plants,
         countries: countries,
@@ -865,11 +961,7 @@ const fetchPkgTypes = async () => {
     
     setPlantRows([defaultPlantRow()]);
     
-    setPackData({
-      PALLETIZATION: [defaultRow("PALLETIZATION")],
-      "UNIFORM - BAGS/BOXES": [defaultRow("UNIFORM - BAGS/BOXES")],
-      "LOOSE - CARGO": [defaultRow("LOOSE - CARGO")],
-    });
+    setPackRows([{ ...defaultRow("PALLETIZATION"), packType: "PALLETIZATION" }]);
     
     setSelectedCustomer(null);
     setCustomerSearchQuery("");
@@ -1042,93 +1134,60 @@ const fetchPkgTypes = async () => {
                 </div>
               </div>
             </div>
-
-            {/* Charges Fields - Conditionally Visible */}
-            {showCharges && (
-              <>
-                <Input
-                  col="col-span-6 md:col-span-3"
-                  label="Collection Charges"
-                  value={top.collectionCharges}
-                  onChange={(v) =>
-                    setTop((p) => ({ ...p, collectionCharges: v }))
-                  }
-                  type="number"
-                />
-                <Input
-                  col="col-span-6 md:col-span-3"
-                  label="Cancellation Charges"
-                  value={top.cancellationCharges}
-                  onChange={(v) =>
-                    setTop((p) => ({ ...p, cancellationCharges: v }))
-                  }
-                />
-                <Input
-                  col="col-span-6 md:col-span-3"
-                  label="Loading Charges"
-                  value={top.loadingCharges}
-                  onChange={(v) => setTop((p) => ({ ...p, loadingCharges: v }))}
-                />
-                <Input
-                  col="col-span-6 md:col-span-3"
-                  label="Other Charges"
-                  value={top.otherCharges}
-                  onChange={(v) => setTop((p) => ({ ...p, otherCharges: v }))}
-                  type="number"
-                />
-              </>
-            )}
           </div>
         </Card>
 
         <div className="mt-4">
-        <Card title="Plant Code / Route">
-  <div className="mb-4 flex justify-between items-center">
-    <div className="text-sm text-slate-600">
-      Manage plant routes and distribution - Enter pincode to auto-fill location fields
-    </div>
-    <div className="flex gap-2">
-      <button
-        onClick={() => setShowCharges(!showCharges)}
-        className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
-          showCharges 
-            ? 'bg-blue-600 text-white hover:bg-blue-700' 
-            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-        }`}
-      >
-        {showCharges ? 'Hide Charges' : 'Charges'}
-      </button>
-      <button
-        onClick={addPlantRow}
-        className="rounded-xl bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-700 transition"
-      >
-        + Add Row
-      </button>
-    </div>
-  </div>
-  <PlantGridTable
-    rows={plantRows}
-    onChange={updatePlantRow}
-    onRemove={removePlantRow}
-    onPlantChange={handlePlantChange}
-    onPincodeChange={handlePincodeChange}
-    onSelectCity={handleSelectCity}
-    plants={plants}
-    branches={branches}
-    locations={locations} // Add this line
-    pincodeAPI={pincodeAPI}
-    pincodeInput={pincodeInput}
-    showCityDropdown={showCityDropdown}
-    setShowCityDropdown={setShowCityDropdown}
-    cityOptionsByRow={cityOptionsByRow}
-  />
-</Card>
-          {/* PACK TYPE SECTIONS */}
+          <Card title="Plant Code / Route">
+            <div className="mb-4 flex justify-between items-center">
+              <div className="text-sm text-slate-600">
+                Manage plant routes and distribution - Enter pincode to auto-fill location fields
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowCharges(!showCharges)}
+                  className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+                    showCharges 
+                      ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  {showCharges ? 'Hide Charges' : 'Charges'}
+                </button>
+                <button
+                  onClick={addPlantRow}
+                  className="rounded-xl bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-700 transition"
+                >
+                  + Add Row
+                </button>
+              </div>
+            </div>
+            <PlantGridTable
+              rows={plantRows}
+              onChange={updatePlantRow}
+              onRemove={removePlantRow}
+              onPlantChange={handlePlantChange}
+              onPincodeChange={handlePincodeChange}
+              onSelectCity={handleSelectCity}
+              plants={plants}
+              branches={branches}
+              locations={locations}
+              pincodeAPI={pincodeAPI}
+              pincodeInput={pincodeInput}
+              showCityDropdown={showCityDropdown}
+              setShowCityDropdown={setShowCityDropdown}
+              cityOptionsByRow={cityOptionsByRow}
+              showCharges={showCharges}
+            />
+          </Card>
+          
+          {/* PACK TYPE SECTIONS - Single table with all rows */}
           <div className="mt-4 space-y-6">
             <Card title="Pack Type">
+              {/* Pack Type Selector for adding new rows */}
               <div className="mb-4 flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                  <div className="text-sm font-bold text-slate-700">Select Pack Type:</div>
+                  <div className="text-sm font-bold text-slate-700">Select Pack Type to Add:</div>
                   <select
                     value={activePack}
                     onChange={(e) => setActivePack(e.target.value)}
@@ -1136,27 +1195,33 @@ const fetchPkgTypes = async () => {
                   >
                     {PACK_TYPES.map((p) => (
                       <option key={p.key} value={p.key}>
-                        {p.label} ({packData[p.key]?.length || 0} rows)
+                        {p.label}
                       </option>
                     ))}
                   </select>
                 </div>
                 <button
-                  onClick={() => addRow(activePack)}
+                  onClick={addRow}
                   className="rounded-xl bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-700 transition"
                 >
                   + Add Row
                 </button>
               </div>
               
+              {/* Single Table showing ALL rows with Pack Type column */}
               <PackTypeTable
-                packType={activePack}
-                rows={rows}
-                onChange={(rowId, key, value) => updatePackRow(rowId, key, value, activePack)}
-                onRemove={(id) => removeRow(activePack, id)}
-                onDuplicate={(id) => duplicateRow(activePack, id)}
-				 pkgTypes={pkgTypes}
-  onNavigateToCreate={() => router.push('/admin/pkg-type?returnUrl=/admin/order-panel/create')}
+                rows={packRows}
+                onChange={updatePackRow}
+                onRemove={removeRow}
+                onDuplicate={duplicateRow}
+                pkgTypes={pkgTypes}
+                uoms={uoms}
+                skuSizes={skuSizes}
+                items={items}
+                onNavigateToCreate={() => router.push('/admin/pkg-type?returnUrl=/admin/order-panel/create')}
+                onNavigateToCreateUOM={() => router.push('/admin/uoms?returnUrl=/admin/order-panel/create')}
+                onNavigateToCreateSKUSize={() => router.push('/admin/sku-sizes?returnUrl=/admin/order-panel/create')}
+                onNavigateToCreateItem={() => router.push('/admin/items?returnUrl=/admin/order-panel/create')}
               />
             </Card>
           </div>
@@ -1403,12 +1468,13 @@ function PlantGridTable({
   onSelectCity,
   plants,
   branches,
-  locations, // Add this prop
+  locations,
   pincodeAPI,
   pincodeInput,
   showCityDropdown,
   setShowCityDropdown,
-  cityOptionsByRow
+  cityOptionsByRow,
+  showCharges = false
 }) {
   const [cityDropdownPosition, setCityDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
   const [activeCityRowId, setActiveCityRowId] = useState(null);
@@ -1477,6 +1543,15 @@ function PlantGridTable({
     { key: "weight", label: "Weight", width: "100px" },
     { key: "status", label: "Status", width: "120px" },
   ];
+
+  if (showCharges) {
+    cols.push(
+      { key: "collectionCharges", label: "Collection Charges", width: "130px" },
+      { key: "cancellationCharges", label: "Cancellation Charges", width: "140px" },
+      { key: "loadingCharges", label: "Loading Charges", width: "120px" },
+      { key: "otherCharges", label: "Other Charges", width: "120px" }
+    );
+  }
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -1657,11 +1732,6 @@ function PlantGridTable({
                         </div>
                       )}
                     </div>
-                    {hasCities && cityOptions.length > 0 && (
-                      <div className="text-xs text-blue-600 mt-1 flex items-center gap-1">
-                        {/* City count indicator */}
-                      </div>
-                    )}
                   </td>
 
                   {/* Taluka */}
@@ -1735,6 +1805,48 @@ function PlantGridTable({
                     </select>
                   </td>
 
+                  {/* Charges Columns */}
+                  {showCharges && (
+                    <>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="number"
+                          value={r.collectionCharges || ""}
+                          onChange={(e) => onChange(r._id, 'collectionCharges', e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                          placeholder="Collection Charges"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={r.cancellationCharges || ""}
+                          onChange={(e) => onChange(r._id, 'cancellationCharges', e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                          placeholder="Cancellation Charges"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={r.loadingCharges || ""}
+                          onChange={(e) => onChange(r._id, 'loadingCharges', e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                          placeholder="Loading Charges"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="number"
+                          value={r.otherCharges || ""}
+                          onChange={(e) => onChange(r._id, 'otherCharges', e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                          placeholder="Other Charges"
+                        />
+                      </td>
+                    </>
+                  )}
+
                   {/* Action */}
                   <td className="border border-yellow-300 px-2 py-2 text-center">
                     <button
@@ -1744,7 +1856,7 @@ function PlantGridTable({
                       Remove
                     </button>
                   </td>
-                </tr>
+                 </tr>
               );
             })}
             
@@ -1822,10 +1934,6 @@ function TableSearchableDropdown({
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
-// Add this with other state declarations
-
-
-// Add this function with other fetch functions
 
   const getDisplayValue = useCallback((item) => {
     if (!item) return "";
@@ -1984,67 +2092,178 @@ function TableSearchableDropdown({
   );
 }
 
-/** ===== Pack Type Table Component ===== */
-/** ===== Pack Type Table Component ===== */
-function PackTypeTable({ packType, rows, onChange, onRemove, onDuplicate, pkgTypes = [], onNavigateToCreate }) {
-  const cols = useMemo(() => {
+/** ===== Pack Type Table Component - Single Table with all rows ===== */
+function PackTypeTable({ 
+  rows, 
+  onChange, 
+  onRemove, 
+  onDuplicate, 
+  pkgTypes = [], 
+  uoms = [], 
+  skuSizes = [], 
+  items = [],
+  onNavigateToCreate, 
+  onNavigateToCreateUOM, 
+  onNavigateToCreateSKUSize,
+  onNavigateToCreateItem
+}) {
+  
+  const [showItemDropdown, setShowItemDropdown] = useState({});
+  const [itemSearchQuery, setItemSearchQuery] = useState({});
+  const [filteredItems, setFilteredItems] = useState({});
+  const [itemDropdownPosition, setItemDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+  const itemInputRefs = useRef({});
+  const itemDropdownRef = useRef({});
+
+  // Update item search when rows change
+  useEffect(() => {
+    rows.forEach(row => {
+      if (row.productName && !itemSearchQuery[row._id]) {
+        setItemSearchQuery(prev => ({ ...prev, [row._id]: row.productName }));
+      }
+      if (!filteredItems[row._id]) {
+        setFilteredItems(prev => ({ ...prev, [row._id]: items }));
+      }
+    });
+  }, [rows, items]);
+
+  // Get columns based on pack type
+  const getColumnsForRow = (packType) => {
     if (packType === "PALLETIZATION") {
       return [
-        { key: "noOfPallets", label: "NO OF PALLETS", type: "number", options: null },
-        { key: "unitPerPallets", label: "UNIT PER PALLETS", type: "number", options: null },
-        { key: "totalPkgs", label: "TOTAL PKGS", type: "number", options: null, readOnly: true },
+        { key: "noOfPallets", label: "NO OF PALLETS", type: "number" },
+        { key: "unitPerPallets", label: "UNIT PER PALLETS", type: "number" },
+        { key: "totalPkgs", label: "TOTAL PKGS", type: "number", readOnly: true },
         { key: "pkgsType", label: "PKG TYPE", type: "select", options: pkgTypes, isDynamic: true },
-        { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
-        { key: "skuSize", label: "SKU - SIZE", type: "text", options: SKU_SIZE_OPTIONS },
-        { key: "packWeight", label: "PACK - WEIGHT", type: "number", options: null },
-        { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS },
-        { key: "wtLtr", label: "WT (LTR)", type: "number", options: null, readOnly: true },
-        { key: "actualWt", label: "ACTUAL - WT", type: "number", options: null, readOnly: true },
-        { key: "chargedWt", label: "CHARGED - WT", type: "number", options: null },
-        { key: "wtUom", label: "UOM", type: "text", options: UOM_OPTIONS },
+        { key: "uom", label: "UOM", type: "select", options: uoms, isUOM: true },
+        { key: "skuSize", label: "SKU - SIZE", type: "select", options: skuSizes, isSKUSize: true },
+        { key: "packWeight", label: "PACK - WEIGHT", type: "number" },
+        { key: "productName", label: "PRODUCT NAME", type: "select", options: items, isItem: true },
+        { key: "wtLtr", label: "WT (LTR)", type: "number", readOnly: true },
+        { key: "actualWt", label: "ACTUAL - WT", type: "number", readOnly: true },
+        { key: "chargedWt", label: "CHARGED - WT", type: "number" },
+        { key: "wtUom", label: "WT UOM", type: "text", readOnly: true, defaultValue: "MT" },
       ];
     }
 
     if (packType === "UNIFORM - BAGS/BOXES") {
       return [
-        { key: "totalPkgs", label: "TOTAL PKGS", type: "number", options: null },
+        { key: "totalPkgs", label: "TOTAL PKGS", type: "number" },
         { key: "pkgsType", label: "PKG TYPE", type: "select", options: pkgTypes, isDynamic: true },
-        { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
-        { key: "skuSize", label: "SKU - SIZE", type: "text", options: SKU_SIZE_OPTIONS },
-        { key: "packWeight", label: "PACK - WEIGHT", type: "number", options: null },
-        { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS },
-        { key: "wtLtr", label: "WT (LTR)", type: "number", options: null, readOnly: true },
-        { key: "actualWt", label: "ACTUAL - WT", type: "number", options: null, readOnly: true },
-        { key: "chargedWt", label: "CHARGED - WT", type: "number", options: null },
-        { key: "wtUom", label: "UOM", type: "text", options: UOM_OPTIONS },
+        { key: "uom", label: "UOM", type: "select", options: uoms, isUOM: true },
+        { key: "skuSize", label: "SKU - SIZE", type: "select", options: skuSizes, isSKUSize: true },
+        { key: "packWeight", label: "PACK - WEIGHT", type: "number" },
+        { key: "productName", label: "PRODUCT NAME", type: "select", options: items, isItem: true },
+        { key: "wtLtr", label: "WT (LTR)", type: "number", readOnly: true },
+        { key: "actualWt", label: "ACTUAL - WT", type: "number", readOnly: true },
+        { key: "chargedWt", label: "CHARGED - WT", type: "number" },
+        { key: "wtUom", label: "WT UOM", type: "text", readOnly: true, defaultValue: "MT" },
       ];
     }
 
-    // LOOSE - CARGO
+    if (packType === "LOOSE - CARGO") {
+      return [
+        { key: "uom", label: "UOM", type: "select", options: uoms, isUOM: true },
+        { key: "productName", label: "PRODUCT NAME", type: "select", options: items, isItem: true },
+        { key: "actualWt", label: "ACTUAL - WT", type: "number" },
+        { key: "chargedWt", label: "CHARGED - WT", type: "number" },
+      ];
+    }
+
+    // NON-UNIFORM - GENERAL CARGO
     return [
-      { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
-      { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS },
-      { key: "actualWt", label: "ACTUAL - WT", type: "number", options: null },
-      { key: "chargedWt", label: "CHARGED - WT", type: "number", options: null },
+      { key: "nos", label: "NOS", type: "number" },
+      { key: "productName", label: "PRODUCT NAME", type: "select", options: items, isItem: true },
+      { key: "uom", label: "UOM", type: "select", options: uoms, isUOM: true },
+      { key: "length", label: "LENGTH", type: "number" },
+      { key: "width", label: "WIDTH", type: "number" },
+      { key: "height", label: "HEIGHT", type: "number" },
+      { key: "actualWt", label: "ACTUAL - WT", type: "number" },
+      { key: "chargedWt", label: "CHARGED - WT", type: "number" },
     ];
-  }, [packType, pkgTypes]);
+  };
 
   const handleChange = (rowId, key, value) => {
     onChange(rowId, key, value);
   };
 
-  // Function to get display value for PKG type
-  const getPkgTypeDisplay = (pkgTypeId) => {
-    const pkgType = pkgTypes.find(pt => pt._id === pkgTypeId);
-    return pkgType ? pkgType.name : '';
+  // Handle item search
+  const handleItemSearch = (rowId, query) => {
+    setItemSearchQuery(prev => ({ ...prev, [rowId]: query }));
+    
+    if (!query.trim()) {
+      setFilteredItems(prev => ({ ...prev, [rowId]: items }));
+    } else {
+      const filtered = items.filter(item =>
+        item.itemName.toLowerCase().includes(query.toLowerCase()) ||
+        (item.itemCode && item.itemCode.toLowerCase().includes(query.toLowerCase()))
+      );
+      setFilteredItems(prev => ({ ...prev, [rowId]: filtered }));
+    }
   };
+
+  const handleSelectItem = (rowId, item) => {
+    onChange(rowId, 'productName', item.itemName);
+    setItemSearchQuery(prev => ({ ...prev, [rowId]: item.itemName }));
+    setShowItemDropdown(prev => ({ ...prev, [rowId]: false }));
+  };
+
+  const handleItemInputFocus = (rowId, event) => {
+    if (!showItemDropdown[rowId]) {
+      setFilteredItems(prev => ({ ...prev, [rowId]: items }));
+      
+      const rect = event.target.getBoundingClientRect();
+      setItemDropdownPosition({
+        top: rect.bottom + window.scrollY,
+        left: rect.left + window.scrollX,
+        width: rect.width
+      });
+      
+      setShowItemDropdown(prev => ({ ...prev, [rowId]: true }));
+    }
+  };
+
+  const handleItemInputBlur = (rowId) => {
+    setTimeout(() => {
+      if (itemDropdownRef.current[rowId] && !itemDropdownRef.current[rowId].contains(document.activeElement)) {
+        setShowItemDropdown(prev => ({ ...prev, [rowId]: false }));
+      }
+    }, 200);
+  };
+
+  // Update dropdown position on scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      Object.keys(showItemDropdown).forEach(rowId => {
+        if (showItemDropdown[rowId] && itemInputRefs.current[rowId]) {
+          const rect = itemInputRefs.current[rowId].getBoundingClientRect();
+          setItemDropdownPosition({
+            top: rect.bottom + window.scrollY,
+            left: rect.left + window.scrollX,
+            width: rect.width
+          });
+        }
+      });
+    };
+    
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleScroll);
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, [showItemDropdown]);
 
   return (
     <div className="overflow-auto rounded-xl border border-yellow-300">
       <table className="min-w-max w-full text-sm">
-        <thead className="sticky top-0 bg-yellow-400">
+        <thead className="sticky top-0 bg-yellow-400 z-10">
           <tr>
-            {cols.map((c) => (
+            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center bg-yellow-400">
+              Pack Type
+            </th>
+            {rows.length > 0 && getColumnsForRow(rows[0].packType).map((c) => (
               <th
                 key={c.key}
                 className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
@@ -2061,87 +2280,217 @@ function PackTypeTable({ packType, rows, onChange, onRemove, onDuplicate, pkgTyp
 
         <tbody>
           {rows.length > 0 ? (
-            rows.map((r) => (
-              <tr key={r._id} className="hover:bg-yellow-50 even:bg-slate-50">
-                {cols.map((c) => (
-                  <td key={c.key} className="border border-yellow-300 px-2 py-2">
-                    {c.key === "pkgsType" && c.isDynamic ? (
-                      <div className="flex gap-2 items-center">
-                        <select
-                          value={r[c.key] || ""}
-                          onChange={(e) => handleChange(r._id, c.key, e.target.value)}
-                          className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                        >
-                          <option value="">Select {c.label}</option>
-                          {c.options.map((opt) => (
-                            <option key={opt._id} value={opt.name}>
-                              {opt.name}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          onClick={onNavigateToCreate}
-                          className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-700 transition whitespace-nowrap"
-                          title="Create New PKG Type"
-                        >
-                          Create
-                        </button>
-                      </div>
-                    ) : c.options ? (
-                      <select
-                        value={r[c.key] || ""}
-                        onChange={(e) => handleChange(r._id, c.key, e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                      >
-                        <option value="">Select {c.label}</option>
-                        {c.options.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        type={c.type || "text"}
-                        value={r[c.key] || ""}
-                        readOnly={c.readOnly}
-                        onChange={(e) => handleChange(r._id, c.key, e.target.value)}
-                        className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
-                          c.readOnly 
-                            ? 'bg-slate-100 text-slate-700' 
-                            : 'bg-white'
-                        }`}
-                        placeholder={c.readOnly ? "Auto-calculated" : `Enter ${c.label}`}
-                        step={c.type === "number" ? "0.001" : undefined}
-                      />
-                    )}
+            rows.map((r) => {
+              const cols = getColumnsForRow(r.packType);
+              
+              return (
+                <tr key={r._id} className="hover:bg-yellow-50 even:bg-slate-50">
+                  <td className="border border-yellow-300 px-2 py-2 text-center font-semibold bg-yellow-50">
+                    {r.packType === "PALLETIZATION" ? "Palletization" :
+                     r.packType === "UNIFORM - BAGS/BOXES" ? "Uniform - Bags/Boxes" :
+                     r.packType === "LOOSE - CARGO" ? "Loose - Cargo" :
+                     "Non-uniform - General Cargo"}
                   </td>
-                ))}
-                <td className="border border-yellow-300 px-2 py-2">
-                  <div className="flex gap-2 justify-center">
-                    <button
-                      onClick={() => onDuplicate(r._id)}
-                      className="rounded-lg border border-yellow-500 bg-yellow-100 px-3 py-1.5 text-xs font-bold text-yellow-800 hover:bg-yellow-200 transition"
-                    >
-                      Duplicate
-                    </button>
-                    <button
-                      onClick={() => onRemove(r._id)}
-                      className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-600 transition"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))
+                  
+                  {cols.map((c) => {
+                    // Handle WT UOM field - always show MT as readonly
+                    if (c.key === "wtUom") {
+                      return (
+                        <td key={c.key} className="border border-yellow-300 px-2 py-2">
+                          <input
+                            type="text"
+                            value="MT"
+                            readOnly
+                            className="w-full rounded-lg border border-slate-200 bg-slate-100 px-2 py-1.5 text-sm text-slate-700 font-medium"
+                          />
+                        </td>
+                      );
+                    }
+                    
+                    // For read-only calculated fields
+                    if (c.readOnly && (c.key === "wtLtr" || c.key === "actualWt" || c.key === "totalPkgs")) {
+                      return (
+                        <td key={c.key} className="border border-yellow-300 px-2 py-2">
+                          <input
+                            type="text"
+                            value={r[c.key] || ""}
+                            readOnly
+                            className="w-full rounded-lg border border-slate-200 bg-slate-100 px-2 py-1.5 text-sm text-slate-700 font-medium"
+                            placeholder="Auto-calculated"
+                          />
+                        </td>
+                      );
+                    }
+                    
+                    return (
+                      <td key={c.key} className="border border-yellow-300 px-2 py-2">
+                        {c.isDynamic ? (
+                          <div className="flex gap-2 items-center">
+                            <select
+                              value={r[c.key] || ""}
+                              onChange={(e) => handleChange(r._id, c.key, e.target.value)}
+                              className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                            >
+                              <option value="">Select {c.label}</option>
+                              {c.options && c.options.map((opt) => (
+                                <option key={opt._id} value={opt.name}>
+                                  {opt.name}
+                                </option>
+                              ))}
+                            </select>
+                          
+                          </div>
+                        ) : c.isUOM ? (
+                          <div className="flex gap-2 items-center">
+                            <select
+                              value={r[c.key] || ""}
+                              onChange={(e) => handleChange(r._id, c.key, e.target.value)}
+                              className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                            >
+                              <option value="">Select {c.label}</option>
+                              {c.options && c.options.length > 0 ? (
+                                c.options.map((opt) => (
+                                  <option key={opt._id} value={opt.name}>
+                                    {opt.name}
+                                  </option>
+                                ))
+                              ) : (
+                                <option value="" disabled>No UOMs available</option>
+                              )}
+                            </select>
+                           
+                          </div>
+                        ) : c.isSKUSize ? (
+                          <div className="flex gap-2 items-center">
+                            <select
+                              value={r[c.key] || ""}
+                              onChange={(e) => handleChange(r._id, c.key, e.target.value)}
+                              className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                            >
+                              <option value="">Select {c.label}</option>
+                              {c.options && c.options.map((opt) => (
+                                <option key={opt._id} value={opt.display}>
+                                  {opt.display}
+                                </option>
+                              ))}
+                            </select>
+                           
+                          </div>
+                        ) : c.isItem ? (
+                          <div className="relative w-full">
+                            <div className="flex gap-2 items-center">
+                              <div className="flex-1 relative">
+                                <input
+                                  ref={el => itemInputRefs.current[r._id] = el}
+                                  type="text"
+                                  value={itemSearchQuery[r._id] || r[c.key] || ""}
+                                  onChange={(e) => handleItemSearch(r._id, e.target.value)}
+                                  onFocus={(e) => handleItemInputFocus(r._id, e)}
+                                  onBlur={() => handleItemInputBlur(r._id)}
+                                  className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                                  placeholder={`Search ${c.label}...`}
+                                  autoComplete="off"
+                                />
+                                {showItemDropdown[r._id] && (
+                                  <div 
+                                    ref={el => itemDropdownRef.current[r._id] = el}
+                                    className="fixed z-[10000] bg-white border border-slate-200 rounded-lg shadow-xl overflow-y-auto"
+                                    style={{
+                                      top: `${itemDropdownPosition.top}px`,
+                                      left: `${itemDropdownPosition.left}px`,
+                                      width: `${itemDropdownPosition.width}px`,
+                                      maxHeight: '300px'
+                                    }}
+                                  >
+                                    <div className="sticky top-0 bg-gray-50 px-3 py-2 text-xs font-semibold text-slate-600 border-b">
+                                      Select Product
+                                    </div>
+                                    {(filteredItems[r._id] || items).length > 0 ? (
+                                      (filteredItems[r._id] || items).map((item) => (
+                                        <div
+                                          key={item._id}
+                                          onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            handleSelectItem(r._id, item);
+                                          }}
+                                          className="px-3 py-2 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors"
+                                        >
+                                          <div className="font-medium text-slate-800 text-sm">
+                                            {item.itemName}
+                                          </div>
+                                          <div className="text-xs text-slate-500 mt-0.5">
+                                            Code: {item.itemCode} | Price: ₹{item.unitPrice}
+                                          </div>
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <div className="p-3 text-center text-sm text-slate-500">
+                                        No items found
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                             
+                            </div>
+                          </div>
+                        ) : c.options && !c.isDynamic && !c.isUOM && !c.isSKUSize && !c.isItem ? (
+                          <select
+                            value={r[c.key] || ""}
+                            onChange={(e) => handleChange(r._id, c.key, e.target.value)}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                          >
+                            <option value="">Select {c.label}</option>
+                            {c.options.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type={c.type || "text"}
+                            value={r[c.key] || ""}
+                            readOnly={c.readOnly}
+                            onChange={(e) => handleChange(r._id, c.key, e.target.value)}
+                            className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                              c.readOnly 
+                                ? 'bg-slate-100 text-slate-700' 
+                                : 'bg-white'
+                            }`}
+                            placeholder={c.readOnly ? "Auto-calculated" : `Enter ${c.label}`}
+                            step={c.type === "number" ? "0.001" : undefined}
+                          />
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className="border border-yellow-300 px-2 py-2">
+                    <div className="flex gap-2 justify-center">
+                      <button
+                        onClick={() => onDuplicate(r._id)}
+                        className="rounded-lg border border-yellow-500 bg-yellow-100 px-3 py-1.5 text-xs font-bold text-yellow-800 hover:bg-yellow-200 transition"
+                      >
+                        Duplicate
+                      </button>
+                      <button
+                        onClick={() => onRemove(r._id)}
+                        className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-600 transition"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })
           ) : (
             <tr>
               <td
-                colSpan={cols.length + 1}
+                colSpan={100}
                 className="border border-yellow-300 px-4 py-10 text-center text-slate-400 font-semibold"
               >
-                No rows yet. Click <b>Add Row</b> to add data.
+                No rows yet. Select a pack type and click <b>Add Row</b> to add data.
               </td>
             </tr>
           )}

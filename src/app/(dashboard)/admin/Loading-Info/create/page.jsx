@@ -10,6 +10,7 @@ const PACK_TYPES = [
   { key: "PALLETIZATION", label: "Palletization" },
   { key: "UNIFORM - BAGS/BOXES", label: "Uniform - Bags/Boxes" },
   { key: "LOOSE - CARGO", label: "Loose - Cargo" },
+  { key: "NON-UNIFORM - GENERAL CARGO", label: "Non-uniform - General Cargo" },
 ];
 
 const DELIVERY_OPTIONS = ["Urgent", "Normal", "Express", "Scheduled"];
@@ -109,12 +110,49 @@ function useVehicleSearch() {
     }
   };
 
-  // Auto-fetch on mount
   useEffect(() => {
     searchVehicles();
   }, []);
 
   return { vehicles, loading, error, searchVehicles, getVehicleById };
+}
+
+/* =======================
+  Owner Search Hook
+========================= */
+function useOwnerSearch() {
+  const [owners, setOwners] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const searchOwners = async (vehicleNumber = "") => {
+    setLoading(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem('token');
+      const url = vehicleNumber ? `/api/owners?search=${encodeURIComponent(vehicleNumber)}` : '/api/owners';
+      
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      
+      if (data.success && Array.isArray(data.data)) {
+        setOwners(data.data);
+      } else {
+        setOwners([]);
+        setError(data.message || 'No owners found');
+      }
+    } catch (err) {
+      console.error('Error fetching owners:', err);
+      setOwners([]);
+      setError('Failed to fetch owners');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { owners, loading, error, searchOwners };
 }
 
 /* =======================
@@ -131,7 +169,6 @@ function useVehicleNegotiation() {
     try {
       const token = localStorage.getItem('token');
       
-      // Fetch all vehicle negotiations
       const vnRes = await fetch('/api/vehicle-negotiation', {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -142,14 +179,12 @@ function useVehicleNegotiation() {
       
       const vnData = await vnRes.json();
       
-      // Fetch all loading info panels to see which VNNs are already used
       const loadingRes = await fetch('/api/loading-panel?format=table', {
         headers: { Authorization: `Bearer ${token}` },
       });
       
       const loadingData = await loadingRes.json();
       
-      // Create a Set of used VNNs
       const usedVnns = new Set();
       if (loadingData.success && Array.isArray(loadingData.data)) {
         loadingData.data.forEach(item => {
@@ -159,7 +194,6 @@ function useVehicleNegotiation() {
         });
       }
       
-      // Filter out VNNs that are already used in loading panels
       if (vnData.success && Array.isArray(vnData.data)) {
         const availableVNs = vnData.data.filter(vn => !usedVnns.has(vn.vnnNo));
         setNegotiations(availableVNs);
@@ -207,7 +241,6 @@ function useVehicleNegotiation() {
     }
   };
 
-  // Auto-fetch on mount
   useEffect(() => {
     fetchNegotiations();
   }, []);
@@ -216,7 +249,7 @@ function useVehicleNegotiation() {
 }
 
 /* =======================
-  Loading Info Hook - To check used VNNs
+  Loading Info Hook
 ========================= */
 function useLoadingInfo() {
   const [loadingInfos, setLoadingInfos] = useState([]);
@@ -247,7 +280,6 @@ function useLoadingInfo() {
     }
   };
 
-  // Auto-fetch on mount
   useEffect(() => {
     fetchLoadingInfos();
   }, []);
@@ -267,11 +299,21 @@ function defaultOrderRow() {
     plantName: "",
     orderType: "",
     pinCode: "",
-    state: "",
+    taluka: "",
+    talukaName: "",
     district: "",
+    districtName: "",
+    state: "",
+    stateName: "",
     from: "",
+    fromName: "",
     to: "",
+    toName: "",
     weight: "",
+    collectionCharges: "",
+    cancellationCharges: "",
+    loadingCharges: "",
+    otherCharges: "",
   };
 }
 
@@ -314,11 +356,25 @@ function defaultPackRow(packType) {
     };
   }
 
-  // LOOSE - CARGO
+  if (packType === "LOOSE - CARGO") {
+    return {
+      _id: uid(),
+      uom: "",
+      productName: "",
+      actualWt: "",
+      chargedWt: "",
+    };
+  }
+
+  // NON-UNIFORM - GENERAL CARGO
   return {
     _id: uid(),
-    uom: "",
+    nos: "",
     productName: "",
+    uom: "",
+    length: "",
+    width: "",
+    height: "",
     actualWt: "",
     chargedWt: "",
   };
@@ -328,16 +384,44 @@ function defaultPackRow(packType) {
   UI Components
 ========================= */
 
-// File upload item component
-function FileUploadItem({ file, onRemove, index, label }) {
+function FileUploadItem({ file, onRemove, index, label, isCameraPhoto = false, photoTime = null, isExisting = false }) {
+  const [imagePreview, setImagePreview] = useState(null);
+  
+  useEffect(() => {
+    if (file && file.type && file.type.startsWith('image/') && !isExisting) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  }, [file, isExisting]);
+
   return (
     <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 mt-1">
+      {imagePreview && !isExisting && (
+        <img src={imagePreview} alt="Preview" className="w-10 h-10 rounded object-cover" />
+      )}
+      {isExisting && (
+        <div className="w-10 h-10 bg-green-100 rounded flex items-center justify-center">
+          <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+      )}
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium text-slate-700 truncate">{file.name}</p>
-        <p className="text-xs text-slate-500">{(file.size / 1024).toFixed(1)} KB</p>
+        <p className="text-xs font-medium text-slate-700 truncate">
+          {isExisting ? (file.name || 'Existing Document') : file.name}
+        </p>
+        <p className="text-xs text-slate-500">
+          {isExisting ? 'Already uploaded' : `${(file.size / 1024).toFixed(1)} KB`}
+        </p>
+        {photoTime && (
+          <p className="text-xs text-green-600">Captured: {photoTime}</p>
+        )}
       </div>
       <button
-        onClick={() => onRemove(index)}
+        onClick={() => onRemove(index, isExisting)}
         className="text-red-500 hover:text-red-700 p-1"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -348,12 +432,7 @@ function FileUploadItem({ file, onRemove, index, label }) {
   );
 }
 
-// Vehicle Search Dropdown Component
-function VehicleSearchDropdown({ 
-  onSelect, 
-  placeholder = "Search vehicle...",
-  selectedVehicleId
-}) {
+function VehicleSearchDropdown({ onSelect, placeholder = "Search vehicle...", selectedVehicleId }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const [filteredVehicles, setFilteredVehicles] = useState([]);
@@ -486,15 +565,7 @@ function Select({ label, value, onChange, options = [], col = "", readOnly = fal
   );
 }
 
-function SearchableDropdown({ 
-  items, 
-  selectedId, 
-  onSelect, 
-  placeholder = "Search...",
-  displayField = 'name',
-  codeField = 'code',
-  disabled = false
-}) {
+function SearchableDropdown({ items, selectedId, onSelect, placeholder = "Search...", displayField = 'name', codeField = 'code', disabled = false }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredItems, setFilteredItems] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -582,16 +653,7 @@ function SearchableDropdown({
   );
 }
 
-function TableSearchableDropdown({ 
-  items, 
-  selectedId, 
-  onSelect, 
-  placeholder = "Search...",
-  displayField = 'name',
-  codeField = 'code',
-  disabled = false,
-  cellId = ""
-}) {
+function TableSearchableDropdown({ items, selectedId, onSelect, placeholder = "Search...", displayField = 'name', codeField = 'code', disabled = false, cellId = "" }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredItems, setFilteredItems] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -704,67 +766,85 @@ function TableSearchableDropdown({
 }
 
 function PackTypeTable({ packType, rows, onChange, onRemove, onDuplicate, onToggleUniform }) {
-  const cols = useMemo(() => {
-    if (packType === "PALLETIZATION") {
+  const getColumns = (type) => {
+    if (type === "PALLETIZATION") {
       return [
-        { key: "noOfPallets", label: "NO OF PALLETS", type: "number", options: null },
-        { key: "unitPerPallets", label: "UNIT PER PALLETS", type: "number", options: null },
-        { key: "totalPkgs", label: "TOTAL PKGS", type: "number", options: null, readOnly: true },
+        { key: "noOfPallets", label: "NO OF PALLETS", type: "number" },
+        { key: "unitPerPallets", label: "UNIT PER PALLETS", type: "number" },
+        { key: "totalPkgs", label: "TOTAL PKGS", type: "number", readOnly: true },
         { key: "pkgsType", label: "PKGS TYPE", type: "text", options: PKGS_TYPE_OPTIONS },
         { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
         { key: "skuSize", label: "SKU - SIZE", type: "text", options: SKU_SIZE_OPTIONS },
-        { key: "packWeight", label: "PACK - WEIGHT", type: "number", options: null },
+        { key: "packWeight", label: "PACK - WEIGHT", type: "number" },
         { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS },
-        { key: "wtLtr", label: "WT (LTR)", type: "number", options: null },
-        { key: "actualWt", label: "ACTUAL - WT", type: "number", options: null },
-        { key: "chargedWt", label: "CHARGED - WT", type: "number", options: null },
-        { key: "wtUom", label: "UOM", type: "text", options: UOM_OPTIONS },
+        { key: "wtLtr", label: "WT (LTR)", type: "number", readOnly: true },
+        { key: "actualWt", label: "ACTUAL - WT", type: "number", readOnly: true },
+        { key: "chargedWt", label: "CHARGED - WT", type: "number" },
+        { key: "wtUom", label: "WT UOM", type: "text", readOnly: true },
       ];
     }
 
-    if (packType === "UNIFORM - BAGS/BOXES") {
+    if (type === "UNIFORM - BAGS/BOXES") {
       return [
-        { key: "totalPkgs", label: "TOTAL PKGS", type: "number", options: null },
+        { key: "totalPkgs", label: "TOTAL PKGS", type: "number" },
         { key: "pkgsType", label: "PKGS TYPE", type: "text", options: PKGS_TYPE_OPTIONS },
         { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
         { key: "skuSize", label: "SKU - SIZE", type: "text", options: SKU_SIZE_OPTIONS },
-        { key: "packWeight", label: "PACK - WEIGHT", type: "number", options: null },
+        { key: "packWeight", label: "PACK - WEIGHT", type: "number" },
         { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS },
-        { key: "wtLtr", label: "WT (LTR)", type: "number", options: null },
-        { key: "actualWt", label: "ACTUAL - WT", type: "number", options: null },
-        { key: "chargedWt", label: "CHARGED - WT", type: "number", options: null },
-        { key: "wtUom", label: "UOM", type: "text", options: UOM_OPTIONS },
+        { key: "wtLtr", label: "WT (LTR)", type: "number", readOnly: true },
+        { key: "actualWt", label: "ACTUAL - WT", type: "number", readOnly: true },
+        { key: "chargedWt", label: "CHARGED - WT", type: "number" },
+        { key: "wtUom", label: "WT UOM", type: "text", readOnly: true },
       ];
     }
 
+    if (type === "LOOSE - CARGO") {
+      return [
+        { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
+        { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS },
+        { key: "actualWt", label: "ACTUAL - WT", type: "number" },
+        { key: "chargedWt", label: "CHARGED - WT", type: "number" },
+      ];
+    }
+
+    // NON-UNIFORM - GENERAL CARGO
     return [
-      { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
+      { key: "nos", label: "NOS", type: "number" },
       { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS },
-      { key: "actualWt", label: "ACTUAL - WT", type: "number", options: null },
-      { key: "chargedWt", label: "CHARGED - WT", type: "number", options: null },
+      { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
+      { key: "length", label: "LENGTH", type: "number" },
+      { key: "width", label: "WIDTH", type: "number" },
+      { key: "height", label: "HEIGHT", type: "number" },
+      { key: "actualWt", label: "ACTUAL - WT", type: "number" },
+      { key: "chargedWt", label: "CHARGED - WT", type: "number" },
     ];
-  }, [packType]);
-
-  const handleChange = (rowId, key, value) => {
-    onChange(rowId, key, value);
   };
+
+  const cols = useMemo(() => getColumns(packType), [packType]);
+
+  if (!rows || rows.length === 0) {
+    return (
+      <div className="overflow-auto rounded-xl border border-yellow-300">
+        <div className="p-8 text-center text-slate-400">
+          No rows yet. Click <b>Add Row</b> to add data.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="overflow-auto rounded-xl border border-yellow-300">
       <table className="min-w-full w-full text-sm">
         <thead className="sticky top-0 bg-yellow-400">
           <tr>
-            {packType === "PALLETIZATION" && (
-              <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
-                UNIFORM
-              </th>
-            )}
             {cols.map((c) => (
               <th
                 key={c.key}
                 className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
               >
                 {c.label}
+                {c.readOnly && <span className="ml-1 text-xs text-blue-600">*Auto</span>}
               </th>
             ))}
             <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
@@ -772,90 +852,66 @@ function PackTypeTable({ packType, rows, onChange, onRemove, onDuplicate, onTogg
             </th>
           </tr>
         </thead>
-
         <tbody>
-          {rows && rows.length > 0 ? (
-            rows.map((r) => (
-              <tr key={r._id} className="hover:bg-yellow-50 even:bg-slate-50">
-                {packType === "PALLETIZATION" && (
-                  <td className="border border-yellow-300 px-2 py-2 text-center">
+          {rows.map((r) => (
+            <tr key={r._id} className="hover:bg-yellow-50 even:bg-slate-50">
+              {cols.map((c) => (
+                <td key={c.key} className="border border-yellow-300 px-2 py-2">
+                  {c.options ? (
+                    <select
+                      value={r[c.key] || ""}
+                      onChange={(e) => onChange(r._id, c.key, e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                    >
+                      <option value="">Select {c.label}</option>
+                      {c.options.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
                     <input
-                      type="checkbox"
-                      checked={r.isUniform || false}
-                      onChange={() => onToggleUniform(r._id)}
-                      className="h-4 w-4 rounded border-yellow-300 text-yellow-600 focus:ring-yellow-500"
+                      type={c.type || "text"}
+                      value={r[c.key] || ""}
+                      readOnly={c.readOnly}
+                      onChange={(e) => onChange(r._id, c.key, e.target.value)}
+                      className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                        c.readOnly ? 'bg-slate-50' : 'bg-white'
+                      }`}
+                      placeholder={`Enter ${c.label}`}
+                      step={c.type === "number" ? "0.001" : undefined}
                     />
-                  </td>
-                )}
-                
-                {cols.map((c) => (
-                  <td key={c.key} className="border border-yellow-300 px-2 py-2">
-                    {c.options ? (
-                      <select
-                        value={r[c.key] || ""}
-                        onChange={(e) => handleChange(r._id, c.key, e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                      >
-                        <option value="">Select {c.label}</option>
-                        {c.options.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        type={c.type || "text"}
-                        value={r[c.key] || ""}
-                        readOnly={c.readOnly}
-                        onChange={(e) => handleChange(r._id, c.key, e.target.value)}
-                        className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${c.readOnly ? 'bg-slate-50' : 'bg-white'}`}
-                        placeholder={`Enter ${c.label}`}
-                      />
-                    )}
-                  </td>
-                ))}
-                <td className="border border-yellow-300 px-2 py-2">
-                  <div className="flex gap-2 justify-center">
-                    <button
-                      onClick={() => onDuplicate(r._id)}
-                      className="rounded-lg border border-yellow-500 bg-yellow-100 px-3 py-1.5 text-xs font-bold text-yellow-800 hover:bg-yellow-200 transition"
-                    >
-                      Duplicate
-                    </button>
-                    <button
-                      onClick={() => onRemove(r._id)}
-                      className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-600 transition"
-                    >
-                      Remove
-                    </button>
-                  </div>
+                  )}
                 </td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td
-                colSpan={cols.length + (packType === "PALLETIZATION" ? 2 : 1)}
-                className="border border-yellow-300 px-4 py-10 text-center text-slate-400 font-semibold"
-              >
-                No rows yet. Click <b>Add Row</b> to add data.
+              ))}
+              <td className="border border-yellow-300 px-2 py-2">
+                <div className="flex gap-2 justify-center">
+                  <button
+                    onClick={() => onDuplicate(r._id)}
+                    className="rounded-lg border border-yellow-500 bg-yellow-100 px-3 py-1.5 text-xs font-bold text-yellow-800 hover:bg-yellow-200 transition"
+                  >
+                    Duplicate
+                  </button>
+                  <button
+                    onClick={() => onRemove(r._id)}
+                    className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-600 transition"
+                  >
+                    Remove
+                  </button>
+                </div>
               </td>
             </tr>
-          )}
+          ))}
         </tbody>
         <tfoot className="bg-yellow-100">
           <tr>
-            <td
-              colSpan={packType === "PALLETIZATION" ? cols.length + 1 : cols.length}
-              className="border border-yellow-300 px-3 py-2 text-right font-bold"
-            >
+            <td colSpan={cols.length} className="border border-yellow-300 px-3 py-2 text-right font-bold">
               Total Actual Weight:
             </td>
             <td className="border border-yellow-300 px-3 py-2 font-bold">
               {rows.reduce((sum, r) => sum + num(r.actualWt), 0).toFixed(2)}
             </td>
-            <td className="border border-yellow-300 px-3 py-2"></td>
           </tr>
         </tfoot>
       </table>
@@ -878,14 +934,40 @@ export default function CreateLoadingInfoPanel() {
   const [uploading, setUploading] = useState(false);
   const [apiError, setApiError] = useState(null);
   const [fetchingNegotiationData, setFetchingNegotiationData] = useState(false);
+  const [isReadOnly, setIsReadOnly] = useState(false);
 
   /** =========================
-   * VEHICLE SEARCH STATE
+   * SEARCH HOOKS
    ========================= */
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const vehicleSearch = useVehicleSearch();
   const vehicleNegotiation = useVehicleNegotiation();
   const loadingInfo = useLoadingInfo();
+  const ownerSearch = useOwnerSearch();
+
+  const [vehiclePhotoFiles, setVehiclePhotoFiles] = useState([]);
+  const [detentionDays, setDetentionDays] = useState("");
+  const [detentionNumber, setDetentionNumber] = useState("");
+  const [loadedVehicleSlipFiles, setLoadedVehicleSlipFiles] = useState([]);
+
+  /** =========================
+   * EXISTING FILES STATE
+   ========================= */
+  const [existingFiles, setExistingFiles] = useState({
+    vehicle: {
+      rc: [],
+      pan: [],
+      license: [],
+      photo: []
+    },
+    vbp: {},
+    vft: {},
+    vot: {},
+    vl: {},
+    weighment: {
+      weighSlip: []
+    }
+  });
 
   /** =========================
    * VEHICLE NEGOTIATION SEARCH STATE
@@ -895,6 +977,14 @@ export default function CreateLoadingInfoPanel() {
   const [filteredVehicleNegotiations, setFilteredVehicleNegotiations] = useState([]);
   const [selectedVehicleNegotiation, setSelectedVehicleNegotiation] = useState(null);
   const vehicleNegotiationDropdownRef = useRef(null);
+
+  const [hasHelper, setHasHelper] = useState(false);
+  const [helperInfo, setHelperInfo] = useState({
+    name: "",
+    mobileNo: "",
+    photo: [],
+    aadharPhoto: []
+  });
 
   /** =========================
    * HEADER STATE
@@ -915,6 +1005,47 @@ export default function CreateLoadingInfoPanel() {
     loadingCharges: "",
     otherCharges: "",
   });
+
+  const handleVehiclePhotoSelect = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.multiple = true;
+    
+    input.onchange = async (e) => {
+      const files = Array.from(e.target.files);
+      const newTotalPhotos = vehiclePhotoFiles.length + files.length;
+      if (newTotalPhotos > 10) {
+        alert("Maximum 10 vehicle photos allowed!");
+        return;
+      }
+      setVehiclePhotoFiles(prev => [...prev, ...files]);
+    };
+    
+    input.click();
+  };
+
+  const removeVehiclePhoto = (index) => {
+    setVehiclePhotoFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleLoadedVehicleSlipSelect = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*,.pdf';
+    input.multiple = true;
+    
+    input.onchange = async (e) => {
+      const files = Array.from(e.target.files);
+      setLoadedVehicleSlipFiles(prev => [...prev, ...files]);
+    };
+    
+    input.click();
+  };
+
+  const removeLoadedVehicleSlip = (index) => {
+    setLoadedVehicleSlipFiles(prev => prev.filter((_, i) => i !== index));
+  };
 
   /** =========================
    * ORDERS TABLE STATE
@@ -956,6 +1087,7 @@ export default function CreateLoadingInfoPanel() {
     PALLETIZATION: [defaultPackRow("PALLETIZATION")],
     "UNIFORM - BAGS/BOXES": [defaultPackRow("UNIFORM - BAGS/BOXES")],
     "LOOSE - CARGO": [defaultPackRow("LOOSE - CARGO")],
+    "NON-UNIFORM - GENERAL CARGO": [defaultPackRow("NON-UNIFORM - GENERAL CARGO")],
   });
 
   /** =========================
@@ -965,7 +1097,7 @@ export default function CreateLoadingInfoPanel() {
   const [totalQuantity, setTotalQuantity] = useState("");
 
   /** =========================
-   * UPLOAD SECTIONS STATE (Stores File objects temporarily)
+   * UPLOAD SECTIONS STATE
    ========================= */
   const [vbpFiles, setVbpFiles] = useState({
     vbp1: [], vbp2: [], vbp3: [], vbp4: [],
@@ -988,7 +1120,7 @@ export default function CreateLoadingInfoPanel() {
   });
 
   const [vehicleFiles, setVehicleFiles] = useState({
-    rc: [], pan: [], license: [], photo: []
+    rc: [], pan: [], license: [], photo: [], aadhar: []
   });
 
   const [weighmentFiles, setWeighmentFiles] = useState({
@@ -996,7 +1128,7 @@ export default function CreateLoadingInfoPanel() {
   });
 
   /** =========================
-   * UPLOAD SECTIONS STATE (For approvals and remarks) - READ ONLY
+   * UPLOAD SECTIONS STATE (For approvals and remarks)
    ========================= */
   const [vbpUploads, setVbpUploads] = useState({
     approval: "",
@@ -1011,11 +1143,10 @@ export default function CreateLoadingInfoPanel() {
     approval: "",
   });
 
-  const [vlUploads, setVlUploads] = useState({
-    approval: "",
-    loadingStatus: "",
-  });
-
+ const [vlUploads, setVlUploads] = useState({
+  approval: "",
+  loadingStatus: "Not Loaded",  // Change from "" to "Not Loaded"
+});
   const [loadedWeighment, setLoadedWeighment] = useState({
     approval: "",
     loadingCharges: "",
@@ -1039,7 +1170,16 @@ export default function CreateLoadingInfoPanel() {
   const [arrivalDetails, setArrivalDetails] = useState({
     date: new Date().toISOString().split('T')[0],
     time: "",
+    outTime: "",
   });
+
+  /** =========================
+   * CAMERA PHOTO CAPTURE STATE
+   ========================= */
+  const [showCamera, setShowCamera] = useState(false);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const [stream, setStream] = useState(null);
 
   /** =========================
    * FETCH DATA FROM APIs
@@ -1050,6 +1190,101 @@ export default function CreateLoadingInfoPanel() {
     fetchOrders();
     vehicleSearch.searchVehicles();
   }, []);
+
+  // Owner Search Dropdown Component
+  function OwnerSearchDropdown({ onSelect, placeholder = "Search owner..." }) {
+    const [searchQuery, setSearchQuery] = useState("");
+    const [showDropdown, setShowDropdown] = useState(false);
+    const [filteredOwners, setFilteredOwners] = useState([]);
+    const [owners, setOwners] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const dropdownRef = useRef(null);
+
+    const fetchOwners = async (query = "") => {
+      setLoading(true);
+      try {
+        const token = localStorage.getItem('token');
+        const url = query ? `/api/owners?search=${encodeURIComponent(query)}` : '/api/owners';
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          setOwners(data.data);
+          setFilteredOwners(data.data);
+        }
+      } catch (err) {
+        console.error("Error fetching owners:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    useEffect(() => {
+      fetchOwners();
+    }, []);
+
+    const handleSearch = (query) => {
+      setSearchQuery(query);
+      if (!query.trim()) {
+        setFilteredOwners(owners);
+      } else {
+        const filtered = owners.filter(owner =>
+          owner.ownerName?.toLowerCase().includes(query.toLowerCase()) ||
+          owner.vehicleNumber?.toLowerCase().includes(query.toLowerCase()) ||
+          owner.rcNumber?.toLowerCase().includes(query.toLowerCase())
+        );
+        setFilteredOwners(filtered);
+      }
+      if (!showDropdown) setShowDropdown(true);
+    };
+
+    const handleSelectOwner = (owner) => {
+      setSearchQuery(owner.ownerName);
+      setShowDropdown(false);
+      onSelect(owner);
+    };
+
+    return (
+      <div className="relative w-full" ref={dropdownRef}>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => handleSearch(e.target.value)}
+          onFocus={() => setShowDropdown(true)}
+          onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+          placeholder={placeholder}
+          autoComplete="off"
+        />
+        {showDropdown && (
+          <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+            {loading ? (
+              <div className="p-3 text-center text-sm text-slate-500">Loading owners...</div>
+            ) : filteredOwners.length > 0 ? (
+              filteredOwners.map((owner) => (
+                <div
+                  key={owner._id}
+                  onMouseDown={() => handleSelectOwner(owner)}
+                  className="p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100"
+                >
+                  <div className="font-medium text-slate-800">{owner.ownerName}</div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    Vehicle: {owner.vehicleNumber} | RC: {owner.rcNumber || 'N/A'}
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    Mobile: {owner.mobileNumber1 || owner.mobileNumber2 || 'N/A'}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-3 text-center text-sm text-slate-500">No owners found</div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const fetchBranches = async () => {
     setLoading(true);
@@ -1140,35 +1375,152 @@ export default function CreateLoadingInfoPanel() {
   };
 
   /** =========================
-   * VEHICLE SELECT HANDLER
+   * CAMERA FUNCTIONS
    ========================= */
-  const handleVehicleSelect = (vehicle) => {
-    setSelectedVehicle(vehicle);
-    
-    setVehicleInfo({
-      ...vehicleInfo,
-      vehicleNo: vehicle.vehicleNumber || "",
-      vehicleOwnerName: vehicle.ownerName || "",
-      vehicleOwnerRC: vehicle.rcNumber || "",
-      ownerPanCard: vehicle.panCard || "",
-      vehicleType: vehicle.vehicleType || "",
-      vehicleWeight: vehicle.vehicleWeight || "",
-      insuranceNumber: vehicle.insuranceNumber || "",
-      chasisNumber: vehicle.chasisNumber || "",
-      fitnessNumber: vehicle.fitnessNumber || "",
-      pucNumber: vehicle.pucNumber || "",
-      vehicleId: vehicle._id || "",
-      driverName: vehicle.driverName || vehicleInfo.driverName,
-      driverMobileNo: vehicle.driverMobile || vehicleInfo.driverMobileNo,
-      drivingLicense: vehicle.drivingLicense || vehicleInfo.drivingLicense,
-    });
+  const startCamera = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      setStream(mediaStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+      setShowCamera(true);
+    } catch (err) {
+      console.error("Error accessing camera:", err);
+      alert("Unable to access camera. Please check permissions.");
+    }
+  };
 
-    alert(`✅ Vehicle ${vehicle.vehicleNumber} loaded successfully`);
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    setShowCamera(false);
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      canvas.toBlob((blob) => {
+        const now = new Date();
+        const timestamp = now.toLocaleString();
+        const filename = `driver_photo_${now.getTime()}.jpg`;
+        const file = new File([blob], filename, { type: 'image/jpeg' });
+        
+        setVehicleFiles(prev => ({
+          ...prev,
+          photo: [...prev.photo, file]
+        }));
+        
+        setArrivalDetails({
+          date: now.toISOString().split('T')[0],
+          time: now.toLocaleTimeString(),
+          outTime: arrivalDetails.outTime,
+        });
+        
+        alert(`✅ Driver photo captured successfully!\n📅 Date: ${now.toLocaleDateString()}\n⏰ Time: ${now.toLocaleTimeString()}`);
+        
+        stopCamera();
+      }, 'image/jpeg', 0.9);
+    }
   };
 
   /** =========================
-   * CREATE VEHICLE FUNCTION
+   * GENERATE LR FUNCTION - Auto-fills Out Time and Date
    ========================= */
+  const handleGenerateLR = () => {
+    const now = new Date();
+    const outTime = now.toLocaleTimeString();
+    const outDate = now.toISOString().split('T')[0];
+    
+    setArrivalDetails(prev => ({
+      ...prev,
+      date: outDate,
+      outTime: outTime,
+    }));
+    
+    alert(`✅ Consignment Note (LR) Generated!\n📅 Out Date: ${outDate}\n⏰ Out Time: ${outTime}`);
+  };
+
+  /** =========================
+   * VEHICLE SELECT HANDLER
+   ========================= */
+const handleVehicleSelect = async (vehicle) => {
+  setSelectedVehicle(vehicle);
+  
+  // Auto-fill vehicle information from Vehicle Master
+  setVehicleInfo(prev => ({
+    ...prev,
+    vehicleNo: vehicle.vehicleNumber || "",
+    vehicleOwnerName: "",
+    vehicleOwnerRC: "",
+    ownerPanCard: "",
+    vehicleType: vehicle.vehicleType || "",
+    vehicleWeight: vehicle.vehicleWeight?.toString() || "",
+    vehicleId: vehicle._id || "",
+    insuranceNumber: vehicle.insuranceNumber || "",
+    chasisNumber: vehicle.chasisNumber || "",
+    fitnessNumber: vehicle.fitnessNumber || "",
+    pucNumber: vehicle.pucNumber || "",
+    // DO NOT auto-fill driver fields - keep them as is
+    // driverName, driverMobileNo, drivingLicense remain unchanged
+  }));
+
+  // Search for owner by vehicle number from Owner Master (only for owner details, not driver)
+  if (vehicle.vehicleNumber) {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/owners?search=${encodeURIComponent(vehicle.vehicleNumber)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      
+      if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+        const owner = data.data[0];
+        
+        // Only auto-fill OWNER details, NOT driver details
+        setVehicleInfo(prev => ({
+          ...prev,
+          vehicleOwnerName: owner.ownerName || "",
+          vehicleOwnerRC: owner.rcNumber || "",
+          ownerPanCard: owner.ownerPanCard || "",
+          // Message & Remarks - add owner info as reference but user can edit
+          message: `Vehicle Owner: ${owner.ownerName}\nContact: ${owner.mobileNumber1 || owner.mobileNumber2}\nRC Number: ${owner.rcNumber || ''}`,
+          remarks: `Pan Card: ${owner.ownerPanCard || 'N/A'}\nAdhar Card: ${owner.adharCardNumber || 'N/A'}`
+        }));
+        
+        // Set existing documents for owner
+        setExistingFiles(prev => ({
+          ...prev,
+          vehicle: {
+            ...prev.vehicle,
+            rc: owner.rcDocuments?.map(doc => ({ name: 'RC Document', path: doc })) || [],
+            pan: owner.panCardDocuments?.map(doc => ({ name: 'PAN Document', path: doc })) || [],
+          }
+        }));
+        
+        alert(`✅ Vehicle ${vehicle.vehicleNumber} loaded successfully!\nOwner: ${owner.ownerName}`);
+      } else {
+        alert(`✅ Vehicle ${vehicle.vehicleNumber} loaded successfully!`);
+      }
+    } catch (err) {
+      console.error("Error fetching owner:", err);
+      alert(`✅ Vehicle ${vehicle.vehicleNumber} loaded successfully!`);
+    }
+  } else {
+    alert(`✅ Vehicle loaded successfully!`);
+  }
+};
+
   const handleCreateVehicle = () => {
     router.push('/admin/vehicle2');
   };
@@ -1191,306 +1543,208 @@ export default function CreateLoadingInfoPanel() {
     }
   };
 
-const handleSelectVehicleNegotiation = async (negotiation) => {
-  setSelectedVehicleNegotiation(negotiation);
-  setVehicleNegotiationNo(negotiation.vnnNo);
-  setShowVehicleNegotiationDropdown(false);
-  setFetchingNegotiationData(true);
-  
-  try {
-    // Fetch full negotiation details
-    const fullNegotiation = await vehicleNegotiation.getNegotiationById(negotiation._id);
+  const handleSelectVehicleNegotiation = async (negotiation) => {
+    setSelectedVehicleNegotiation(negotiation);
+    setVehicleNegotiationNo(negotiation.vnnNo);
+    setShowVehicleNegotiationDropdown(false);
+    setFetchingNegotiationData(true);
     
-    console.log("===== FULL NEGOTIATION DATA =====");
-    console.log("Full Negotiation:", fullNegotiation);
-    
-    if (fullNegotiation) {
-      // Auto-fill header with negotiation data
-      setHeader({
-        ...header,
-        vehicleNegotiationNo: negotiation.vnnNo,
-        branch: fullNegotiation.branch || "",
-        branchName: fullNegotiation.branchName || "",
-        branchCode: fullNegotiation.branchCode || "",
-        delivery: fullNegotiation.delivery || "",
-        billingType: fullNegotiation.billingType || "",
-        noOfLoadingPoints: fullNegotiation.loadingPoints?.toString() || "",
-        noOfDroppingPoint: fullNegotiation.dropPoints?.toString() || "",
-        collectionCharges: fullNegotiation.collectionCharges?.toString() || "",
-        cancellationCharges: fullNegotiation.cancellationCharges || "",
-        loadingCharges: fullNegotiation.loadingCharges || "",
-        otherCharges: fullNegotiation.otherCharges || "",
-      });
-
-      // Auto-fill vehicle information from the negotiation
-      if (fullNegotiation.vehicleInfo) {
-        const vInfo = fullNegotiation.vehicleInfo;
-        setVehicleInfo({
-          ...vehicleInfo,
-          vehicleNo: vInfo.vehicleNo || "",
-          driverMobileNo: vInfo.driverMobileNo || "",
-          driverName: vInfo.driverName || "",
-          drivingLicense: vInfo.drivingLicense || "",
-          vehicleWeight: vInfo.vehicleWeight?.toString() || "",
-          vehicleOwnerName: vInfo.vehicleOwnerName || "",
-          vehicleOwnerRC: vInfo.vehicleOwnerRC || "",
-          ownerPanCard: vInfo.ownerPanCard || "",
-          verified: vInfo.verified || false,
-          vehicleType: vInfo.vehicleType || "",
-          message: vInfo.message || "",
-          remarks: vInfo.remarks || "",
-          rcDocument: vInfo.rcDocument || "",
-          panDocument: vInfo.panDocument || "",
-          licenseDocument: vInfo.licenseDocument || "",
-          driverPhoto: vInfo.driverPhoto || "",
-          vehicleId: vInfo.vehicleId || "",
-          insuranceNumber: vInfo.insuranceNumber || "",
-          chasisNumber: vInfo.chasisNumber || "",
-          fitnessNumber: vInfo.fitnessNumber || "",
-          pucNumber: vInfo.pucNumber || ""
+    try {
+      const fullNegotiation = await vehicleNegotiation.getNegotiationById(negotiation._id);
+      
+      if (fullNegotiation) {
+        setHeader({
+          ...header,
+          vehicleNegotiationNo: negotiation.vnnNo,
+          branch: fullNegotiation.branch || "",
+          branchName: fullNegotiation.branchName || "",
+          branchCode: fullNegotiation.branchCode || "",
+          delivery: fullNegotiation.delivery || "",
+          billingType: fullNegotiation.billingType || "",
+          noOfLoadingPoints: fullNegotiation.loadingPoints?.toString() || "",
+          noOfDroppingPoint: fullNegotiation.dropPoints?.toString() || "",
+          collectionCharges: fullNegotiation.collectionCharges?.toString() || "",
+          cancellationCharges: fullNegotiation.cancellationCharges || "",
+          loadingCharges: fullNegotiation.loadingCharges || "",
+          otherCharges: fullNegotiation.otherCharges || "",
         });
-      }
 
-      // Auto-fill orders from the negotiation
-      if (fullNegotiation.orders && fullNegotiation.orders.length > 0) {
-        console.log("Orders found:", fullNegotiation.orders);
-        const newOrderRows = fullNegotiation.orders.map(order => ({
-          _id: uid(),
-          orderNo: order.orderNo || "",
-          partyName: order.partyName || fullNegotiation.customerName || "",
-          plantCode: order.plantCode || "",
-          plantName: order.plantName || "",
-          orderType: order.orderType || "",
-          pinCode: order.pinCode || "",
-          state: order.stateName || order.state || "",
-          district: order.districtName || order.district || "",
-          from: order.fromName || order.from || "",
-          to: order.toName || order.to || "",
-          weight: order.weight?.toString() || "",
-        }));
-        
-        setOrderRows(newOrderRows);
-      }
-
-      // ===== FETCH PACK DATA FROM ORIGINAL ORDER PANELS USING ORDER NUMBERS =====
-      console.log("===== FETCHING PACK DATA FROM ORDER PANELS =====");
-      
-      // Initialize merged pack data structure
-      let mergedPackData = {
-        PALLETIZATION: [],
-        'UNIFORM - BAGS/BOXES': [],
-        'LOOSE - CARGO': []
-      };
-      
-      let packDataFound = false;
-      const token = localStorage.getItem('token');
-      
-      if (fullNegotiation.orders && fullNegotiation.orders.length > 0) {
-        console.log(`Processing ${fullNegotiation.orders.length} orders for pack data`);
-        
-        // First, fetch all order panels once (optimization)
-        console.log("Fetching all order panels...");
-        const allOrdersRes = await fetch('/api/order-panel', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        
-        if (allOrdersRes.ok) {
-          const allOrdersData = await allOrdersRes.json();
+        if (fullNegotiation.approval) {
+          const vehicleNumber = fullNegotiation.approval.vehicleNo || "";
+          const mobileNumber = fullNegotiation.approval.mobile || "";
           
-          if (allOrdersData.success && allOrdersData.data) {
-            console.log(`Found ${allOrdersData.data.length} total order panels`);
-            
-            // Create a map for faster lookup
-            const orderPanelMap = {};
-            allOrdersData.data.forEach(op => {
-              orderPanelMap[op.orderPanelNo] = op._id;
+          setVehicleInfo(prev => ({
+            ...prev,
+            vehicleNo: vehicleNumber,
+            driverMobileNo: mobileNumber,
+            driverName: fullNegotiation.approval.driverName || prev.driverName,
+            drivingLicense: fullNegotiation.approval.drivingLicense || prev.drivingLicense,
+            vehicleWeight: fullNegotiation.approval.vehicleWeight?.toString() || "",
+            vehicleOwnerName: fullNegotiation.approval.vendorName || "",
+            vehicleOwnerRC: fullNegotiation.approval.vehicleRC || "",
+            ownerPanCard: fullNegotiation.approval.panCard || "",
+            verified: fullNegotiation.approval.verified || false,
+            vehicleType: fullNegotiation.approval.vehicleType || "",
+            message: fullNegotiation.approval.message || "",
+            remarks: fullNegotiation.approval.remarks || "",
+            vehicleId: fullNegotiation.approval.vehicleId || "",
+            insuranceNumber: fullNegotiation.approval.insuranceNumber || "",
+            chasisNumber: fullNegotiation.approval.chasisNumber || "",
+            fitnessNumber: fullNegotiation.approval.fitnessNumber || "",
+            pucNumber: fullNegotiation.approval.pucNumber || ""
+          }));
+          
+          if (vehicleNumber) {
+            setSelectedVehicle({
+              _id: fullNegotiation.approval.vehicleId,
+              vehicleNumber: vehicleNumber,
+              ownerName: fullNegotiation.approval.vendorName || ""
             });
+          }
+        }
+
+        if (fullNegotiation.orders && fullNegotiation.orders.length > 0) {
+          const newOrderRows = fullNegotiation.orders.map(order => ({
+            _id: uid(),
+            orderNo: order.orderNo || "",
+            partyName: order.partyName || fullNegotiation.customerName || "",
+            plantCode: order.plantCode || "",
+            plantName: order.plantName || "",
+            orderType: order.orderType || "",
+            pinCode: order.pinCode || "",
+            taluka: order.talukaName || order.taluka || "",
+            talukaName: order.talukaName || order.taluka || "",
+            district: order.districtName || order.district || "",
+            districtName: order.districtName || order.district || "",
+            state: order.stateName || order.state || "",
+            stateName: order.stateName || order.state || "",
+            from: order.fromName || order.from || "",
+            fromName: order.fromName || order.from || "",
+            to: order.toName || order.to || "",
+            toName: order.toName || order.to || "",
+            weight: order.weight?.toString() || "",
+            collectionCharges: order.collectionCharges?.toString() || "",
+            cancellationCharges: order.cancellationCharges || "",
+            loadingCharges: order.loadingCharges || "",
+            otherCharges: order.otherCharges?.toString() || "",
+          }));
+          setOrderRows(newOrderRows);
+        }
+
+        // Fetch pack data from selected order panels
+        let mergedPackData = {
+          PALLETIZATION: [],
+          'UNIFORM - BAGS/BOXES': [],
+          'LOOSE - CARGO': [],
+          'NON-UNIFORM - GENERAL CARGO': []
+        };
+
+        let packDataFound = false;
+        const token = localStorage.getItem('token');
+        const selectedOrderPanels = fullNegotiation.selectedOrderPanels || [];
+
+        if (selectedOrderPanels.length > 0) {
+          for (const panel of selectedOrderPanels) {
+            const orderPanelId = panel._id;
+            const orderPanelNo = panel.orderPanelNo;
             
-            // Process each order from the negotiation
-            for (let i = 0; i < fullNegotiation.orders.length; i++) {
-              const order = fullNegotiation.orders[i];
-              const orderNo = order.orderNo; // Like "OP-0006"
-              
-              if (orderNo) {
-                console.log(`\n----- Processing Order ${i+1}: ${orderNo} -----`);
+            if (orderPanelId) {
+              try {
+                const orderRes = await fetch(`/api/order-panel?id=${orderPanelId}`, {
+                  headers: { Authorization: `Bearer ${token}` },
+                });
                 
-                // Find the order panel ID from our map
-                const orderPanelId = orderPanelMap[orderNo];
-                
-                if (orderPanelId) {
-                  console.log(`✅ Found matching order panel for ${orderNo}, ID: ${orderPanelId}`);
+                if (orderRes.ok) {
+                  const orderData = await orderRes.json();
                   
-                  // Fetch the full order panel details using its ID
-                  try {
-                    const fullOrderRes = await fetch(`/api/order-panel?id=${orderPanelId}`, {
-                      headers: { Authorization: `Bearer ${token}` },
-                    });
+                  if (orderData.success && orderData.data && orderData.data.packData) {
+                    const orderPackData = orderData.data.packData;
+                    packDataFound = true;
                     
-                    if (fullOrderRes.ok) {
-                      const fullOrderData = await fullOrderRes.json();
-                      
-                      if (fullOrderData.success && fullOrderData.data) {
-                        const orderPanel = fullOrderData.data;
-                        
-                        // Check if the order panel has packData
-                        if (orderPanel.packData) {
-                          console.log(`✅ Order ${orderNo} HAS packData!`);
-                          packDataFound = true;
-                          
-                          // Process PALLETIZATION data - APPEND to merged data
-                          if (orderPanel.packData.PALLETIZATION && orderPanel.packData.PALLETIZATION.length > 0) {
-                            console.log(`Found ${orderPanel.packData.PALLETIZATION.length} PALLETIZATION rows in order ${orderNo}`);
-                            const newPalletRows = orderPanel.packData.PALLETIZATION.map(item => ({
-                              _id: uid(),
-                              noOfPallets: item.noOfPallets?.toString() || "",
-                              unitPerPallets: item.unitPerPallets?.toString() || "",
-                              totalPkgs: item.totalPkgs?.toString() || "",
-                              pkgsType: item.pkgsType || "",
-                              uom: item.uom || "",
-                              skuSize: item.skuSize || "",
-                              packWeight: item.packWeight?.toString() || "",
-                              productName: item.productName || "",
-                              wtLtr: item.wtLtr?.toString() || "",
-                              actualWt: item.actualWt?.toString() || "",
-                              chargedWt: item.chargedWt?.toString() || "",
-                              wtUom: item.wtUom || "",
-                              isUniform: item.isUniform || false,
-                            }));
-                            mergedPackData.PALLETIZATION = [...mergedPackData.PALLETIZATION, ...newPalletRows];
-                          }
-                          
-                          // Process UNIFORM - BAGS/BOXES data - APPEND to merged data
-                          if (orderPanel.packData['UNIFORM - BAGS/BOXES'] && orderPanel.packData['UNIFORM - BAGS/BOXES'].length > 0) {
-                            console.log(`Found ${orderPanel.packData['UNIFORM - BAGS/BOXES'].length} UNIFORM rows in order ${orderNo}`);
-                            const newUniformRows = orderPanel.packData['UNIFORM - BAGS/BOXES'].map(item => ({
-                              _id: uid(),
-                              totalPkgs: item.totalPkgs?.toString() || "",
-                              pkgsType: item.pkgsType || "",
-                              uom: item.uom || "",
-                              skuSize: item.skuSize || "",
-                              packWeight: item.packWeight?.toString() || "",
-                              productName: item.productName || "",
-                              wtLtr: item.wtLtr?.toString() || "",
-                              actualWt: item.actualWt?.toString() || "",
-                              chargedWt: item.chargedWt?.toString() || "",
-                              wtUom: item.wtUom || "",
-                            }));
-                            mergedPackData['UNIFORM - BAGS/BOXES'] = [...mergedPackData['UNIFORM - BAGS/BOXES'], ...newUniformRows];
-                          }
-                          
-                          // Process LOOSE - CARGO data - APPEND to merged data
-                          if (orderPanel.packData['LOOSE - CARGO'] && orderPanel.packData['LOOSE - CARGO'].length > 0) {
-                            console.log(`Found ${orderPanel.packData['LOOSE - CARGO'].length} LOOSE rows in order ${orderNo}`);
-                            const newLooseRows = orderPanel.packData['LOOSE - CARGO'].map(item => ({
-                              _id: uid(),
-                              uom: item.uom || "",
-                              productName: item.productName || "",
-                              actualWt: item.actualWt?.toString() || "",
-                              chargedWt: item.chargedWt?.toString() || "",
-                            }));
-                            mergedPackData['LOOSE - CARGO'] = [...mergedPackData['LOOSE - CARGO'], ...newLooseRows];
-                          }
-                        } else {
-                          console.log(`Order panel ${orderNo} has no packData`);
-                        }
-                      }
+                    if (orderPackData.PALLETIZATION && orderPackData.PALLETIZATION.length > 0) {
+                      const newPalletRows = orderPackData.PALLETIZATION.map(item => ({
+                        _id: uid(),
+                        noOfPallets: item.noOfPallets?.toString() || "",
+                        unitPerPallets: item.unitPerPallets?.toString() || "",
+                        totalPkgs: item.totalPkgs?.toString() || "",
+                        pkgsType: item.pkgsType || "",
+                        uom: item.uom || "",
+                        skuSize: item.skuSize || "",
+                        packWeight: item.packWeight?.toString() || "",
+                        productName: item.productName || "",
+                        wtLtr: item.wtLtr?.toString() || "",
+                        actualWt: item.actualWt?.toString() || "",
+                        chargedWt: item.chargedWt?.toString() || "",
+                        wtUom: item.wtUom || "",
+                        isUniform: item.isUniform || false,
+                      }));
+                      mergedPackData.PALLETIZATION = [...mergedPackData.PALLETIZATION, ...newPalletRows];
                     }
-                  } catch (error) {
-                    console.error(`Error fetching full order panel for ${orderNo}:`, error);
+                    
+                    if (orderPackData['UNIFORM - BAGS/BOXES'] && orderPackData['UNIFORM - BAGS/BOXES'].length > 0) {
+                      const newUniformRows = orderPackData['UNIFORM - BAGS/BOXES'].map(item => ({
+                        _id: uid(),
+                        totalPkgs: item.totalPkgs?.toString() || "",
+                        pkgsType: item.pkgsType || "",
+                        uom: item.uom || "",
+                        skuSize: item.skuSize || "",
+                        packWeight: item.packWeight?.toString() || "",
+                        productName: item.productName || "",
+                        wtLtr: item.wtLtr?.toString() || "",
+                        actualWt: item.actualWt?.toString() || "",
+                        chargedWt: item.chargedWt?.toString() || "",
+                        wtUom: item.wtUom || "",
+                      }));
+                      mergedPackData['UNIFORM - BAGS/BOXES'] = [...mergedPackData['UNIFORM - BAGS/BOXES'], ...newUniformRows];
+                    }
+                    
+                    if (orderPackData['LOOSE - CARGO'] && orderPackData['LOOSE - CARGO'].length > 0) {
+                      const newLooseRows = orderPackData['LOOSE - CARGO'].map(item => ({
+                        _id: uid(),
+                        uom: item.uom || "",
+                        productName: item.productName || "",
+                        actualWt: item.actualWt?.toString() || "",
+                        chargedWt: item.chargedWt?.toString() || "",
+                      }));
+                      mergedPackData['LOOSE - CARGO'] = [...mergedPackData['LOOSE - CARGO'], ...newLooseRows];
+                    }
                   }
-                } else {
-                  console.log(`No matching order panel found for ${orderNo}`);
                 }
+              } catch (err) {
+                console.error(`Error fetching order panel ${orderPanelId}:`, err);
               }
             }
           }
         }
-      }
-      
-      // After processing all orders, log the merged results
-      console.log("\n===== MERGED PACK DATA FROM ALL ORDERS =====");
-      console.log("Total PALLETIZATION rows:", mergedPackData.PALLETIZATION.length);
-      console.log("Total UNIFORM rows:", mergedPackData['UNIFORM - BAGS/BOXES'].length);
-      console.log("Total LOOSE rows:", mergedPackData['LOOSE - CARGO'].length);
-      
-      // If no pack data found in any order, use defaults
-      if (!packDataFound || 
-          (mergedPackData.PALLETIZATION.length === 0 && 
-           mergedPackData['UNIFORM - BAGS/BOXES'].length === 0 && 
-           mergedPackData['LOOSE - CARGO'].length === 0)) {
-        console.log("No pack data found in any order panel, using defaults");
-        mergedPackData = {
-          PALLETIZATION: [defaultPackRow('PALLETIZATION')],
-          'UNIFORM - BAGS/BOXES': [defaultPackRow('UNIFORM - BAGS/BOXES')],
-          'LOOSE - CARGO': [defaultPackRow('LOOSE - CARGO')]
-        };
-      } else {
-        // Ensure at least one row exists for each pack type (if completely empty)
-        if (mergedPackData.PALLETIZATION.length === 0) {
-          mergedPackData.PALLETIZATION.push(defaultPackRow('PALLETIZATION'));
+        
+        if (!packDataFound || 
+            (mergedPackData.PALLETIZATION.length === 0 && 
+             mergedPackData['UNIFORM - BAGS/BOXES'].length === 0 && 
+             mergedPackData['LOOSE - CARGO'].length === 0 &&
+             mergedPackData['NON-UNIFORM - GENERAL CARGO'].length === 0)) {
+          mergedPackData = {
+            PALLETIZATION: [defaultPackRow('PALLETIZATION')],
+            'UNIFORM - BAGS/BOXES': [defaultPackRow('UNIFORM - BAGS/BOXES')],
+            'LOOSE - CARGO': [defaultPackRow('LOOSE - CARGO')],
+            'NON-UNIFORM - GENERAL CARGO': [defaultPackRow('NON-UNIFORM - GENERAL CARGO')]
+          };
+        } else {
+          if (mergedPackData.PALLETIZATION.length === 0) mergedPackData.PALLETIZATION.push(defaultPackRow('PALLETIZATION'));
+          if (mergedPackData['UNIFORM - BAGS/BOXES'].length === 0) mergedPackData['UNIFORM - BAGS/BOXES'].push(defaultPackRow('UNIFORM - BAGS/BOXES'));
+          if (mergedPackData['LOOSE - CARGO'].length === 0) mergedPackData['LOOSE - CARGO'].push(defaultPackRow('LOOSE - CARGO'));
+          if (mergedPackData['NON-UNIFORM - GENERAL CARGO'].length === 0) mergedPackData['NON-UNIFORM - GENERAL CARGO'].push(defaultPackRow('NON-UNIFORM - GENERAL CARGO'));
         }
-        if (mergedPackData['UNIFORM - BAGS/BOXES'].length === 0) {
-          mergedPackData['UNIFORM - BAGS/BOXES'].push(defaultPackRow('UNIFORM - BAGS/BOXES'));
-        }
-        if (mergedPackData['LOOSE - CARGO'].length === 0) {
-          mergedPackData['LOOSE - CARGO'].push(defaultPackRow('LOOSE - CARGO'));
-        }
-      }
-      
-      console.log("\n===== FINAL PACK DATA =====");
-      console.log("PALLETIZATION:", mergedPackData.PALLETIZATION);
-      console.log("UNIFORM:", mergedPackData['UNIFORM - BAGS/BOXES']);
-      console.log("LOOSE:", mergedPackData['LOOSE - CARGO']);
-      
-      // Set the merged pack data
-      setPackData(mergedPackData);
-      
-      // Set active pack based on which has the most data or first non-default
-      if (mergedPackData.PALLETIZATION.length > 1 || 
-          (mergedPackData.PALLETIZATION.length === 1 && mergedPackData.PALLETIZATION[0].noOfPallets)) {
-        console.log("Setting active pack to PALLETIZATION");
-        setActivePack('PALLETIZATION');
-      } else if (mergedPackData['UNIFORM - BAGS/BOXES'].length > 1 ||
-                (mergedPackData['UNIFORM - BAGS/BOXES'].length === 1 && mergedPackData['UNIFORM - BAGS/BOXES'][0].totalPkgs)) {
-        console.log("Setting active pack to UNIFORM - BAGS/BOXES");
-        setActivePack('UNIFORM - BAGS/BOXES');
-      } else if (mergedPackData['LOOSE - CARGO'].length > 1 ||
-                (mergedPackData['LOOSE - CARGO'].length === 1 && mergedPackData['LOOSE - CARGO'][0].actualWt)) {
-        console.log("Setting active pack to LOOSE - CARGO");
-        setActivePack('LOOSE - CARGO');
-      }
 
-      // Auto-fill approval statuses from negotiation
-      if (fullNegotiation.approval) {
-        setVbpUploads({
-          approval: fullNegotiation.approval.vbpApproval || "",
-          remark: fullNegotiation.approval.vbpRemark || "",
-        });
-        setVftUploads({
-          approval: fullNegotiation.approval.vftApproval || "",
-        });
-        setVotUploads({
-          approval: fullNegotiation.approval.votApproval || "",
-        });
-        setVlUploads({
-          approval: fullNegotiation.approval.vlApproval || "",
-          loadingStatus: fullNegotiation.approval.loadingStatus || "",
-        });
-        setLoadedWeighment({
-          ...loadedWeighment,
-          approval: fullNegotiation.approval.weighmentApproval || "",
-        });
+        setPackData(mergedPackData);
+        alert(`✅ Data loaded from Vehicle Negotiation: ${negotiation.vnnNo}`);
       }
-
-      alert(`✅ Data loaded from Vehicle Negotiation: ${negotiation.vnnNo}`);
+    } catch (error) {
+      console.error("Error loading vehicle negotiation:", error);
+      alert(`❌ Failed to load data: ${error.message}`);
+    } finally {
+      setFetchingNegotiationData(false);
     }
-  } catch (error) {
-    console.error("Error loading vehicle negotiation:", error);
-    alert(`❌ Failed to load data: ${error.message}`);
-  } finally {
-    setFetchingNegotiationData(false);
-  }
-};
+  };
 
   const handleVehicleNegotiationInputFocus = () => {
     if (!showVehicleNegotiationDropdown) {
@@ -1535,7 +1789,9 @@ const handleSelectVehicleNegotiation = async (negotiation) => {
   /** =========================
    * PACK DATA FUNCTIONS
    ========================= */
-  const rows = packData[activePack] || [];
+  const rows = useMemo(() => {
+    return packData[activePack] || [];
+  }, [packData, activePack]);
 
   const updatePackRow = (rowId, key, value) => {
     setPackData((prev) => {
@@ -1621,16 +1877,10 @@ const handleSelectVehicleNegotiation = async (negotiation) => {
     });
   };
 
-  /** =========================
-   * BILLING TYPE CHANGE HANDLER
-   ========================= */
   const handleBillingTypeChange = (value) => {
     setHeader((prev) => ({ ...prev, billingType: value }));
   };
 
-  /** =========================
-   * GPS TRACKING HANDLER
-   ========================= */
   const handleActivateTracking = () => {
     if (!gpsTracking.driverMobileNumber) {
       alert("Please enter driver mobile number first");
@@ -1640,9 +1890,6 @@ const handleSelectVehicleNegotiation = async (negotiation) => {
     alert(`✅ Tracking activated for mobile: ${gpsTracking.driverMobileNumber}`);
   };
 
-  /** =========================
-   * CALCULATED VALUES
-   ========================= */
   const calculateTotalWeight = () => {
     return orderRows.reduce((sum, row) => sum + num(row.weight), 0);
   };
@@ -1661,22 +1908,12 @@ const handleSelectVehicleNegotiation = async (negotiation) => {
     );
   };
 
-  /** =========================
-   * BILLING COLUMNS FOR TABLE
-   ========================= */
   const billingColumns = [
     { key: "billingType", label: "Billing Type", options: BILLING_TYPES },
     { key: "noOfLoadingPoints", label: "No. of Loading Points", type: "number" },
     { key: "noOfDroppingPoint", label: "No. of Droping Point", type: "number" },
-    { key: "collectionCharges", label: "Collection Charges", type: "text" },
-    { key: "cancellationCharges", label: "Cancellation Charges", type: "text" },
-    { key: "loadingCharges", label: "Loading Charges", type: "text" },
-    { key: "otherCharges", label: "Other Charges", type: "text" },
   ];
 
-  /** =========================
-   * HANDLE FILE SELECTION
-   ========================= */
   const handleFileSelect = (section, field, isVideo = false) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -1694,35 +1931,30 @@ const handleSelectVehicleNegotiation = async (negotiation) => {
             [field]: [...prev[field], file]
           }));
           break;
-          
         case 'vbp':
           setVbpFiles(prev => ({
             ...prev,
             [field]: [...prev[field], file]
           }));
           break;
-          
         case 'vft':
           setVftFiles(prev => ({
             ...prev,
             [field]: [...prev[field], file]
           }));
           break;
-          
         case 'vot':
           setVotFiles(prev => ({
             ...prev,
             [field]: [...prev[field], file]
           }));
           break;
-          
         case 'vl':
           setVlFiles(prev => ({
             ...prev,
             [field]: [...prev[field], file]
           }));
           break;
-          
         case 'weighment':
           setWeighmentFiles(prev => ({
             ...prev,
@@ -1735,70 +1967,91 @@ const handleSelectVehicleNegotiation = async (negotiation) => {
     input.click();
   };
 
-  /** =========================
-   * REMOVE SELECTED FILE
-   ========================= */
-  const removeFile = (section, field, index) => {
-    switch(section) {
-      case 'vehicle':
-        setVehicleFiles(prev => ({
-          ...prev,
-          [field]: prev[field].filter((_, i) => i !== index)
-        }));
-        break;
-        
-      case 'vbp':
-        setVbpFiles(prev => ({
-          ...prev,
-          [field]: prev[field].filter((_, i) => i !== index)
-        }));
-        break;
-        
-      case 'vft':
-        setVftFiles(prev => ({
-          ...prev,
-          [field]: prev[field].filter((_, i) => i !== index)
-        }));
-        break;
-        
-      case 'vot':
-        setVotFiles(prev => ({
-          ...prev,
-          [field]: prev[field].filter((_, i) => i !== index)
-        }));
-        break;
-        
-      case 'vl':
-        setVlFiles(prev => ({
-          ...prev,
-          [field]: prev[field].filter((_, i) => i !== index)
-        }));
-        break;
-        
-      case 'weighment':
-        setWeighmentFiles(prev => ({
-          ...prev,
-          [field]: prev[field].filter((_, i) => i !== index)
-        }));
-        break;
+  const handleHelperFileSelect = (field, isVideo = false) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = isVideo ? 'video/*' : 'image/*';
+    input.multiple = false;
+    
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      setHelperInfo(prev => ({
+        ...prev,
+        [field]: [...prev[field], file]
+      }));
+    };
+    
+    input.click();
+  };
+
+  const removeFile = (section, field, index, isExisting = false) => {
+    if (isExisting) {
+      setExistingFiles(prev => ({
+        ...prev,
+        [section]: {
+          ...prev[section],
+          [field]: prev[section][field].filter((_, i) => i !== index)
+        }
+      }));
+      
+      if (section === 'vehicle') {
+        if (field === 'rc') setVehicleInfo(prev => ({ ...prev, rcDocument: '' }));
+        if (field === 'pan') setVehicleInfo(prev => ({ ...prev, panDocument: '' }));
+        if (field === 'license') setVehicleInfo(prev => ({ ...prev, licenseDocument: '' }));
+        if (field === 'photo') setVehicleInfo(prev => ({ ...prev, driverPhoto: '' }));
+      }
+    } else {
+      switch(section) {
+        case 'vehicle':
+          setVehicleFiles(prev => ({
+            ...prev,
+            [field]: prev[field].filter((_, i) => i !== index)
+          }));
+          break;
+        case 'helper':
+          setHelperInfo(prev => ({
+            ...prev,
+            [field]: prev[field].filter((_, i) => i !== index)
+          }));
+          break;
+        case 'vbp':
+          setVbpFiles(prev => ({
+            ...prev,
+            [field]: prev[field].filter((_, i) => i !== index)
+          }));
+          break;
+        case 'vft':
+          setVftFiles(prev => ({
+            ...prev,
+            [field]: prev[field].filter((_, i) => i !== index)
+          }));
+          break;
+        case 'vot':
+          setVotFiles(prev => ({
+            ...prev,
+            [field]: prev[field].filter((_, i) => i !== index)
+          }));
+          break;
+        case 'vl':
+          setVlFiles(prev => ({
+            ...prev,
+            [field]: prev[field].filter((_, i) => i !== index)
+          }));
+          break;
+        case 'weighment':
+          setWeighmentFiles(prev => ({
+            ...prev,
+            [field]: prev[field].filter((_, i) => i !== index)
+          }));
+          break;
+      }
     }
   };
 
-  /** =========================
-   * UPLOAD ALL FILES DURING SAVE
-   ========================= */
-const uploadAllFiles = async (token) => {
-  const uploadPromises = [];
-  const uploadedPaths = {
-    vehicle: {},
-    vbp: {},
-    vft: {},
-    vot: {},
-    vl: {},
-    weighment: {}
-  };
-
-  // Helper function to upload a single file
+ const uploadAllFiles = async (token) => {
+  // Define uploadFile FIRST before using it
   const uploadFile = async (file, section, field) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -1814,14 +2067,12 @@ const uploadAllFiles = async (token) => {
         body: formData,
       });
 
-      // Check if response is OK
       if (!response.ok) {
         const text = await response.text();
         console.error(`Upload failed: ${response.status}`, text);
         throw new Error(`Upload failed with status ${response.status}`);
       }
 
-      // Try to parse JSON
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
         const data = await response.json();
@@ -1837,15 +2088,81 @@ const uploadAllFiles = async (token) => {
     }
   };
 
-  // Upload vehicle files
+  const uploadPromises = [];
+  const uploadedPaths = {
+    vehicle: {},
+    vbp: {},
+    vft: {},
+    vot: {},
+    vl: {},
+    weighment: {}
+  };
+
+  // Upload vehicle photos
+  for (const file of vehiclePhotoFiles) {
+    uploadPromises.push(
+      uploadFile(file, 'vehicle', 'vehiclePhotos')
+        .then(data => {
+          if (data.success) {
+            if (!uploadedPaths.vehiclePhotos) uploadedPaths.vehiclePhotos = [];
+            uploadedPaths.vehiclePhotos.push(data.filePath);
+          }
+          return data;
+        })
+        .catch(error => {
+          console.error(`Failed to upload vehicle photo:`, error);
+          return null;
+        })
+    );
+  }
+
+  // Upload loaded vehicle slips
+  for (const file of loadedVehicleSlipFiles) {
+    uploadPromises.push(
+      uploadFile(file, 'weighment', 'loadedVehicleSlip')
+        .then(data => {
+          if (data.success) {
+            if (!uploadedPaths.loadedVehicleSlips) uploadedPaths.loadedVehicleSlips = [];
+            uploadedPaths.loadedVehicleSlips.push(data.filePath);
+          }
+          return data;
+        })
+        .catch(error => {
+          console.error(`Failed to upload loaded vehicle slip:`, error);
+          return null;
+        })
+    );
+  }
+
+  // Upload helper files
+  for (const [field, files] of Object.entries(helperInfo)) {
+    if (Array.isArray(files)) {
+      for (const file of files) {
+        uploadPromises.push(
+          uploadFile(file, 'helper', field)
+            .then(data => {
+              if (data.success) {
+                if (!uploadedPaths.helper) uploadedPaths.helper = {};
+                uploadedPaths.helper[field] = data.filePath;
+              }
+              return data;
+            })
+            .catch(error => {
+              console.error(`Failed to upload helper/${field}:`, error);
+              return null;
+            })
+        );
+      }
+    }
+  }
+
+  // Upload vehicle files (RC, PAN, License, Photo, Aadhar)
   for (const [field, files] of Object.entries(vehicleFiles)) {
     for (const file of files) {
       uploadPromises.push(
         uploadFile(file, 'vehicle', field)
           .then(data => {
-            if (data.success) {
-              uploadedPaths.vehicle[field] = data.filePath;
-            }
+            if (data.success) uploadedPaths.vehicle[field] = data.filePath;
             return data;
           })
           .catch(error => {
@@ -1862,9 +2179,7 @@ const uploadAllFiles = async (token) => {
       uploadPromises.push(
         uploadFile(file, 'vbp', field)
           .then(data => {
-            if (data.success) {
-              uploadedPaths.vbp[field] = data.filePath;
-            }
+            if (data.success) uploadedPaths.vbp[field] = data.filePath;
             return data;
           })
           .catch(error => {
@@ -1881,9 +2196,7 @@ const uploadAllFiles = async (token) => {
       uploadPromises.push(
         uploadFile(file, 'vft', field)
           .then(data => {
-            if (data.success) {
-              uploadedPaths.vft[field] = data.filePath;
-            }
+            if (data.success) uploadedPaths.vft[field] = data.filePath;
             return data;
           })
           .catch(error => {
@@ -1900,9 +2213,7 @@ const uploadAllFiles = async (token) => {
       uploadPromises.push(
         uploadFile(file, 'vot', field)
           .then(data => {
-            if (data.success) {
-              uploadedPaths.vot[field] = data.filePath;
-            }
+            if (data.success) uploadedPaths.vot[field] = data.filePath;
             return data;
           })
           .catch(error => {
@@ -1919,9 +2230,7 @@ const uploadAllFiles = async (token) => {
       uploadPromises.push(
         uploadFile(file, 'vl', field)
           .then(data => {
-            if (data.success) {
-              uploadedPaths.vl[field] = data.filePath;
-            }
+            if (data.success) uploadedPaths.vl[field] = data.filePath;
             return data;
           })
           .catch(error => {
@@ -1938,9 +2247,7 @@ const uploadAllFiles = async (token) => {
       uploadPromises.push(
         uploadFile(file, 'weighment', field)
           .then(data => {
-            if (data.success) {
-              uploadedPaths.weighment[field] = data.filePath;
-            }
+            if (data.success) uploadedPaths.weighment[field] = data.filePath;
             return data;
           })
           .catch(error => {
@@ -1951,16 +2258,65 @@ const uploadAllFiles = async (token) => {
     }
   }
 
-  // Wait for all uploads to complete
-  const results = await Promise.allSettled(uploadPromises);
-  console.log('Upload results:', results);
-
+  await Promise.allSettled(uploadPromises);
+  console.log('Upload results completed');
   return uploadedPaths;
 };
 
-  /** =========================
-   * HANDLE SAVE
-   ========================= */
+  const getTotalVlPhotosCount = () => {
+    return vlFiles.vl1.length + vlFiles.vl2.length + vlFiles.vl3.length + 
+           vlFiles.vl4.length + vlFiles.vl5.length + vlFiles.vl6.length + 
+           vlFiles.vl7.length;
+  };
+
+  const handleAddMoreVlPhotos = () => {
+    const currentCounts = [
+      vlFiles.vl1.length,
+      vlFiles.vl2.length,
+      vlFiles.vl3.length,
+      vlFiles.vl4.length,
+      vlFiles.vl5.length,
+      vlFiles.vl6.length,
+      vlFiles.vl7.length
+    ];
+    
+    const totalPhotos = currentCounts.reduce((a, b) => a + b, 0);
+    
+    if (totalPhotos >= 25) {
+      alert("Maximum 25 photos already uploaded!");
+      return;
+    }
+    
+    for (let i = 0; i < currentCounts.length; i++) {
+      if (currentCounts[i] < 25 && totalPhotos < 25) {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.multiple = false;
+        
+        input.onchange = async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          
+          const newTotalPhotos = getTotalVlPhotosCount() + 1;
+          if (newTotalPhotos > 25) {
+            alert("Maximum 25 photos allowed! Cannot add more.");
+            return;
+          }
+          
+          const field = `vl${i + 1}`;
+          setVlFiles(prev => ({
+            ...prev,
+            [field]: [...prev[field], file]
+          }));
+        };
+        
+        input.click();
+        break;
+      }
+    }
+  };
+
   const handleSave = async () => {
     if (!header.branch) {
       alert("Please select a branch");
@@ -1969,6 +2325,12 @@ const uploadAllFiles = async (token) => {
 
     if (!vehicleInfo.vehicleNo) {
       alert("Please enter vehicle number");
+      return;
+    }
+
+    const totalVlPhotos = getTotalVlPhotosCount();
+    if (totalVlPhotos < 5) {
+      alert(`Please upload at least 5 Vehicle Loading (VL) photos. Currently uploaded: ${totalVlPhotos}/5`);
       return;
     }
 
@@ -1981,7 +2343,6 @@ const uploadAllFiles = async (token) => {
       const uploadedPaths = await uploadAllFiles(token);
       setUploading(false);
 
-      // Ensure pack data is properly formatted with all required fields
       const formattedPackData = {
         PALLETIZATION: packData.PALLETIZATION.map(item => ({
           _id: item._id,
@@ -2018,10 +2379,32 @@ const uploadAllFiles = async (token) => {
           productName: item.productName || "",
           actualWt: item.actualWt || "",
           chargedWt: item.chargedWt || "",
+        })),
+        'NON-UNIFORM - GENERAL CARGO': packData['NON-UNIFORM - GENERAL CARGO'].map(item => ({
+          _id: item._id,
+          nos: item.nos || "",
+          productName: item.productName || "",
+          uom: item.uom || "",
+          length: item.length || "",
+          width: item.width || "",
+          height: item.height || "",
+          actualWt: item.actualWt || "",
+          chargedWt: item.chargedWt || "",
         }))
       };
 
       const payload = {
+        detentionDays: detentionDays,
+        detentionNumber: detentionNumber,
+        vehiclePhotos: uploadedPaths.vehiclePhotos || [],
+        loadedVehicleSlips: uploadedPaths.loadedVehicleSlips || [],
+        hasHelper: hasHelper,
+        helperInfo: {
+          name: helperInfo.name,
+          mobileNo: helperInfo.mobileNo,
+          photo: uploadedPaths.helper?.photo || [],
+          aadharPhoto: uploadedPaths.helper?.aadharPhoto || []
+        },
         header: {
           ...header,
           vehicleNegotiationNo: vehicleNegotiationNo,
@@ -2032,8 +2415,31 @@ const uploadAllFiles = async (token) => {
           panDocument: uploadedPaths.vehicle.pan || vehicleInfo.panDocument,
           licenseDocument: uploadedPaths.vehicle.license || vehicleInfo.licenseDocument,
           driverPhoto: uploadedPaths.vehicle.photo || vehicleInfo.driverPhoto,
+          aadharDocument: uploadedPaths.vehicle.aadhar || vehicleInfo.aadharDocument,
         },
-        orderRows,
+        orderRows: orderRows.map(order => ({
+          orderNo: order.orderNo,
+          partyName: order.partyName,
+          plantCode: order.plantCode,
+          plantName: order.plantName,
+          orderType: order.orderType,
+          pinCode: order.pinCode,
+          taluka: order.taluka || order.talukaName,
+          talukaName: order.talukaName || order.taluka,
+          district: order.district || order.districtName,
+          districtName: order.districtName || order.district,
+          state: order.state || order.stateName,
+          stateName: order.stateName || order.state,
+          from: order.from || order.fromName,
+          fromName: order.fromName || order.from,
+          to: order.to || order.toName,
+          toName: order.toName || order.to,
+          weight: num(order.weight),
+          collectionCharges: num(order.collectionCharges) || 0,
+          cancellationCharges: order.cancellationCharges || 'Nil',
+          loadingCharges: order.loadingCharges || 'Nil',
+          otherCharges: num(order.otherCharges) || 0
+        })),
         packData: formattedPackData,
         deductionRows,
         totalQuantity,
@@ -2133,10 +2539,18 @@ const uploadAllFiles = async (token) => {
     }
   };
 
-  /** =========================
-   * RESET FORM
-   ========================= */
   const resetForm = () => {
+    setVehiclePhotoFiles([]);
+    setDetentionDays("");
+    setDetentionNumber("");
+    setLoadedVehicleSlipFiles([]);
+    setHasHelper(false);
+    setHelperInfo({
+      name: "",
+      mobileNo: "",
+      photo: [],
+      aadharPhoto: []
+    });
     setHeader({
       vehicleArrivalNo: "",
       vehicleNegotiationNo: "",
@@ -2153,7 +2567,6 @@ const uploadAllFiles = async (token) => {
       loadingCharges: "",
       otherCharges: "",
     });
-    
     setVehicleNegotiationNo("");
     setSelectedVehicleNegotiation(null);
     setOrderRows([defaultOrderRow()]);
@@ -2187,6 +2600,16 @@ const uploadAllFiles = async (token) => {
       PALLETIZATION: [defaultPackRow("PALLETIZATION")],
       "UNIFORM - BAGS/BOXES": [defaultPackRow("UNIFORM - BAGS/BOXES")],
       "LOOSE - CARGO": [defaultPackRow("LOOSE - CARGO")],
+      "NON-UNIFORM - GENERAL CARGO": [defaultPackRow("NON-UNIFORM - GENERAL CARGO")],
+    });
+    
+    setExistingFiles({
+      vehicle: { rc: [], pan: [], license: [], photo: [] },
+      vbp: {},
+      vft: {},
+      vot: {},
+      vl: {},
+      weighment: { weighSlip: [] }
     });
     
     setActivePack("PALLETIZATION");
@@ -2210,7 +2633,7 @@ const uploadAllFiles = async (token) => {
       vl5: [], vl6: [], vl7: [], videoVl: [],
     });
     setVehicleFiles({
-      rc: [], pan: [], license: [], photo: []
+      rc: [], pan: [], license: [], photo: [], aadhar: []
     });
     setWeighmentFiles({
       weighSlip: []
@@ -2234,12 +2657,15 @@ const uploadAllFiles = async (token) => {
       isTrackingActive: false,
     });
     
-    setArrivalDetails({ date: new Date().toISOString().split('T')[0], time: "" });
+    setArrivalDetails({ date: new Date().toISOString().split('T')[0], time: "", outTime: "" });
+    
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    setShowCamera(false);
   };
 
-  /** =========================
-   * Helper function to get status badge color
-   ========================= */
   const getStatusBadge = (status) => {
     if (status === 'Approved') return 'bg-green-100 text-green-800';
     if (status === 'Rejected') return 'bg-red-100 text-red-800';
@@ -2250,9 +2676,6 @@ const uploadAllFiles = async (token) => {
     return 'bg-slate-100 text-slate-800';
   };
 
-  /** =========================
-   * RENDER
-   ========================= */
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white">
       {/* Sticky Header */}
@@ -2331,6 +2754,48 @@ const uploadAllFiles = async (token) => {
         </div>
       </div>
 
+      {/* Camera Modal */}
+      {showCamera && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center">
+          <div className="bg-white rounded-2xl p-4 max-w-2xl w-full mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-slate-900">Capture Driver Photo</h3>
+              <button
+                onClick={stopCamera}
+                className="text-red-500 hover:text-red-700 p-2"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="relative">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                className="w-full rounded-lg bg-black"
+              />
+              <canvas ref={canvasRef} className="hidden" />
+            </div>
+            <div className="flex justify-center gap-4 mt-4">
+              <button
+                onClick={capturePhoto}
+                className="rounded-full bg-blue-600 px-6 py-3 text-white font-bold hover:bg-blue-700"
+              >
+                Capture Photo
+              </button>
+              <button
+                onClick={stopCamera}
+                className="rounded-full bg-gray-500 px-6 py-3 text-white font-bold hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <div className="mx-auto max-w-full p-4">
         {/* Vehicle Arrival Information Card */}
@@ -2347,7 +2812,6 @@ const uploadAllFiles = async (token) => {
               />
             </div>
 
-            {/* Vehicle Negotiation Search Field */}
             <div className="col-span-12 md:col-span-3 relative" ref={vehicleNegotiationDropdownRef}>
               <label className="text-xs font-bold text-slate-600">Vehicle Negotiation No</label>
               <div className="relative">
@@ -2370,7 +2834,7 @@ const uploadAllFiles = async (token) => {
                 )}
               </div>
               
-              {showVehicleNegotiationDropdown && (
+              {showVehicleNegotiationDropdown && !selectedVehicleNegotiation && (
                 <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
                   {vehicleNegotiation.loading ? (
                     <div className="p-3 text-center text-sm text-slate-500">
@@ -2388,7 +2852,7 @@ const uploadAllFiles = async (token) => {
                           {nego.vnnNo}
                         </div>
                         <div className="text-xs text-slate-500 mt-1">
-                          Vehicle: {nego.vehicleInfo?.vehicleNo || 'N/A'} • Vendor: {nego.approval?.vendorName || 'N/A'}
+                          Vehicle: {nego.approval?.vehicleNo || 'N/A'} • Vendor: {nego.approval?.vendorName || 'N/A'}
                         </div>
                         <div className="text-xs text-slate-400">
                           Customer: {nego.customerName || 'N/A'}
@@ -2411,7 +2875,41 @@ const uploadAllFiles = async (token) => {
               <div className="text-xs text-slate-400 mt-1">Select to auto-fill vehicle data</div>
             </div>
 
-            <div className="col-span-12 md:col-span-3">
+            <div className="col-span-12 md:col-span-2">
+              <label className="text-xs font-bold text-slate-600">Vehicle Number</label>
+              <input
+                type="text"
+                value={vehicleInfo.vehicleNo}
+                onChange={(e) => setVehicleInfo({ ...vehicleInfo, vehicleNo: e.target.value })}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 ${
+                  selectedVehicleNegotiation ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                }`}
+                placeholder="Enter vehicle number"
+                readOnly={!!selectedVehicleNegotiation}
+              />
+              {selectedVehicleNegotiation && (
+                <div className="text-xs text-green-600 mt-0.5">Auto-filled from negotiation</div>
+              )}
+            </div>
+
+            <div className="col-span-12 md:col-span-2">
+              <label className="text-xs font-bold text-slate-600">Mobile Number</label>
+              <input
+                type="text"
+                value={vehicleInfo.driverMobileNo}
+                onChange={(e) => setVehicleInfo({ ...vehicleInfo, driverMobileNo: e.target.value })}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 ${
+                  selectedVehicleNegotiation ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                }`}
+                placeholder="Enter mobile number"
+                readOnly={!!selectedVehicleNegotiation}
+              />
+              {selectedVehicleNegotiation && (
+                <div className="text-xs text-green-600 mt-0.5">Auto-filled from negotiation</div>
+              )}
+            </div>
+
+            <div className="col-span-12 md:col-span-2">
               <label className="text-xs font-bold text-slate-600">Branch *</label>
               <SearchableDropdown
                 items={branches}
@@ -2425,16 +2923,20 @@ const uploadAllFiles = async (token) => {
                 placeholder="Search branch..."
                 displayField="name"
                 codeField="code"
+                disabled={!!selectedVehicleNegotiation}
               />
             </div>
 
-            <div className="col-span-12 md:col-span-3">
+            <div className="col-span-12 md:col-span-2">
               <label className="text-xs font-bold text-slate-600">Date</label>
               <input
                 type="date"
                 value={header.date}
                 onChange={(e) => setHeader({ ...header, date: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                readOnly={!!selectedVehicleNegotiation}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 ${
+                  selectedVehicleNegotiation ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                }`}
               />
             </div>
 
@@ -2444,7 +2946,68 @@ const uploadAllFiles = async (token) => {
                 value={header.delivery}
                 onChange={(v) => setHeader({ ...header, delivery: v })}
                 options={DELIVERY_OPTIONS}
+                readOnly={!!selectedVehicleNegotiation}
               />
+            </div>
+
+            <div className="col-span-12 md:col-span-2">
+              <label className="text-xs font-bold text-slate-600">Owner Aadhar Card</label>
+              <button 
+                onClick={() => handleFileSelect('vehicle', 'aadhar')}
+                className="mt-1 w-full rounded-lg bg-purple-50 px-3 py-2 text-xs font-bold text-purple-700 border border-purple-200 hover:bg-purple-100 transition flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                {vehicleFiles.aadhar.length > 0 ? `✓ ${vehicleFiles.aadhar.length} file(s)` : 'Upload Aadhar'}
+              </button>
+              {vehicleFiles.aadhar.map((file, idx) => (
+                <FileUploadItem 
+                  key={idx} 
+                  file={file} 
+                  index={idx}
+                  onRemove={() => removeFile('vehicle', 'aadhar', idx)}
+                  label="Aadhar"
+                />
+              ))}
+              <p className="text-xs text-slate-400 mt-1">Upload Owner's Aadhar Card (PDF/Image)</p>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-slate-200">
+            <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Driver Photo Capture</h3>
+                  <p className="text-xs text-slate-600 mt-1">Click to open camera and capture driver photo</p>
+                  <p className="text-xs text-green-600 mt-1">📸 Photo capture will auto-fill Arrival Date & Time</p>
+                </div>
+                <button
+                  onClick={startCamera}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Open Camera
+                </button>
+              </div>
+              {vehicleFiles.photo.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-xs font-bold text-slate-600 mb-2">Captured Photos:</p>
+                  {vehicleFiles.photo.map((file, idx) => (
+                    <FileUploadItem 
+                      key={idx} 
+                      file={file} 
+                      index={idx}
+                      onRemove={() => removeFile('vehicle', 'photo', idx)}
+                      label="Driver Photo"
+                      isCameraPhoto={true}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </Card>
@@ -2466,7 +3029,6 @@ const uploadAllFiles = async (token) => {
                     ))}
                   </tr>
                 </thead>
-
                 <tbody>
                   <tr className="hover:bg-yellow-50 even:bg-slate-50">
                     {billingColumns.map((col) => (
@@ -2481,7 +3043,8 @@ const uploadAllFiles = async (token) => {
                                 setHeader(prev => ({ ...prev, [col.key]: e.target.value }));
                               }
                             }}
-                            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                            disabled={!!selectedVehicleNegotiation}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 disabled:bg-slate-50 disabled:cursor-not-allowed"
                           >
                             <option value="">Select {col.label}</option>
                             {col.options.map((opt) => (
@@ -2495,7 +3058,10 @@ const uploadAllFiles = async (token) => {
                             type={col.type || "text"}
                             value={header[col.key] || ""}
                             onChange={(e) => setHeader(prev => ({ ...prev, [col.key]: e.target.value }))}
-                            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                            readOnly={!!selectedVehicleNegotiation}
+                            className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 ${
+                              selectedVehicleNegotiation ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                            }`}
                             placeholder={`Enter ${col.label}`}
                           />
                         )}
@@ -2515,27 +3081,37 @@ const uploadAllFiles = async (token) => {
             right={
               <button
                 onClick={addOrderRow}
-                className="rounded-xl bg-yellow-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-yellow-700 transition"
+                disabled={!!selectedVehicleNegotiation}
+                className={`rounded-xl px-4 py-1.5 text-xs font-bold text-white transition ${
+                  selectedVehicleNegotiation 
+                    ? 'bg-gray-400 cursor-not-allowed' 
+                    : 'bg-yellow-600 hover:bg-yellow-700'
+                }`}
               >
                 + Add Order
               </button>
             }
           >
-            <div className="overflow-auto rounded-xl border border-yellow-300">
-              <table className="min-w-full w-full text-sm">
+            <div className="overflow-auto rounded-xl border border-yellow-300 max-h-[500px]">
+              <table className="min-w-max w-full text-sm">
                 <thead className="sticky top-0 bg-yellow-400 z-10">
                   <tr>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Order</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Party Name</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Plant</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Order Type</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Pin Code</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">State</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">District</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">From</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">To</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Weight</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Actions</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[100px]">Order</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[150px]">Party Name</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[150px]">Plant</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[100px]">Order Type</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[100px]">Pin Code</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">From</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">To</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[100px]">Taluka</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[100px]">District</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[100px]">State</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[80px]">Weight (MT)</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">Collection Charges</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[130px]">Cancellation Charges</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">Loading Charges</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">Other Charges</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[80px]">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2546,7 +3122,10 @@ const uploadAllFiles = async (token) => {
                           type="text"
                           value={row.orderNo || ""}
                           onChange={(e) => updateOrderRow(row._id, 'orderNo', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-emerald-500"
+                          readOnly={!!selectedVehicleNegotiation}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-emerald-500 ${
+                            selectedVehicleNegotiation ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                          }`}
                           placeholder="Order No"
                         />
                       </td>
@@ -2555,7 +3134,10 @@ const uploadAllFiles = async (token) => {
                           type="text"
                           value={row.partyName || ""}
                           onChange={(e) => updateOrderRow(row._id, 'partyName', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-emerald-500"
+                          readOnly={!!selectedVehicleNegotiation}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-emerald-500 ${
+                            selectedVehicleNegotiation ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                          }`}
                           placeholder="Party Name"
                         />
                       </td>
@@ -2568,7 +3150,7 @@ const uploadAllFiles = async (token) => {
                               updateOrderRow(row._id, 'plantCode', plant._id);
                               updateOrderRow(row._id, 'plantName', plant.name);
                               if (plant.address || plant.city) {
-                                updateOrderRow(row._id, 'from', plant.address || plant.city || '');
+                                updateOrderRow(row._id, 'fromName', plant.address || plant.city || '');
                               }
                             }
                           }}
@@ -2576,13 +3158,17 @@ const uploadAllFiles = async (token) => {
                           displayField="name"
                           codeField="code"
                           cellId={`plant-${row._id}`}
+                          disabled={!!selectedVehicleNegotiation}
                         />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
                         <select
                           value={row.orderType || ""}
                           onChange={(e) => updateOrderRow(row._id, 'orderType', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none focus:border-emerald-500"
+                          disabled={!!selectedVehicleNegotiation}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-2 text-sm outline-none focus:border-emerald-500 ${
+                            selectedVehicleNegotiation ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                          }`}
                         >
                           <option value="">Select</option>
                           {ORDER_TYPES.map((opt) => (
@@ -2595,44 +3181,71 @@ const uploadAllFiles = async (token) => {
                           type="text"
                           value={row.pinCode || ""}
                           onChange={(e) => updateOrderRow(row._id, 'pinCode', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-emerald-500"
+                          readOnly={!!selectedVehicleNegotiation}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-emerald-500 ${
+                            selectedVehicleNegotiation ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                          }`}
                           placeholder="Pin Code"
                         />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
                         <input
                           type="text"
-                          value={row.state || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'state', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-emerald-500"
-                          placeholder="State"
-                        />
-                      </td>
-                      <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="text"
-                          value={row.district || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'district', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-emerald-500"
-                          placeholder="District"
-                        />
-                      </td>
-                      <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="text"
-                          value={row.from || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'from', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-emerald-500"
+                          value={row.fromName || row.from || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'fromName', e.target.value)}
+                          readOnly={!!selectedVehicleNegotiation}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-emerald-500 ${
+                            selectedVehicleNegotiation ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                          }`}
                           placeholder="From"
                         />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
                         <input
                           type="text"
-                          value={row.to || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'to', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-emerald-500"
+                          value={row.toName || row.to || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'toName', e.target.value)}
+                          readOnly={!!selectedVehicleNegotiation}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-emerald-500 ${
+                            selectedVehicleNegotiation ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                          }`}
                           placeholder="To"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.talukaName || row.taluka || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'talukaName', e.target.value)}
+                          readOnly={!!selectedVehicleNegotiation}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-emerald-500 ${
+                            selectedVehicleNegotiation ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                          }`}
+                          placeholder="Taluka"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.districtName || row.district || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'districtName', e.target.value)}
+                          readOnly={!!selectedVehicleNegotiation}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-emerald-500 ${
+                            selectedVehicleNegotiation ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                          }`}
+                          placeholder="District"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.stateName || row.state || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'stateName', e.target.value)}
+                          readOnly={!!selectedVehicleNegotiation}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-emerald-500 ${
+                            selectedVehicleNegotiation ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                          }`}
+                          placeholder="State"
                         />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
@@ -2640,14 +3253,70 @@ const uploadAllFiles = async (token) => {
                           type="number"
                           value={row.weight || ""}
                           onChange={(e) => updateOrderRow(row._id, 'weight', e.target.value)}
-                          className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-emerald-500"
+                          readOnly={!!selectedVehicleNegotiation}
+                          className={`w-20 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-emerald-500 ${
+                            selectedVehicleNegotiation ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                          }`}
                           placeholder="Weight"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="number"
+                          value={row.collectionCharges || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'collectionCharges', e.target.value)}
+                          readOnly={!!selectedVehicleNegotiation}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-emerald-500 ${
+                            selectedVehicleNegotiation ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                          }`}
+                          placeholder="Collection Charges"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.cancellationCharges || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'cancellationCharges', e.target.value)}
+                          readOnly={!!selectedVehicleNegotiation}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-emerald-500 ${
+                            selectedVehicleNegotiation ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                          }`}
+                          placeholder="Cancellation Charges"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.loadingCharges || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'loadingCharges', e.target.value)}
+                          readOnly={!!selectedVehicleNegotiation}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-emerald-500 ${
+                            selectedVehicleNegotiation ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                          }`}
+                          placeholder="Loading Charges"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="number"
+                          value={row.otherCharges || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'otherCharges', e.target.value)}
+                          readOnly={!!selectedVehicleNegotiation}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-emerald-500 ${
+                            selectedVehicleNegotiation ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                          }`}
+                          placeholder="Other Charges"
                         />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
                         <button
                           onClick={() => removeOrderRow(row._id)}
-                          className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-600"
+                          disabled={!!selectedVehicleNegotiation}
+                          className={`rounded-lg px-3 py-1.5 text-xs font-bold text-white ${
+                            selectedVehicleNegotiation 
+                              ? 'bg-gray-400 cursor-not-allowed' 
+                              : 'bg-red-500 hover:bg-red-600'
+                          }`}
                         >
                           Remove
                         </button>
@@ -2657,13 +3326,13 @@ const uploadAllFiles = async (token) => {
                 </tbody>
                 <tfoot className="bg-yellow-100">
                   <tr>
-                    <td colSpan="9" className="border border-yellow-300 px-3 py-2 text-right font-bold">
+                    <td colSpan="10" className="border border-yellow-300 px-3 py-2 text-right font-bold">
                       Total Quantity (MT):
                     </td>
                     <td className="border border-yellow-300 px-3 py-2 font-bold">
                       {calculateTotalWeight()}
                     </td>
-                    <td className="border border-yellow-300 px-3 py-2"></td>
+                    <td colSpan="5" className="border border-yellow-300 px-3 py-2"></td>
                   </tr>
                 </tfoot>
               </table>
@@ -2694,6 +3363,7 @@ const uploadAllFiles = async (token) => {
                 </thead>
                 <tbody>
                   <tr className="hover:bg-yellow-50 even:bg-slate-50">
+                    {/* Vehicle Search Column */}
                     <td className="border border-yellow-300 px-4 py-3 align-top">
                       <div className="space-y-3">
                         <div>
@@ -2705,7 +3375,47 @@ const uploadAllFiles = async (token) => {
                           />
                           <div className="text-xs text-slate-400 mt-1">Search by vehicle number or owner name</div>
                         </div>
-                        
+
+                        {/* Owner Search Dropdown */}
+                        <div className="mt-3 pt-2 border-t border-slate-200">
+                          <label className="text-xs font-bold text-slate-600">Or Search by Owner Name</label>
+                       <OwnerSearchDropdown
+  onSelect={(owner) => {
+    if (owner) {
+      setVehicleInfo(prev => ({
+        ...prev,
+        vehicleNo: owner.vehicleNumber || "",
+        vehicleOwnerName: owner.ownerName || "",
+        vehicleOwnerRC: owner.rcNumber || "",
+        ownerPanCard: owner.ownerPanCard || "",
+        // DO NOT auto-fill driver fields - keep existing or empty
+        // Message & Remarks - add owner info as reference
+        message: `Vehicle Owner: ${owner.ownerName}\nContact: ${owner.mobileNumber1 || owner.mobileNumber2}\nRC Number: ${owner.rcNumber || ''}`,
+        remarks: `Pan Card: ${owner.ownerPanCard || 'N/A'}\nAdhar Card: ${owner.adharCardNumber || 'N/A'}`
+      }));
+      
+      setSelectedVehicle({
+        _id: owner._id,
+        vehicleNumber: owner.vehicleNumber,
+        ownerName: owner.ownerName
+      });
+      
+      setExistingFiles(prev => ({
+        ...prev,
+        vehicle: {
+          ...prev.vehicle,
+          rc: owner.rcDocuments?.map(doc => ({ name: 'RC Document', path: doc })) || [],
+          pan: owner.panCardDocuments?.map(doc => ({ name: 'PAN Document', path: doc })) || [],
+        }
+      }));
+      
+      alert(`✅ Owner ${owner.ownerName} loaded!\nVehicle: ${owner.vehicleNumber}`);
+    }
+  }}
+  placeholder="Search by owner name, vehicle number, or RC number..."
+/>
+                        </div>
+
                         <button
                           onClick={handleCreateVehicle}
                           className="w-full rounded-lg bg-green-600 px-3 py-2 text-xs font-bold text-white hover:bg-green-700 transition"
@@ -2720,6 +3430,40 @@ const uploadAllFiles = async (token) => {
                             <div className="text-xs text-green-600">Owner: {selectedVehicle.ownerName}</div>
                           </div>
                         )}
+
+                        <div className="pt-2 border-t border-slate-200">
+                          <label className="text-xs font-bold text-slate-600">Vehicle Photos</label>
+                          <p className="text-xs text-slate-400 mb-1">Upload vehicle photos (Max 10)</p>
+                          <button 
+                            onClick={handleVehiclePhotoSelect}
+                            className="w-full rounded-lg bg-cyan-50 px-3 py-2 text-xs font-bold text-cyan-700 border border-cyan-200 hover:bg-cyan-100 transition flex items-center justify-center gap-2"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            {vehiclePhotoFiles.length > 0 ? `✓ ${vehiclePhotoFiles.length} / 10 photos` : '+ Upload Vehicle Photos'}
+                          </button>
+                          <div className="mt-2 max-h-40 overflow-y-auto">
+                            {vehiclePhotoFiles.map((file, idx) => (
+                              <FileUploadItem 
+                                key={idx} 
+                                file={file} 
+                                index={idx}
+                                onRemove={removeVehiclePhoto}
+                                label={`Vehicle Photo ${idx + 1}`}
+                              />
+                            ))}
+                          </div>
+                          {vehiclePhotoFiles.length > 0 && (
+                            <div className="w-full bg-slate-200 rounded-full h-1.5 mt-2">
+                              <div 
+                                className="bg-cyan-500 h-1.5 rounded-full transition-all"
+                                style={{ width: `${(vehiclePhotoFiles.length / 10) * 100}%` }}
+                              />
+                            </div>
+                          )}
+                        </div>
 
                         <div>
                           <label className="text-xs font-bold text-slate-600">Insurance Number</label>
@@ -2767,6 +3511,7 @@ const uploadAllFiles = async (token) => {
                       </div>
                     </td>
 
+                    {/* Vehicle Information Column */}
                     <td className="border border-yellow-300 px-4 py-3 align-top">
                       <div className="space-y-3">
                         <div>
@@ -2856,6 +3601,16 @@ const uploadAllFiles = async (token) => {
                                 label="RC"
                               />
                             ))}
+                            {existingFiles.vehicle?.rc?.map((file, idx) => (
+                              <FileUploadItem 
+                                key={`existing-rc-${idx}`}
+                                file={file}
+                                index={idx}
+                                onRemove={() => removeFile('vehicle', 'rc', idx, true)}
+                                label="RC"
+                                isExisting={true}
+                              />
+                            ))}
                           </div>
                           <div>
                             <label className="text-xs font-bold text-slate-600">Owner Pan Doc</label>
@@ -2872,6 +3627,16 @@ const uploadAllFiles = async (token) => {
                                 index={idx}
                                 onRemove={() => removeFile('vehicle', 'pan', idx)}
                                 label="PAN"
+                              />
+                            ))}
+                            {existingFiles.vehicle?.pan?.map((file, idx) => (
+                              <FileUploadItem 
+                                key={`existing-pan-${idx}`}
+                                file={file}
+                                index={idx}
+                                onRemove={() => removeFile('vehicle', 'pan', idx, true)}
+                                label="PAN"
+                                isExisting={true}
                               />
                             ))}
                           </div>
@@ -2892,109 +3657,259 @@ const uploadAllFiles = async (token) => {
                       </div>
                     </td>
 
-                    <td className="border border-yellow-300 px-4 py-3 align-top">
-                      <div className="space-y-3">
-                        <div>
-                          <label className="text-xs font-bold text-slate-600">Driver Name</label>
-                          <input
-                            type="text"
-                            value={vehicleInfo.driverName}
-                            onChange={(e) => setVehicleInfo({ ...vehicleInfo, driverName: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                            placeholder="Enter driver name"
-                          />
-                        </div>
+                    {/* Driver Information Column */}
+                  <td className="border border-yellow-300 px-4 py-3 align-top">
+  <div className="space-y-3">
+    <div>
+      <label className="text-xs font-bold text-slate-600">Driver Name</label>
+      <input
+        type="text"
+        value={vehicleInfo.driverName}
+        onChange={(e) => setVehicleInfo({ ...vehicleInfo, driverName: e.target.value })}
+        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+        placeholder="Enter driver name"
+      />
+    </div>
 
-                        <div>
-                          <label className="text-xs font-bold text-slate-600">Driver Mobile No</label>
-                          <input
-                            type="text"
-                            value={vehicleInfo.driverMobileNo}
-                            onChange={(e) => setVehicleInfo({ ...vehicleInfo, driverMobileNo: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                            placeholder="Enter mobile number"
-                          />
-                        </div>
+    <div>
+      <label className="text-xs font-bold text-slate-600">Driver Mobile No</label>
+      <input
+        type="text"
+        value={vehicleInfo.driverMobileNo}
+        onChange={(e) => setVehicleInfo({ ...vehicleInfo, driverMobileNo: e.target.value })}
+        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+        placeholder="Enter mobile number"
+      />
+    </div>
 
-                        <div>
-                          <label className="text-xs font-bold text-slate-600">Driving License No</label>
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={vehicleInfo.drivingLicense}
-                              onChange={(e) => setVehicleInfo({ ...vehicleInfo, drivingLicense: e.target.value })}
-                              className="mt-1 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                              placeholder="License No"
-                            />
-                            <button 
-                              onClick={() => handleFileSelect('vehicle', 'license')}
-                              className="mt-1 rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 border border-blue-200 hover:bg-blue-100 whitespace-nowrap"
-                            >
-                              {vehicleFiles.license.length > 0 ? `✓ ${vehicleFiles.license.length}` : 'Select'}
-                            </button>
+    <div>
+      <label className="text-xs font-bold text-slate-600">Driving License No</label>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={vehicleInfo.drivingLicense}
+          onChange={(e) => setVehicleInfo({ ...vehicleInfo, drivingLicense: e.target.value })}
+          className="mt-1 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+          placeholder="License No"
+        />
+        <button 
+          onClick={() => handleFileSelect('vehicle', 'license')}
+          className="mt-1 rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 border border-blue-200 hover:bg-blue-100 whitespace-nowrap"
+        >
+          {vehicleFiles.license.length > 0 ? `✓ ${vehicleFiles.license.length}` : 'Select'}
+        </button>
+      </div>
+      {vehicleFiles.license.map((file, idx) => (
+        <FileUploadItem 
+          key={idx} 
+          file={file} 
+          index={idx}
+          onRemove={() => removeFile('vehicle', 'license', idx)}
+          label="License"
+        />
+      ))}
+    </div>
+
+    <div>
+      <label className="text-xs font-bold text-slate-600">Driver Photo</label>
+      <button 
+        onClick={() => handleFileSelect('vehicle', 'photo')}
+        className="mt-1 w-full rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 border border-blue-200 hover:bg-blue-100"
+      >
+        {vehicleFiles.photo.length > 0 ? `✓ ${vehicleFiles.photo.length} file(s)` : '+ Select Photo'}
+      </button>
+      {vehicleFiles.photo.map((file, idx) => (
+        <FileUploadItem 
+          key={idx} 
+          file={file} 
+          index={idx}
+          onRemove={() => removeFile('vehicle', 'photo', idx)}
+          label="Photo"
+        />
+      ))}
+    </div>
+
+    {/* Helper / Co-Driver section remains same */}
+    <div className="pt-3 border-t border-slate-200">
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={hasHelper}
+          onChange={(e) => setHasHelper(e.target.checked)}
+          className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+        />
+        <span className="text-xs font-bold text-slate-700">Helper / Co-Driver Available?</span>
+      </label>
+    </div>
+
+     {hasHelper && (
+                          <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200 space-y-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                              </svg>
+                              <span className="text-xs font-bold text-blue-800">Helper / Co-Driver Details</span>
+                            </div>
+
+                            <div>
+                              <label className="text-xs font-bold text-slate-600">Helper Name</label>
+                              <input
+                                type="text"
+                                value={helperInfo.name}
+                                onChange={(e) => setHelperInfo({ ...helperInfo, name: e.target.value })}
+                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                                placeholder="Enter helper name"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-xs font-bold text-slate-600">Helper Mobile Number</label>
+                              <input
+                                type="tel"
+                                value={helperInfo.mobileNo}
+                                onChange={(e) => setHelperInfo({ ...helperInfo, mobileNo: e.target.value })}
+                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                                placeholder="Enter mobile number"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-xs font-bold text-slate-600">Helper Photo</label>
+                              <button 
+                                onClick={() => handleHelperFileSelect('photo')}
+                                className="mt-1 w-full rounded-lg bg-green-50 px-3 py-2 text-xs font-bold text-green-700 border border-green-200 hover:bg-green-100"
+                              >
+                                {helperInfo.photo.length > 0 ? `✓ ${helperInfo.photo.length} file(s)` : '+ Upload Photo'}
+                              </button>
+                              {helperInfo.photo.map((file, idx) => (
+                                <FileUploadItem 
+                                  key={idx} 
+                                  file={file} 
+                                  index={idx}
+                                  onRemove={() => removeFile('helper', 'photo', idx)}
+                                  label="Helper Photo"
+                                />
+                              ))}
+                            </div>
+
+                            <div>
+                              <label className="text-xs font-bold text-slate-600">Helper Aadhar Photo</label>
+                              <button 
+                                onClick={() => handleHelperFileSelect('aadharPhoto')}
+                                className="mt-1 w-full rounded-lg bg-purple-50 px-3 py-2 text-xs font-bold text-purple-700 border border-purple-200 hover:bg-purple-100"
+                              >
+                                {helperInfo.aadharPhoto.length > 0 ? `✓ ${helperInfo.aadharPhoto.length} file(s)` : '+ Upload Aadhar'}
+                              </button>
+                              {helperInfo.aadharPhoto.map((file, idx) => (
+                                <FileUploadItem 
+                                  key={idx} 
+                                  file={file} 
+                                  index={idx}
+                                  onRemove={() => removeFile('helper', 'aadharPhoto', idx)}
+                                  label="Helper Aadhar"
+                                />
+                              ))}
+                            </div>
                           </div>
-                          {vehicleFiles.license.map((file, idx) => (
-                            <FileUploadItem 
-                              key={idx} 
-                              file={file} 
-                              index={idx}
-                              onRemove={() => removeFile('vehicle', 'license', idx)}
-                              label="License"
-                            />
-                          ))}
-                        </div>
+                        )}
 
-                        <div>
-                          <label className="text-xs font-bold text-slate-600">Driver Photo</label>
-                          <button 
-                            onClick={() => handleFileSelect('vehicle', 'photo')}
-                            className="mt-1 w-full rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 border border-blue-200 hover:bg-blue-100"
-                          >
-                            {vehicleFiles.photo.length > 0 ? `✓ ${vehicleFiles.photo.length} file(s)` : '+ Select Photo'}
-                          </button>
-                          {vehicleFiles.photo.map((file, idx) => (
-                            <FileUploadItem 
-                              key={idx} 
-                              file={file} 
-                              index={idx}
-                              onRemove={() => removeFile('vehicle', 'photo', idx)}
-                              label="Photo"
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    </td>
+  </div>
+</td>
 
-                    <td className="border border-yellow-300 px-4 py-3 align-top">
-                      <div className="space-y-3">
-                        <div>
-                          <label className="text-xs font-bold text-slate-600">Message (Hindi/English)</label>
-                          <textarea
-                            value={vehicleInfo.message}
-                            onChange={(e) => setVehicleInfo({ ...vehicleInfo, message: e.target.value })}
-                            rows={3}
-                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                            placeholder="Enter message"
-                          />
-                        </div>
+                    {/* Message & Remarks Column */}
+                   <td className="border border-yellow-300 px-4 py-3 align-top">
+  <div className="space-y-3">
+    <div>
+      <label className="text-xs font-bold text-slate-600">Message (Hindi/English)</label>
+      <textarea
+        value={vehicleInfo.message}
+        onChange={(e) => setVehicleInfo({ ...vehicleInfo, message: e.target.value })}
+        rows={3}
+        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+        placeholder="Enter message"
+      />
+    </div>
 
-                        <div>
-                          <label className="text-xs font-bold text-slate-600">Remarks</label>
-                          <textarea
-                            value={vehicleInfo.remarks}
-                            onChange={(e) => setVehicleInfo({ ...vehicleInfo, remarks: e.target.value })}
-                            rows={4}
-                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                            placeholder="Enter remarks"
-                          />
-                        </div>
-                      </div>
-                    </td>
+    <div>
+      <label className="text-xs font-bold text-slate-600">Remarks</label>
+      <textarea
+        value={vehicleInfo.remarks}
+        onChange={(e) => setVehicleInfo({ ...vehicleInfo, remarks: e.target.value })}
+        rows={4}
+        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+        placeholder="Enter remarks"
+      />
+    </div>
+  </div>
+</td>
                   </tr>
                 </tbody>
               </table>
             </div>
           </Card>
+        </div>
+
+        {/* Detention Information Card */}
+        <div className="mt-4">
+          <Card title="Detention Information">
+            <div className="grid grid-cols-12 gap-4">
+              <div className="col-span-12 md:col-span-6">
+                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
+                  <label className="text-xs font-bold text-orange-700">Detention Days</label>
+                  <input
+                    type="number"
+                    value={detentionDays}
+                    onChange={(e) => setDetentionDays(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-orange-200 bg-white px-3 py-2 text-sm outline-none focus:border-orange-500"
+                    placeholder="Enter number of detention days"
+                    min="0"
+                  />
+                  <p className="text-xs text-orange-600 mt-1">Number of days vehicle is detained</p>
+                </div>
+              </div>
+              <div className="col-span-12 md:col-span-6">
+                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
+                  <label className="text-xs font-bold text-orange-700">Detention Number / Reference</label>
+                  <input
+                    type="text"
+                    value={detentionNumber}
+                    onChange={(e) => setDetentionNumber(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-orange-200 bg-white px-3 py-2 text-sm outline-none focus:border-orange-500"
+                    placeholder="Enter detention reference number"
+                  />
+                  <p className="text-xs text-orange-600 mt-1">Reference number or ID for detention</p>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Loaded Vehicle Slip Upload */}
+        <div className="mt-4">
+          <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
+            <label className="text-xs font-bold text-indigo-700">Loaded Vehicle Slip</label>
+            <p className="text-xs text-slate-400 mb-1">Upload loaded vehicle slip (Image/PDF)</p>
+            <button 
+              onClick={handleLoadedVehicleSlipSelect}
+              className="w-full rounded-lg bg-indigo-100 px-3 py-2 text-xs font-bold text-indigo-700 border border-indigo-300 hover:bg-indigo-200 transition flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              {loadedVehicleSlipFiles.length > 0 ? `✓ ${loadedVehicleSlipFiles.length} file(s)` : '+ Upload Loaded Vehicle Slip'}
+            </button>
+            <div className="mt-2">
+              {loadedVehicleSlipFiles.map((file, idx) => (
+                <FileUploadItem 
+                  key={idx} 
+                  file={file} 
+                  index={idx}
+                  onRemove={removeLoadedVehicleSlip}
+                  label="Loaded Vehicle Slip"
+                />
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Pack Type Card */}
@@ -3024,6 +3939,7 @@ const uploadAllFiles = async (token) => {
             </div>
             
             <PackTypeTable
+              key={activePack}
               packType={activePack}
               rows={rows}
               onChange={updatePackRow}
@@ -3178,6 +4094,163 @@ const uploadAllFiles = async (token) => {
           </Card>
         </div>
 
+        {/* VL Panel Card */}
+        <div className="mt-4">
+          <Card title="VL - PANEL (Vehicle Loading Pictures)">
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <div className="mb-3 flex justify-between items-center">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Vehicle Loading Pictures (VL)</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Minimum 5 photos required • Maximum 25 photos allowed • Current: {getTotalVlPhotosCount()} / 25
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  {getTotalVlPhotosCount() < 25 && (
+                    <button
+                      onClick={handleAddMoreVlPhotos}
+                      className="rounded-lg bg-green-600 px-4 py-2 text-xs font-bold text-white hover:bg-green-700 transition flex items-center gap-1"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add More Photo
+                    </button>
+                  )}
+                  {getTotalVlPhotosCount() < 5 && (
+                    <div className="text-xs text-red-500 font-medium flex items-center">
+                      ⚠️ Need {5 - getTotalVlPhotosCount()} more photo(s)
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-8 gap-3">
+                {[1, 2, 3, 4, 5, 6, 7].map((num) => {
+                  const currentCount = vlFiles[`vl${num}`]?.length || 0;
+                  const totalCount = getTotalVlPhotosCount();
+                  const isMaxReached = totalCount >= 25;
+                  const isDisabled = isMaxReached && currentCount === 0;
+                  
+                  return (
+                    <div key={num} className="col-span-1">
+                      <div className="text-xs font-bold text-slate-600 mb-1">VL - {num}</div>
+                      <button 
+                        onClick={() => handleFileSelect('vl', `vl${num}`)}
+                        disabled={isDisabled}
+                        className={`w-full rounded-lg px-2 py-3 text-xs font-bold border hover:bg-opacity-80 transition-all ${
+                          currentCount > 0 
+                            ? 'bg-green-50 text-green-700 border-green-200' 
+                            : isDisabled 
+                              ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                              : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                        }`}
+                        title={isDisabled ? "Maximum 25 photos reached" : `Upload VL-${num} photos`}
+                      >
+                        {currentCount > 0 
+                          ? `✓ ${currentCount} file(s)` 
+                          : isDisabled 
+                            ? 'Max Reached' 
+                            : 'Select'}
+                      </button>
+                      <div className="mt-1 text-center">
+                        <span className={`text-xs ${currentCount > 0 ? 'text-green-600 font-medium' : 'text-slate-400'}`}>
+                          {currentCount} / 25
+                        </span>
+                      </div>
+                      {vlFiles[`vl${num}`] && vlFiles[`vl${num}`].map((file, idx) => (
+                        <FileUploadItem 
+                          key={idx} 
+                          file={file} 
+                          index={idx}
+                          onRemove={() => removeFile('vl', `vl${num}`, idx)}
+                          label={`VL-${num}`}
+                        />
+                      ))}
+                    </div>
+                  );
+                })}
+                <div className="col-span-1">
+                  <div className="text-xs font-bold text-slate-600 mb-1">Video - VL</div>
+                  <button 
+                    onClick={() => handleFileSelect('vl', 'videoVl', true)}
+                    className={`w-full rounded-lg px-2 py-3 text-xs font-bold border hover:bg-opacity-80 ${
+                      vlFiles.videoVl && vlFiles.videoVl.length > 0
+                        ? 'bg-green-50 text-green-700 border-green-200' 
+                        : 'bg-purple-50 text-purple-700 border-purple-200'
+                    }`}
+                  >
+                    {vlFiles.videoVl && vlFiles.videoVl.length > 0 
+                      ? `✓ ${vlFiles.videoVl.length} file(s)` 
+                      : 'Select'}
+                  </button>
+                  {vlFiles.videoVl && vlFiles.videoVl.map((file, idx) => (
+                    <FileUploadItem 
+                      key={idx} 
+                      file={file} 
+                      index={idx}
+                      onRemove={() => removeFile('vl', 'videoVl', idx)}
+                      label="Video"
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <div className="flex justify-between text-xs text-slate-600 mb-1">
+                  <span>Upload Progress</span>
+                  <span>{getTotalVlPhotosCount()} / 25 photos</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-2">
+                  <div 
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      getTotalVlPhotosCount() >= 5 
+                        ? 'bg-green-500' 
+                        : 'bg-yellow-500'
+                    }`}
+                    style={{ 
+                      width: `${Math.min(100, (getTotalVlPhotosCount() / 25) * 100)}%` 
+                    }}
+                  />
+                </div>
+                <div className="flex justify-between text-xs mt-1">
+                  <span className="text-red-500">Min: 5</span>
+                  <span className="text-green-500">Max: 25</span>
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center gap-3">
+                <span className="text-xs font-bold text-slate-600">Vehicle - Loading Approval:</span>
+                <span className={`text-sm px-3 py-1 rounded-full ${getStatusBadge(vlUploads.approval)}`}>
+                  {vlUploads.approval || 'Not Set'}
+                </span>
+              </div>
+              <div className="mt-2 flex items-center gap-3">
+                <span className="text-xs font-bold text-slate-600">Loading Status:</span>
+                <span className={`text-sm px-3 py-1 rounded-full ${getStatusBadge(vlUploads.loadingStatus)}`}>
+                  {vlUploads.loadingStatus || 'Not Set'}
+                </span>
+              </div>
+              
+              {getTotalVlPhotosCount() > 0 && getTotalVlPhotosCount() < 5 && (
+                <div className="mt-3 p-2 bg-red-50 rounded-lg border border-red-200">
+                  <p className="text-xs text-red-600">
+                    ⚠️ Please upload at least {5 - getTotalVlPhotosCount()} more photo(s). Minimum 5 photos required.
+                  </p>
+                </div>
+              )}
+              
+              {getTotalVlPhotosCount() >= 5 && (
+                <div className="mt-3 p-2 bg-green-50 rounded-lg border border-green-200">
+                  <p className="text-xs text-green-600">
+                    ✅ Great! You have uploaded {getTotalVlPhotosCount()} photo(s). Minimum requirement satisfied.
+                  </p>
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+
         {/* VOT Panel Card */}
         <div className="mt-4">
           <Card title="VOT - PANEL (Vehicle Outer Tarpaulin Pictures)">
@@ -3241,79 +4314,6 @@ const uploadAllFiles = async (token) => {
           </Card>
         </div>
 
-        {/* VL Panel Card */}
-        <div className="mt-4">
-          <Card title="VL - PANEL (Vehicle Loading Pictures)">
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-              <div className="grid grid-cols-8 gap-3">
-                {[1,2,3,4,5,6,7].map((num) => (
-                  <div key={num} className="col-span-1">
-                    <div className="text-xs font-bold text-slate-600 mb-1">VL - {num}</div>
-                    <button 
-                      onClick={() => handleFileSelect('vl', `vl${num}`)}
-                      className={`w-full rounded-lg px-2 py-3 text-xs font-bold border hover:bg-opacity-80 ${
-                        vlFiles[`vl${num}`] && vlFiles[`vl${num}`].length > 0
-                          ? 'bg-green-50 text-green-700 border-green-200' 
-                          : 'bg-blue-50 text-blue-700 border-blue-200'
-                      }`}
-                    >
-                      {vlFiles[`vl${num}`] && vlFiles[`vl${num}`].length > 0 
-                        ? `✓ ${vlFiles[`vl${num}`].length} file(s)` 
-                        : 'Select'}
-                    </button>
-                    {vlFiles[`vl${num}`] && vlFiles[`vl${num}`].map((file, idx) => (
-                      <FileUploadItem 
-                        key={idx} 
-                        file={file} 
-                        index={idx}
-                        onRemove={() => removeFile('vl', `vl${num}`, idx)}
-                        label={`VL-${num}`}
-                      />
-                    ))}
-                  </div>
-                ))}
-                <div className="col-span-1">
-                  <div className="text-xs font-bold text-slate-600 mb-1">Video - VL</div>
-                  <button 
-                    onClick={() => handleFileSelect('vl', 'videoVl', true)}
-                    className={`w-full rounded-lg px-2 py-3 text-xs font-bold border hover:bg-opacity-80 ${
-                      vlFiles.videoVl && vlFiles.videoVl.length > 0
-                        ? 'bg-green-50 text-green-700 border-green-200' 
-                        : 'bg-purple-50 text-purple-700 border-purple-200'
-                    }`}
-                  >
-                    {vlFiles.videoVl && vlFiles.videoVl.length > 0 
-                      ? `✓ ${vlFiles.videoVl.length} file(s)` 
-                      : 'Select'}
-                  </button>
-                  {vlFiles.videoVl && vlFiles.videoVl.map((file, idx) => (
-                    <FileUploadItem 
-                      key={idx} 
-                      file={file} 
-                      index={idx}
-                      onRemove={() => removeFile('vl', 'videoVl', idx)}
-                      label="Video"
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-4 flex items-center gap-3">
-                <span className="text-xs font-bold text-slate-600">Vehicle - Loading Approval:</span>
-                <span className={`text-sm px-3 py-1 rounded-full ${getStatusBadge(vlUploads.approval)}`}>
-                  {vlUploads.approval || 'Not Set'}
-                </span>
-              </div>
-              <div className="mt-2 flex items-center gap-3">
-                <span className="text-xs font-bold text-slate-600">Loading Status:</span>
-                <span className={`text-sm px-3 py-1 rounded-full ${getStatusBadge(vlUploads.loadingStatus)}`}>
-                  {vlUploads.loadingStatus || 'Not Set'}
-                </span>
-              </div>
-            </div>
-          </Card>
-        </div>
-
         {/* Loaded Vehicle Weighment & Charges Card */}
         <div className="mt-4">
           <Card title="Loaded Vehicle Weighment & Charges">
@@ -3353,21 +4353,17 @@ const uploadAllFiles = async (token) => {
                       </span>
                     </div>
                   </div>
-
-                  <div className="mt-4 p-3 bg-white rounded-lg border border-yellow-100">
-                    <p className="text-xs text-slate-600">
-                      <span className="font-bold text-red-600">⚠️ Note:</span> Documents - LR & Ewaybill is required for Vehicle to do the Loaded Vehicle Weighment and this could be a loophole - Try to Fix this.
-                    </p>
-                    <p className="text-xs text-slate-600 mt-2">
-                      <span className="font-bold text-amber-600">⚠️ Note:</span> Unless the Tracking of Driver of loaded Vehicle is activated the LR Option should not be available.
-                    </p>
-                  </div>
                 </div>
               </div>
 
               <div className="col-span-12 md:col-span-6">
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                  <h3 className="text-sm font-bold text-slate-800 mb-3">Loading Charges & Expenses</h3>
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-sm font-bold text-slate-800">Loading Charges & Expenses</h3>
+                    <div className="bg-orange-100 text-orange-800 text-xs px-3 py-1 rounded-full font-medium">
+                      Deduct at Office
+                    </div>
+                  </div>
                   
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
@@ -3421,8 +4417,8 @@ const uploadAllFiles = async (token) => {
                       />
                     </div>
                     <div className="flex justify-between items-center pt-2 border-t border-slate-200 mt-2">
-                      <span className="text-sm font-bold text-slate-800">Total:</span>
-                      <span className="font-bold text-emerald-700">
+                      <span className="text-sm font-bold text-slate-800">Total (to be deducted at office):</span>
+                      <span className="font-bold text-orange-700 text-lg">
                         ₹{calculateTotalCharges().toLocaleString()}
                       </span>
                     </div>
@@ -3478,6 +4474,59 @@ const uploadAllFiles = async (token) => {
           </Card>
         </div>
 
+        {/* Arrival Details Card */}
+        <div className="mt-4">
+          <Card title="Arrival Details">
+            <div className="grid grid-cols-12 gap-4">
+              <div className="col-span-12 md:col-span-3">
+                <div className="bg-slate-50 p-3 rounded-lg">
+                  <label className="text-xs font-bold text-slate-600">Arrival Date</label>
+                  <input
+                    type="date"
+                    value={arrivalDetails.date}
+                    onChange={(e) => setArrivalDetails({ ...arrivalDetails, date: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                  />
+                  <p className="text-xs text-green-600 mt-1">Auto-filled from camera capture</p>
+                </div>
+              </div>
+              <div className="col-span-12 md:col-span-3">
+                <div className="bg-slate-50 p-3 rounded-lg">
+                  <label className="text-xs font-bold text-slate-600">Arrival Time</label>
+                  <input
+                    type="time"
+                    value={arrivalDetails.time}
+                    onChange={(e) => setArrivalDetails({ ...arrivalDetails, time: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    placeholder="HH:MM"
+                  />
+                  <p className="text-xs text-green-600 mt-1">Auto-filled from camera capture</p>
+                </div>
+              </div>
+              <div className="col-span-12 md:col-span-3">
+                <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                  <label className="text-xs font-bold text-orange-700">Out Time</label>
+                  <input
+                    type="time"
+                    value={arrivalDetails.outTime}
+                    onChange={(e) => setArrivalDetails({ ...arrivalDetails, outTime: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-orange-200 bg-white px-3 py-2 text-sm outline-none focus:border-orange-500"
+                    placeholder="HH:MM"
+                  />
+                  <p className="text-xs text-orange-600 mt-1">Auto-filled when generating LR</p>
+                </div>
+              </div>
+              <div className="col-span-12 md:col-span-3">
+                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <p className="text-xs text-blue-800">
+                    <span className="font-bold">Note:</span> JV need for making the payment in Driver or Motor Owner Account.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+
         {/* Documents & Consignment Note Card */}
         <div className="mt-4">
           <Card title="Documents & Consignment Note (LR)">
@@ -3485,9 +4534,13 @@ const uploadAllFiles = async (token) => {
               <div className="col-span-12 md:col-span-4">
                 <div className="bg-white p-4 rounded-xl border border-slate-200">
                   <h3 className="text-sm font-bold text-slate-800 mb-2">Consignment Note (LR)</h3>
-                  <button className="w-full rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700">
+                  <button 
+                    onClick={handleGenerateLR}
+                    className="w-full rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                  >
                     Generate LR
                   </button>
+                  <p className="text-xs text-slate-500 mt-2">Click to generate LR and auto-fill Out Time & Date</p>
                 </div>
               </div>
               <div className="col-span-12 md:col-span-4">
@@ -3504,44 +4557,6 @@ const uploadAllFiles = async (token) => {
                   <button className="w-full rounded-lg bg-purple-600 px-4 py-2 text-xs font-bold text-white hover:bg-purple-700">
                     View Invoice
                   </button>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Arrival Details Card */}
-        <div className="mt-4">
-          <Card title="Arrival Details">
-            <div className="grid grid-cols-12 gap-4">
-              <div className="col-span-12 md:col-span-3">
-                <div className="bg-slate-50 p-3 rounded-lg">
-                  <label className="text-xs font-bold text-slate-600">Arrival Date</label>
-                  <input
-                    type="date"
-                    value={arrivalDetails.date}
-                    onChange={(e) => setArrivalDetails({ ...arrivalDetails, date: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                  />
-                </div>
-              </div>
-              <div className="col-span-12 md:col-span-3">
-                <div className="bg-slate-50 p-3 rounded-lg">
-                  <label className="text-xs font-bold text-slate-600">Arrival Time</label>
-                  <input
-                    type="time"
-                    value={arrivalDetails.time}
-                    onChange={(e) => setArrivalDetails({ ...arrivalDetails, time: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                    placeholder="HH:MM"
-                  />
-                </div>
-              </div>
-              <div className="col-span-12 md:col-span-6">
-                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                  <p className="text-xs text-blue-800">
-                    <span className="font-bold">Note:</span> JV need for making the payment in Driver or Motor Owner Account.
-                  </p>
                 </div>
               </div>
             </div>

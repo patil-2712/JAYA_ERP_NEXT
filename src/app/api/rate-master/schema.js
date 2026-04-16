@@ -1,6 +1,12 @@
+// schema.js - Make sure you have this complete schema
 import mongoose from 'mongoose';
 
-const rateSlabSchema = new mongoose.Schema({
+const locationRateSchema = new mongoose.Schema({
+  locationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Location',
+    required: true
+  },
   fromQty: {
     type: Number,
     required: true
@@ -31,12 +37,18 @@ const rateMasterSchema = new mongoose.Schema({
     ref: 'Branch',
     required: true
   },
-  locationId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Location',
+  locationRates: [locationRateSchema],
+  // THESE FIELDS ARE MISSING IN YOUR SAVE
+  weightRule: {
+    type: String,
+    enum: ['above_25', 'all_weights'],
+    default: 'all_weights'
+  },
+  approvalOption: {
+    type: String,
+    enum: ['contract_rate', 'mail_approval'],
     required: true
   },
-  rateSlabs: [rateSlabSchema],
   companyId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Company',
@@ -54,7 +66,6 @@ const rateMasterSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Compound index to ensure unique title per company
 rateMasterSchema.index({ companyId: 1, title: 1 }, { unique: true });
 
 const RateMaster = mongoose.models.RateMaster || mongoose.model('RateMaster', rateMasterSchema);

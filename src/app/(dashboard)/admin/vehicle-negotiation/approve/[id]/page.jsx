@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
+import mongoose from 'mongoose';
 
 /* =======================
   HELPERS / CONSTANTS
@@ -31,6 +32,10 @@ function num(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function isValidObjectId(id) {
+  return id && mongoose.Types.ObjectId.isValid(id);
+}
+
 /* =======================
   Supplier Search Hook
 ========================= */
@@ -38,24 +43,19 @@ function useSupplierSearch() {
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const searchSuppliers = async (query = "") => {
+  const searchSuppliers = async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const url = '/api/suppliers';
-      
-      const res = await fetch(url, {
+      const res = await fetch('/api/suppliers', {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
         setSuppliers(data.data);
-      } else {
-        setSuppliers([]);
       }
     } catch (err) {
       console.error('Error fetching suppliers:', err);
-      setSuppliers([]);
     } finally {
       setLoading(false);
     }
@@ -65,216 +65,128 @@ function useSupplierSearch() {
 }
 
 /* =======================
-  Vehicle Search Hook
+  Customer Search Hook
 ========================= */
-function useVehicleSearch() {
-  const [vehicles, setVehicles] = useState([]);
+function useCustomerSearch() {
+  const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const searchVehicles = async (query = "") => {
+  const searchCustomers = async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const url = query ? `/api/vehicles?search=${encodeURIComponent(query)}` : '/api/vehicles';
-      
-      const res = await fetch(url, {
+      const res = await fetch('/api/customers', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
-      
       const data = await res.json();
-      
       if (data.success && Array.isArray(data.data)) {
-        setVehicles(data.data);
-      } else {
-        setVehicles([]);
+        setCustomers(data.data);
       }
     } catch (err) {
-      console.error('Error fetching vehicles:', err);
-      setVehicles([]);
+      console.error('Error fetching customers:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  return { vehicles, loading, searchVehicles };
+  return { customers, loading, searchCustomers };
 }
 
 /* =======================
-  Searchable Dropdown Components
+  Order Panel Search Hook
 ========================= */
-function TableSearchableDropdown({ 
-  items, 
-  selectedId, 
-  onSelect, 
-  placeholder = "Search...",
-  displayField = 'name',
-  codeField = 'code',
-  disabled = false,
-  showCode = true
-}) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filteredItems, setFilteredItems] = useState([]);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const inputRef = useRef(null);
-  const dropdownRef = useRef(null);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+function useOrderPanelSearch() {
+  const [orderPanels, setOrderPanels] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    setFilteredItems(items);
-    if (selectedId) {
-      const item = items.find(i => i._id === selectedId || i.supplierName === selectedId || i.vehicleNumber === selectedId);
-      if (item) {
-        setSelectedItem(item);
-        setSearchQuery(getDisplayValue(item));
-      } else {
-        setSelectedItem(null);
-        setSearchQuery("");
-      }
-    } else {
-      setSelectedItem(null);
-      setSearchQuery("");
-    }
-  }, [items, selectedId]);
-
-  const getDisplayValue = (item) => {
-    if (!item) return "";
-    const display = item[displayField] || "";
-    const code = item[codeField] && showCode ? ` (${item[codeField]})` : "";
-    return `${display}${code}`;
-  };
-
-  const handleSearch = (query) => {
-    setSearchQuery(query);
-    
-    if (!query.trim()) {
-      setFilteredItems(items);
-    } else {
-      const filtered = items.filter(item => {
-        const display = (item[displayField] || '').toLowerCase();
-        const code = (item[codeField] || '').toLowerCase();
-        const searchLower = query.toLowerCase();
-        return display.includes(searchLower) || code.includes(searchLower);
+  const searchOrderPanels = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/order-panel', {
+        headers: { Authorization: `Bearer ${token}` },
       });
-      setFilteredItems(filtered);
-    }
-  };
-
-  const handleSelectItem = (item) => {
-    setSelectedItem(item);
-    setSearchQuery(getDisplayValue(item));
-    setShowDropdown(false);
-    onSelect?.(item);
-  };
-
-  const handleInputFocus = () => {
-    if (disabled) return;
-    
-    if (inputRef.current) {
-      const rect = inputRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + window.scrollY,
-        left: rect.left + window.scrollX,
-        width: rect.width
-      });
-    }
-    
-    setFilteredItems(items);
-    setShowDropdown(true);
-  };
-
-  const handleInputBlur = () => {
-    setTimeout(() => {
-      if (dropdownRef.current && !dropdownRef.current.contains(document.activeElement)) {
-        setShowDropdown(false);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setOrderPanels(data.data);
       }
-    }, 200);
+    } catch (err) {
+      console.error('Error fetching order panels:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getOrderPanelById = async (id) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/order-panel?id=${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        return data.data;
+      }
+      return null;
+    } catch (err) {
+      console.error('Error fetching order panel:', err);
+      return null;
+    }
   };
 
   useEffect(() => {
-    const handleScroll = () => {
-      if (showDropdown && inputRef.current) {
-        const rect = inputRef.current.getBoundingClientRect();
-        setDropdownPosition({
-          top: rect.bottom + window.scrollY,
-          left: rect.left + window.scrollX,
-          width: rect.width
-        });
-      }
-    };
+    searchOrderPanels();
+  }, []);
 
-    window.addEventListener('scroll', handleScroll, true);
-    window.addEventListener('resize', handleScroll);
+  return { orderPanels, loading, searchOrderPanels, getOrderPanelById };
+}
 
-    return () => {
-      window.removeEventListener('scroll', handleScroll, true);
-      window.removeEventListener('resize', handleScroll);
-    };
-  }, [showDropdown]);
+/* =======================
+  DEFAULT ROWS
+======================= */
+function defaultOrderRow() {
+  return {
+    _id: uid(),
+    orderNo: "",
+    orderPanelId: "",
+    partyName: "",
+    customerId: null,
+    customerCode: "",
+    contactPerson: "",
+    plantCode: null,
+    plantName: "",
+    plantCodeValue: "",
+    orderType: "Sales",
+    pinCode: "",
+    from: null,
+    fromName: "",
+    to: null,
+    toName: "",
+    taluka: "",
+    talukaName: "",
+    district: "",
+    districtName: "",
+    state: "",
+    stateName: "",
+    country: "",
+    countryName: "",
+    weight: "",
+    status: "Open",
+    collectionCharges: "",
+    cancellationCharges: "",
+    loadingCharges: "",
+    otherCharges: "",
+  };
+}
 
-  return (
-    <div className="relative w-full">
-      <input
-        ref={inputRef}
-        type="text"
-        value={searchQuery}
-        onChange={(e) => handleSearch(e.target.value)}
-        onFocus={handleInputFocus}
-        onBlur={handleInputBlur}
-        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 disabled:opacity-50"
-        placeholder={placeholder}
-        disabled={disabled}
-        autoComplete="off"
-      />
-      
-      {showDropdown && !disabled && (
-        <div 
-          ref={dropdownRef}
-          style={{
-            position: 'fixed',
-            top: dropdownPosition.top,
-            left: dropdownPosition.left,
-            width: dropdownPosition.width,
-            zIndex: 9999
-          }}
-          className="bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto"
-        >
-          {filteredItems.length > 0 ? (
-            filteredItems.map((item) => (
-              <div
-                key={item._id}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  handleSelectItem(item);
-                }}
-                className="p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors"
-              >
-                <div className="font-medium text-slate-800 text-sm">
-                  {item[displayField]}
-                </div>
-                {item[codeField] && showCode && (
-                  <div className="text-xs text-slate-500 mt-0.5">
-                    Code: {item[codeField]}
-                  </div>
-                )}
-              </div>
-            ))
-          ) : (
-            <div className="p-3 text-center text-sm text-slate-500">
-              {searchQuery.trim() ? 
-                `No items found for "${searchQuery}"` : 
-                "No items available"
-              }
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
+function defaultVendorRow() {
+  return {
+    _id: uid(),
+    vendorName: "",
+    vendorCode: "", 
+    marketRate: "",
+    purchaseType: "",
+  };
 }
 
 /* =======================
@@ -323,17 +235,218 @@ function Select({ label, value, onChange, options = [], col = "", readOnly = fal
       >
         <option value="">Select {label}</option>
         {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
+          <option key={o} value={o}>{o}</option>
         ))}
       </select>
     </div>
   );
 }
 
+function SearchableDropdown({ 
+  items, 
+  selectedId, 
+  onSelect, 
+  placeholder = "Search...",
+  displayField = 'name',
+  codeField = 'code',
+  disabled = false
+}) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredItems, setFilteredItems] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    setFilteredItems(items);
+    if (selectedId) {
+      const item = items.find(i => i._id === selectedId);
+      if (item) {
+        setSelectedItem(item);
+        setSearchQuery(item[displayField] || "");
+      }
+    }
+  }, [items, selectedId, displayField]);
+
+  const handleSelectItem = (item) => {
+    setSelectedItem(item);
+    setSearchQuery(item[displayField] || "");
+    setShowDropdown(false);
+    onSelect?.(item);
+  };
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <input
+        type="text"
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        onFocus={() => setShowDropdown(true)}
+        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+        disabled={disabled}
+        className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+          disabled ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+        }`}
+        placeholder={placeholder}
+        autoComplete="off"
+      />
+      
+      {showDropdown && !disabled && filteredItems.length > 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+          {filteredItems.map((item) => (
+            <div
+              key={item._id}
+              onMouseDown={() => handleSelectItem(item)}
+              className="p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100"
+            >
+              <div className="font-medium text-slate-800">{item[displayField]}</div>
+              <div className="text-xs text-slate-500">{item[codeField] && `Code: ${item[codeField]}`}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SupplierSearchDropdown({ value, onSelect, readOnly = false }) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [suppliers, setSuppliers] = useState([]);
+  const supplierSearch = useSupplierSearch();
+
+  useEffect(() => {
+    supplierSearch.searchSuppliers();
+  }, []);
+
+  useEffect(() => {
+    if (value) setSearchQuery(value);
+  }, [value]);
+
+  useEffect(() => {
+    setSuppliers(supplierSearch.suppliers);
+  }, [supplierSearch.suppliers]);
+
+  const handleSelectItem = (supplier) => {
+    setSearchQuery(supplier.supplierName);
+    setShowDropdown(false);
+    onSelect(supplier);
+  };
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        onFocus={() => setShowDropdown(true)}
+        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+        readOnly={readOnly}
+        className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+          readOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+        }`}
+        placeholder="Search supplier..."
+        autoComplete="off"
+      />
+      
+      {showDropdown && !readOnly && suppliers.length > 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+          {suppliers.map((supplier) => (
+            <div
+              key={supplier._id}
+              onMouseDown={() => handleSelectItem(supplier)}
+              className="p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100"
+            >
+              <div className="font-medium text-slate-800">{supplier.supplierName}</div>
+              <div className="text-xs text-slate-500">Code: {supplier.supplierCode}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MultiSelectOrderPanelDropdown({ selectedPanels = [], onSelect, placeholder = "Search and select order panels...", readOnly = false }) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
+  const orderPanelSearch = useOrderPanelSearch();
+
+  useEffect(() => {
+    orderPanelSearch.searchOrderPanels();
+  }, []);
+
+  const availablePanels = orderPanelSearch.orderPanels.filter(
+    panel => !selectedPanels.some(p => p._id === panel._id)
+  );
+
+  const handleSelectPanel = async (panel) => {
+    const fullPanel = await orderPanelSearch.getOrderPanelById(panel._id);
+    if (fullPanel) onSelect(fullPanel);
+    setSearchQuery("");
+    setShowDropdown(false);
+  };
+
+  const handleRemovePanel = (panelId) => {
+    onSelect(null, panelId);
+  };
+
+  if (readOnly) {
+    return (
+      <div className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 min-h-[42px]">
+        {selectedPanels.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {selectedPanels.map((panel, idx) => (
+              <span key={idx} className="bg-yellow-100 px-2 py-1 rounded-md text-xs">{panel.orderPanelNo}</span>
+            ))}
+          </div>
+        ) : "No order panels selected"}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      {selectedPanels.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-2 p-2 border border-yellow-200 rounded-lg bg-yellow-50">
+          {selectedPanels.map((panel) => (
+            <div key={panel._id} className="flex items-center gap-1 bg-yellow-100 px-2 py-1 rounded-md text-sm">
+              <span className="font-medium">{panel.orderPanelNo}</span>
+              <button onClick={() => handleRemovePanel(panel._id)} className="text-red-500 hover:text-red-700 font-bold ml-1">×</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <input
+        type="text"
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        onFocus={() => setShowDropdown(true)}
+        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+        placeholder={placeholder}
+        autoComplete="off"
+      />
+      {showDropdown && availablePanels.length > 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+          {availablePanels.map((panel) => (
+            <div
+              key={panel._id}
+              onMouseDown={() => handleSelectPanel(panel)}
+              className="p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100"
+            >
+              <div className="font-medium text-slate-800">{panel.orderPanelNo}</div>
+              <div className="text-xs text-slate-500">{panel.partyName || panel.customerName}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* =======================
-  Orders Table Component (Read-only with Taluka)
+  Orders Table Component (Read-only with all charge fields)
 ========================= */
 function OrdersTable({ rows }) {
   const columns = [
@@ -341,18 +454,29 @@ function OrdersTable({ rows }) {
     { key: "partyName", label: "Party Name", minWidth: "150px" },
     { key: "plantCode", label: "Plant Code", minWidth: "100px" },
     { key: "plantName", label: "Plant Name", minWidth: "120px" },
-    { key: "plantCodeValue", label: "Plant Code Value", minWidth: "120px" },
     { key: "orderType", label: "Order Type", minWidth: "100px" },
     { key: "pinCode", label: "Pin Code", minWidth: "100px" },
     { key: "from", label: "From", minWidth: "120px" },
     { key: "to", label: "To", minWidth: "120px" },
     { key: "taluka", label: "Taluka", minWidth: "120px" },
-    { key: "country", label: "Country", minWidth: "100px" },
-    { key: "state", label: "State", minWidth: "100px" },
     { key: "district", label: "District", minWidth: "100px" },
+    { key: "state", label: "State", minWidth: "100px" },
+    { key: "country", label: "Country", minWidth: "100px" },
     { key: "weight", label: "Weight", minWidth: "80px" },
     { key: "status", label: "Status", minWidth: "100px" },
+    { key: "collectionCharges", label: "Collection Charges", minWidth: "120px" },
+    { key: "cancellationCharges", label: "Cancellation Charges", minWidth: "130px" },
+    { key: "loadingCharges", label: "Loading Charges", minWidth: "120px" },
+    { key: "otherCharges", label: "Other Charges", minWidth: "110px" },
   ];
+
+  if (!rows || rows.length === 0) {
+    return (
+      <div className="overflow-auto rounded-xl border border-yellow-300 p-8 text-center text-slate-400">
+        No orders found
+      </div>
+    );
+  }
 
   return (
     <div className="overflow-auto rounded-xl border border-yellow-300 max-h-[500px]">
@@ -360,54 +484,41 @@ function OrdersTable({ rows }) {
         <thead className="sticky top-0 bg-yellow-400 z-10">
           <tr>
             {columns.map((col) => (
-              <th
-                key={col.key}
-                className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
-                style={{ minWidth: col.minWidth }}
-              >
+              <th key={col.key} className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center" style={{ minWidth: col.minWidth }}>
                 {col.label}
               </th>
             ))}
           </tr>
         </thead>
-
         <tbody>
-          {rows.length > 0 ? (
-            rows.map((row) => (
-              <tr key={row._id} className="hover:bg-yellow-50 even:bg-slate-50">
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.orderNo || '-'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.partyName || '-'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.plantCode || '-'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.plantName || '-'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.plantCodeValue || '-'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.orderType || '-'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.pinCode || '-'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.fromName || row.from || '-'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.toName || row.to || '-'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.talukaName || row.taluka || '-'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.countryName || row.country || '-'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.stateName || row.state || '-'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.districtName || row.district || '-'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.weight || '0'}</td>
-                <td className="border border-yellow-300 px-2 py-2">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    row.status === 'Open' ? 'bg-green-100 text-green-800' :
-                    row.status === 'Hold' ? 'bg-yellow-100 text-yellow-800' :
-                    row.status === 'Cancelled' ? 'bg-red-100 text-red-800' :
-                    'bg-slate-100 text-slate-800'
-                  }`}>
-                    {row.status || 'Open'}
-                  </span>
-                </td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={columns.length} className="border border-yellow-300 px-4 py-8 text-center text-slate-400">
-                No orders added.
+          {rows.map((row, idx) => (
+            <tr key={row._id || idx} className="hover:bg-yellow-50 even:bg-slate-50">
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.orderNo || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.partyName || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.plantCode || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.plantName || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.orderType || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.pinCode || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.fromName || row.from || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.toName || row.to || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.talukaName || row.taluka || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.districtName || row.district || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.stateName || row.state || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.countryName || row.country || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.weight || '0'}</td>
+              <td className="border border-yellow-300 px-2 py-2">
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                  row.status === 'Open' ? 'bg-green-100 text-green-800' :
+                  row.status === 'Hold' ? 'bg-yellow-100 text-yellow-800' :
+                  row.status === 'Cancelled' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-800'
+                }`}>{row.status || 'Open'}</span>
               </td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.collectionCharges || '0'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.cancellationCharges || 'Nil'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.loadingCharges || 'Nil'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.otherCharges || '0'}</td>
             </tr>
-          )}
+          ))}
         </tbody>
       </table>
     </div>
@@ -415,42 +526,67 @@ function OrdersTable({ rows }) {
 }
 
 /* =======================
-  Vendors Table Component (Read-only)
+  Vendors Table Component (Read-only with Purchase Type)
 ========================= */
 function VendorsTable({ rows }) {
+  if (!rows || rows.length === 0) {
+    return (
+      <div className="overflow-auto rounded-xl border border-yellow-300 p-8 text-center text-slate-400">
+        No suppliers found
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-auto rounded-xl border border-yellow-300 max-h-[300px]">
       <table className="min-w-full w-full text-sm">
         <thead className="sticky top-0 bg-yellow-400 z-10">
           <tr>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
-              Supplier Name
-            </th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
-              Supplier Code
-            </th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
-              Market Rates
-            </th>
+            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">Supplier Name</th>
+            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">Supplier Code</th>
+            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">Purchase - Type</th>
+            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">Market Rates</th>
           </tr>
         </thead>
-
         <tbody>
-          {rows.length > 0 ? (
-            rows.map((row) => (
-              <tr key={row._id} className="hover:bg-yellow-50 even:bg-slate-50">
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.vendorName || '-'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.vendorCode || '-'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700">₹{row.marketRate || '0'}</td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan="3" className="border border-yellow-300 px-4 py-8 text-center text-slate-400">
-                No suppliers added.
-              </td>
+          {rows.map((row, idx) => (
+            <tr key={row._id || idx} className="hover:bg-yellow-50 even:bg-slate-50">
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.vendorName || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.vendorCode || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.purchaseType || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">₹{row.marketRate || '0'}</td>
             </tr>
-          )}
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* =======================
+  Billing Type Table Component (Read-only - Only Billing Type, Loading Points, Drop Points)
+========================= */
+function BillingTypeTable({ header, billingColumns }) {
+  return (
+    <div className="overflow-auto rounded-xl border border-yellow-300">
+      <table className="min-w-full w-full text-sm">
+        <thead className="sticky top-0 bg-yellow-400">
+          <tr>
+            {billingColumns.map((col) => (
+              <th key={col.key} className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
+                {col.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          <tr className="hover:bg-yellow-50 even:bg-slate-50">
+            {billingColumns.map((col) => (
+              <td key={col.key} className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">
+                {header[col.key] || '-'}
+              </td>
+            ))}
+          </tr>
         </tbody>
       </table>
     </div>
@@ -466,23 +602,30 @@ export default function ApproveVehicleNegotiation() {
   const negotiationId = params.id;
 
   const supplierSearch = useSupplierSearch();
-  const vehicleSearch = useVehicleSearch();
+  const customerSearch = useCustomerSearch();
+  const audioRef = useRef(null);
   const fileInputRef = useRef(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [purchaseTypes, setPurchaseTypes] = useState([]);
+  const [paymentTerms, setPaymentTerms] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [plants, setPlants] = useState([]);
 
-  // State for all data
   const [vnnNumber, setVnnNumber] = useState("");
+  const [selectedOrderPanels, setSelectedOrderPanels] = useState([]);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [selectedSupplier, setSelectedSupplier] = useState(null);
+
   const [header, setHeader] = useState({
     vnnNo: "",
+    branch: null,
     branchName: "",
     branchCode: "",
-    delivery: "",
+    delivery: "Urgent",
     date: "",
-    billingType: "",
     loadingPoints: "",
     dropPoints: "",
     collectionCharges: "",
@@ -490,12 +633,22 @@ export default function ApproveVehicleNegotiation() {
     loadingCharges: "",
     otherCharges: "",
     partyName: "",
-    customerCode: "",
-    contactPerson: ""
+    customerId: null,
+    billingType: "Multi - Order"
   });
+
   const [orders, setOrders] = useState([]);
-  const [negotiation, setNegotiation] = useState({});
   const [vendors, setVendors] = useState([]);
+  const [negotiation, setNegotiation] = useState({
+    maxRate: "",
+    targetRate: "",
+    purchaseType: "",
+    oldRatePercent: "",
+    remarks1: "",
+  });
+  const [voiceUrl, setVoiceUrl] = useState("");
+  const [voiceFileInfo, setVoiceFileInfo] = useState(null);
+
   const [approval, setApproval] = useState({
     vendorName: "",
     vendorCode: "",
@@ -507,99 +660,142 @@ export default function ApproveVehicleNegotiation() {
     vehicleId: "",
     vehicleData: null,
     mobile: "",
-    purchaseType: "Loading & Unloading",
-    paymentTerms: "80 % Advance",
-    approvalStatus: "Pending",
+    purchaseType: "",
+    paymentTerms: "",
+    approvalStatus: "",
     remarks: "",
     memoStatus: "Pending",
     memoFile: null
   });
-  const [voiceUrl, setVoiceUrl] = useState("");
-  const [selectedOrderPanels, setSelectedOrderPanels] = useState([]);
 
-  // Fetch suppliers and vehicles on mount
+  // Fetch data
   useEffect(() => {
-    supplierSearch.searchSuppliers();
-    vehicleSearch.searchVehicles();
+    const fetchData = async () => {
+      try {
+        await fetchBranches();
+        await fetchPlants();
+        await supplierSearch.searchSuppliers();
+        await customerSearch.searchCustomers();
+        await fetchPurchaseTypes();
+        await fetchPaymentTerms();
+        await fetchNegotiationData();
+      } catch (error) {
+        console.error("Error in fetchData:", error);
+      }
+    };
+    fetchData();
   }, []);
 
-  useEffect(() => {
-    fetchNegotiationData();
-  }, []);
+  const fetchBranches = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/branches', { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) setBranches(data.data);
+    } catch (error) { console.error('Error fetching branches:', error); }
+  };
+
+  const fetchPlants = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/plants', { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) setPlants(data.data);
+    } catch (error) { console.error('Error fetching plants:', error); }
+  };
+
+  const fetchPurchaseTypes = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/purchase-type', { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) setPurchaseTypes(data.data.map(item => item.name));
+    } catch (error) { console.error('Error fetching purchase types:', error); }
+  };
+
+  const fetchPaymentTerms = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/payment-terms', { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) setPaymentTerms(data.data.map(item => item.name));
+    } catch (error) { console.error('Error fetching payment terms:', error); }
+  };
 
   const fetchNegotiationData = async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
+      console.log("Fetching negotiation with ID:", negotiationId);
       
       const res = await fetch(`/api/vehicle-negotiation?id=${negotiationId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
       const data = await res.json();
+      console.log("API Response:", data);
       
-      if (!data.success) {
-        throw new Error(data.message || 'Failed to fetch vehicle negotiation');
-      }
+      if (!data.success) throw new Error(data.message || 'Failed to fetch');
 
       const vn = data.data;
-      console.log("Loaded negotiation data:", vn);
+      console.log("Vehicle Negotiation Data:", vn);
       
-      // Set VNN number
       setVnnNumber(vn.vnnNo || "");
       
-      // ✅ FIXED: Set header data with all fields properly mapped
       setHeader({
         vnnNo: vn.vnnNo || "",
+        branch: vn.branch || null,
         branchName: vn.branchName || "",
         branchCode: vn.branchCode || "",
         delivery: vn.delivery || "Urgent",
-        date: vn.date ? new Date(vn.date).toLocaleDateString('en-GB') : "",
-        billingType: vn.billingType || "Multi - Order",
-        loadingPoints: vn.loadingPoints || "",
-        dropPoints: vn.dropPoints || "",
-        collectionCharges: vn.collectionCharges || "",
+        date: vn.date ? new Date(vn.date).toISOString().split('T')[0] : "",
+        loadingPoints: vn.loadingPoints?.toString() || "",
+        dropPoints: vn.dropPoints?.toString() || "",
+        collectionCharges: vn.collectionCharges?.toString() || "",
         cancellationCharges: vn.cancellationCharges || "Nil",
         loadingCharges: vn.loadingCharges || "Nil",
         otherCharges: vn.otherCharges || "Nil",
-        // ✅ FIXED: Party Name mapping - check multiple possible field names
-        partyName: vn.partyName || vn.customerName || vn.header?.partyName || "",
-        customerCode: vn.customerCode || vn.header?.customerCode || "",
-        contactPerson: vn.contactPerson || vn.header?.contactPerson || ""
+        partyName: vn.partyName || vn.customerName || "",
+        customerId: vn.customerId || null,
+        billingType: vn.billingType || "Multi - Order"
       });
 
-      // Set orders
-      if (vn.orders && vn.orders.length > 0) {
-        setOrders(vn.orders);
+      if (vn.customerName) {
+        setSelectedCustomer({
+          _id: vn.customerId,
+          customerName: vn.customerName,
+          customerCode: vn.customerCode || ""
+        });
       }
 
-      // Set order panels
-      if (vn.selectedOrderPanels) {
+      if (vn.orders && vn.orders.length > 0) {
+        setOrders(vn.orders.map(order => ({ ...order, _id: order._id || uid() })));
+      } else {
+        setOrders([defaultOrderRow()]);
+      }
+
+      if (vn.selectedOrderPanels && vn.selectedOrderPanels.length > 0) {
         setSelectedOrderPanels(vn.selectedOrderPanels);
       }
 
-      // Set negotiation
       if (vn.negotiation) {
         setNegotiation({
-          maxRate: vn.negotiation.maxRate || "",
-          targetRate: vn.negotiation.targetRate || "",
+          maxRate: vn.negotiation.maxRate?.toString() || "",
+          targetRate: vn.negotiation.targetRate?.toString() || "",
           purchaseType: vn.negotiation.purchaseType || "",
           oldRatePercent: vn.negotiation.oldRatePercent || "",
           remarks1: vn.negotiation.remarks1 || "",
         });
       }
 
-      // Set vendors
       if (vn.vendors && vn.vendors.length > 0) {
-        setVendors(vn.vendors);
+        setVendors(vn.vendors.map(v => ({ ...v, _id: v._id || uid() })));
+      } else {
+        setVendors([defaultVendorRow()]);
       }
 
-      // Set voice note
-      if (vn.voiceNote) {
-        setVoiceUrl(vn.voiceNote);
-      }
+      if (vn.voiceNote) setVoiceUrl(vn.voiceNote);
+      if (vn.voiceNoteFile) setVoiceFileInfo(vn.voiceNoteFile);
 
-      // Set approval - ALL FIELDS ARE EDITABLE
       if (vn.approval) {
         setApproval({
           vendorName: vn.approval.vendorName || "",
@@ -612,19 +808,22 @@ export default function ApproveVehicleNegotiation() {
           vehicleId: vn.approval.vehicleId || "",
           vehicleData: vn.approval.vehicleData || null,
           mobile: vn.approval.mobile || "",
-          purchaseType: vn.approval.purchaseType || "Loading & Unloading",
-          paymentTerms: vn.approval.paymentTerms || "80 % Advance",
+          purchaseType: vn.approval.purchaseType || "",
+          paymentTerms: vn.approval.paymentTerms || "",
           approvalStatus: vn.approval.approvalStatus || "Pending",
           remarks: vn.approval.remarks || "",
           memoStatus: vn.approval.memoStatus || "Pending",
           memoFile: vn.approval.memoFile || null
         });
+
+        if (vn.approval.vendorName) {
+          setSelectedSupplier({ supplierName: vn.approval.vendorName });
+        }
       }
 
     } catch (error) {
-      console.error('Error fetching vehicle negotiation:', error);
-      setError(error.message);
-      alert(`Failed to load vehicle negotiation: ${error.message}`);
+      console.error('Error fetching:', error);
+      alert(`Failed to load: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -632,25 +831,13 @@ export default function ApproveVehicleNegotiation() {
 
   const handleSupplierSelect = (supplier) => {
     if (supplier) {
-      console.log("Selected supplier:", supplier);
-      setApproval({
-        ...approval,
+      setSelectedSupplier(supplier);
+      setApproval(prev => ({
+        ...prev,
         vendorName: supplier.supplierName,
         vendorCode: supplier.supplierCode || '',
         vendorStatus: supplier.supplierStatus || "Active"
-      });
-    }
-  };
-
-  const handleVehicleSelect = (vehicle) => {
-    if (vehicle) {
-      setApproval({
-        ...approval,
-        vehicleNo: vehicle.vehicleNumber,
-        vehicleId: vehicle._id,
-        vehicleData: vehicle,
-        mobile: vehicle.driverMobile || approval.mobile
-      });
+      }));
     }
   };
 
@@ -660,7 +847,7 @@ export default function ApproveVehicleNegotiation() {
 
     const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
     if (!allowedTypes.includes(file.type)) {
-      alert("❌ Please upload only PDF or image files (JPEG, PNG)");
+      alert("❌ Please upload only PDF or image files");
       return;
     }
 
@@ -670,7 +857,6 @@ export default function ApproveVehicleNegotiation() {
     }
 
     setUploading(true);
-    
     const formData = new FormData();
     formData.append('file', file);
     
@@ -678,16 +864,13 @@ export default function ApproveVehicleNegotiation() {
       const token = localStorage.getItem('token');
       const res = await fetch('/api/upload/excel', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
-      
       const data = await res.json();
       
       if (data.success) {
-        setApproval((prev) => ({ 
+        setApproval(prev => ({ 
           ...prev, 
           memoStatus: "Uploaded",
           memoFile: {
@@ -700,12 +883,10 @@ export default function ApproveVehicleNegotiation() {
           }
         }));
         alert("✅ Memo uploaded successfully!");
-      } else {
-        throw new Error(data.error || "Upload failed");
       }
     } catch (error) {
       console.error("Error uploading memo:", error);
-      alert("❌ Failed to upload memo. Please try again.");
+      alert("❌ Failed to upload memo");
     } finally {
       setUploading(false);
     }
@@ -721,23 +902,14 @@ export default function ApproveVehicleNegotiation() {
     try {
       const token = localStorage.getItem('token');
       
-      // Fetch current data
       const fetchRes = await fetch(`/api/vehicle-negotiation?id=${negotiationId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
       const fetchData = await fetchRes.json();
-      
-      if (!fetchData.success) {
-        throw new Error('Failed to fetch negotiation data');
-      }
+      if (!fetchData.success) throw new Error('Failed to fetch data');
       
       const currentData = fetchData.data;
       
-      // Log what we're about to send
-      console.log("Saving approval with vendorCode:", approval.vendorCode);
-      
-      // Update only the approval section with all fields
       const updatedData = {
         ...currentData,
         approval: {
@@ -760,21 +932,16 @@ export default function ApproveVehicleNegotiation() {
         }
       };
       
-      // Send update
       const res = await fetch('/api/vehicle-negotiation', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          id: negotiationId,
-          ...updatedData
-        }),
+        body: JSON.stringify({ id: negotiationId, ...updatedData }),
       });
 
       const data = await res.json();
-
       if (data.success) {
         alert(`Vehicle Negotiation ${approval.approvalStatus} successfully!`);
         router.push('/admin/vehicle-negotiation');
@@ -782,15 +949,11 @@ export default function ApproveVehicleNegotiation() {
         alert(data.message || 'Failed to update approval');
       }
     } catch (error) {
-      console.error('Error updating approval:', error);
+      console.error('Error:', error);
       alert(`Error: ${error.message}`);
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleCreateVehicle = () => {
-    router.push('/admin/vehicle2');
   };
 
   const totalWeight = useMemo(() => {
@@ -808,10 +971,6 @@ export default function ApproveVehicleNegotiation() {
     { key: "billingType", label: "Billing Type" },
     { key: "loadingPoints", label: "No. of Loading Points" },
     { key: "dropPoints", label: "No. of Droping Point" },
-    { key: "collectionCharges", label: "Collection Charges" },
-    { key: "cancellationCharges", label: "Cancellation Charges" },
-    { key: "loadingCharges", label: "Loading Charges" },
-    { key: "otherCharges", label: "Other Charges" },
   ];
 
   if (loading) {
@@ -829,7 +988,7 @@ export default function ApproveVehicleNegotiation() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white">
-      {/* ===== Top Bar ===== */}
+      {/* Top Bar */}
       <div className="sticky top-0 z-40 border-b bg-white/80 backdrop-blur">
         <div className="mx-auto max-w-full px-4 py-3 flex items-center justify-between">
           <div>
@@ -848,146 +1007,67 @@ export default function ApproveVehicleNegotiation() {
               </div>
             </div>
             <div className="text-xs text-green-600 mt-1 font-medium">
-              ⓘ Part 3 and Memo section are editable for approval
+              ⓘ Only Approval Status and Remarks are editable
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleApprove}
-              disabled={saving || uploading}
-              className={`rounded-xl px-5 py-2 text-sm font-bold text-white transition ${
-                saving || uploading
-                  ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-green-600 hover:bg-green-700'
-              }`}
-            >
-              {saving || uploading ? (
-                <span className="flex items-center gap-2">
-                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  {uploading ? 'Uploading...' : 'Saving...'}
-                </span>
-              ) : 'Submit Approval'}
-            </button>
-          </div>
+          <button
+            onClick={handleApprove}
+            disabled={saving || uploading}
+            className={`rounded-xl px-5 py-2 text-sm font-bold text-white transition ${
+              saving || uploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+            }`}
+          >
+            {saving || uploading ? (
+              <span className="flex items-center gap-2">
+                <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                {uploading ? 'Uploading...' : 'Saving...'}
+              </span>
+            ) : 'Submit Approval'}
+          </button>
         </div>
       </div>
 
-      {/* ===== Main Layout ===== */}
       <div className="mx-auto max-w-full p-4 space-y-4">
-        {/* ===== PART 1: VEHICLE NEGOTIATION - PART 1 (READ ONLY) ===== */}
+        {/* PART 1 - READ ONLY */}
         <Card title="Vehicle Negotiation - Panel - Part -1 (Read Only)">
-          {/* Header Section */}
           <div className="grid grid-cols-12 gap-3 mb-4">
-            <Input
-              col="col-span-12 md:col-span-3"
-              label="Vehicle Negotiation No"
-              value={vnnNumber}
-              readOnly={true}
-            />
+            <Input col="col-span-12 md:col-span-3" label="Vehicle Negotiation No" value={vnnNumber} readOnly={true} />
             
             <div className="col-span-12 md:col-span-6">
-              <label className="text-xs font-bold text-slate-600">Selected Order Panels</label>
-              <div className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 min-h-[42px]">
-                {selectedOrderPanels.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {selectedOrderPanels.map((panel, idx) => (
-                      <span key={idx} className="bg-yellow-100 px-2 py-1 rounded-md text-xs">
-                        {panel.orderPanelNo}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  "No order panels selected"
-                )}
-              </div>
+              <label className="text-xs font-bold text-slate-600">Select Order Panels</label>
+              <MultiSelectOrderPanelDropdown
+                selectedPanels={selectedOrderPanels}
+                onSelect={() => {}}
+                placeholder="Search and select order panels..."
+                readOnly={true}
+              />
             </div>
             
-            <Input
-              col="col-span-12 md:col-span-3"
-              label="Branch"
-              value={header.branchName}
-              readOnly={true}
-            />
+            <div className="col-span-12 md:col-span-3">
+              <label className="text-xs font-bold text-slate-600">Branch</label>
+              <Input value={header.branchName} readOnly={true} />
+            </div>
 
-            {/* ✅ FIXED: Delivery field */}
-            <Input
-              col="col-span-12 md:col-span-3"
-              label="Delivery"
-              value={header.delivery || "Urgent"}
-              readOnly={true}
-            />
-
-            <Input
-              col="col-span-12 md:col-span-3"
-              label="Date"
-              value={header.date}
-              readOnly={true}
-            />
-            
-            {/* ✅ FIXED: Party Name field */}
-            <Input
-              col="col-span-12 md:col-span-3"
-              label="Party Name"
-              value={header.partyName || "-"}
-              readOnly={true}
-            />
-            
-            <Input
-              col="col-span-12 md:col-span-3"
-              label="Customer Code"
-              value={header.customerCode || "-"}
-              readOnly={true}
-            />
-            
-            <Input
-              col="col-span-12 md:col-span-3"
-              label="Contact Person"
-              value={header.contactPerson || "-"}
-              readOnly={true}
-            />
+            <Input col="col-span-12 md:col-span-3" label="Delivery" value={header.delivery} readOnly={true} />
+            <Input type="date" col="col-span-12 md:col-span-3" label="Date" value={header.date} readOnly={true} />
+           
           </div>
 
           {/* Billing Type / Charges */}
           <div className="mb-4">
             <div className="text-sm font-bold text-slate-700 mb-2">Billing Type / Charges</div>
-            <div className="overflow-auto rounded-xl border border-yellow-300">
-              <table className="min-w-full w-full text-sm">
-                <thead className="sticky top-0 bg-yellow-400">
-                  <tr>
-                    {billingColumns.map((col) => (
-                      <th
-                        key={col.key}
-                        className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
-                      >
-                        {col.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-
-                <tbody>
-                  <tr className="hover:bg-yellow-50 even:bg-slate-50">
-                    {billingColumns.map((col) => (
-                      <td key={col.key} className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">
-                        {header[col.key] || '-'}
-                      </td>
-                    ))}
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <BillingTypeTable header={header} billingColumns={billingColumns} />
           </div>
 
-          {/* Orders Table */}
+          {/* Orders Table with all charge fields */}
           <div>
             <div className="text-sm font-bold text-slate-700 mb-4">
               Orders (Part-1) - {header.billingType} - {orders.length} row{orders.length !== 1 ? 's' : ''}
             </div>
-            
             <OrdersTable rows={orders} />
           </div>
 
@@ -998,41 +1078,20 @@ export default function ApproveVehicleNegotiation() {
               <div className="text-xl font-extrabold text-emerald-700">{totalWeight}</div>
             </div>
           </div>
-        </Card>
 
-        {/* ===== PART 2: VEHICLE NEGOTIATION - PART 2 (READ ONLY) ===== */}
-        <Card title="Vehicle - Negotiation - Part - 2 (Read Only)">
-          <div className="grid grid-cols-12 gap-3 mb-4">
-            <Input
-              col="col-span-12 md:col-span-3"
-              label="Max Rate"
-              value={negotiation.maxRate}
-              readOnly={true}
-            />
-            <Input
-              col="col-span-12 md:col-span-3"
-              label="Target Rate"
-              value={negotiation.targetRate}
-              readOnly={true}
-            />
-            <Input
-              col="col-span-12 md:col-span-3"
-              label="Purchase - Type"
-              value={negotiation.purchaseType}
-              readOnly={true}
-            />
-            <Input
-              col="col-span-12 md:col-span-3"
-              label="Old Rate %"
-              value={negotiation.oldRatePercent}
-              readOnly={true}
-            />
-          </div>
-
-          {/* Vendors / Market Rates */}
-          <div className="mb-4">
+          {/* Suppliers / Market Rates Section with Purchase Type */}
+          <div className="mt-6">
             <div className="text-sm font-bold text-slate-700 mb-4">Suppliers / Market Rates</div>
             <VendorsTable rows={vendors} />
+          </div>
+        </Card>
+
+        {/* PART 2 - READ ONLY */}
+        <Card title="Vehicle - Negotiation - Part - 2 (Read Only)">
+          <div className="grid grid-cols-12 gap-3 mb-4">
+            <Input col="col-span-12 md:col-span-3" label="Max Rate" value={negotiation.maxRate} readOnly={true} />
+            <Input col="col-span-12 md:col-span-3" label="Target Rate" value={negotiation.targetRate} readOnly={true} />
+            <Input col="col-span-12 md:col-span-3" label="Old Rate %" value={negotiation.oldRatePercent} readOnly={true} />
           </div>
 
           {/* Remarks & Voice Note */}
@@ -1045,15 +1104,11 @@ export default function ApproveVehicleNegotiation() {
                 </div>
               </div>
             </div>
-
-            {/* Voice Note Section */}
             <div className="col-span-12 md:col-span-5">
               <div className="rounded-xl border border-slate-200 p-4">
                 <div className="text-sm font-extrabold text-slate-900 mb-3">Voice Note</div>
                 {voiceUrl ? (
-                  <div className="mt-3">
-                    <audio src={voiceUrl} controls className="w-full" />
-                  </div>
+                  <audio ref={audioRef} src={voiceUrl} controls className="w-full" />
                 ) : (
                   <div className="text-sm text-slate-500 italic">No voice note uploaded</div>
                 )}
@@ -1062,229 +1117,135 @@ export default function ApproveVehicleNegotiation() {
           </div>
         </Card>
 
-        {/* ===== PART 3: VEHICLE APPROVAL - PART 3 (ALL FIELDS EDITABLE) ===== */}
-        <Card title="Vehicle - Approval - Part - 3 (All Fields Editable)">
+        {/* PART 3 - VEHICLE APPROVAL - Only Approval Status and Remarks Editable */}
+        <Card title="Vehicle - Approval - Part - 3 (Only Approval Status & Remarks Editable)">
           <div className="grid grid-cols-12 gap-3 mb-4">
-            {/* Supplier Name with Dropdown */}
             <div className="col-span-12 md:col-span-4">
-              <label className="text-xs font-bold text-slate-600">Supplier Name *</label>
-              <TableSearchableDropdown
-                items={supplierSearch.suppliers}
-                selectedId={approval.vendorName}
-                onSelect={handleSupplierSelect}
-                placeholder="Search supplier..."
-                displayField="supplierName"
-                codeField="supplierCode"
-              />
+              <label className="text-xs font-bold text-slate-600">Supplier Name</label>
+              <Input value={selectedSupplier?.supplierName || approval.vendorName} readOnly={true} />
             </div>
-            
-            {/* Supplier Code - Auto-filled */}
-            <Input
-              col="col-span-12 md:col-span-4"
-              label="Supplier Code"
-              value={approval.vendorCode}
-              onChange={(v) => setApproval({ ...approval, vendorCode: v })}
-            />
-            
-            {/* Supplier Status */}
-            <Select
-              col="col-span-12 md:col-span-4"
-              label="Supplier Status"
-              value={approval.vendorStatus}
-              onChange={(v) => setApproval({ ...approval, vendorStatus: v })}
-              options={VENDOR_STATUS}
-            />
+            <Input col="col-span-12 md:col-span-4" label="Supplier Code" value={approval.vendorCode} readOnly={true} />
+            <Select col="col-span-12 md:col-span-4" label="Supplier Status" value={approval.vendorStatus} options={VENDOR_STATUS} readOnly={true} />
           </div>
 
           <div className="grid grid-cols-12 gap-3 mb-4">
-            {/* Rate Type */}
-            <Select
-              col="col-span-12 md:col-span-4"
-              label="Rate - Type"
-              value={approval.rateType}
-              onChange={(v) => setApproval({ ...approval, rateType: v })}
-              options={RATE_TYPES}
-            />
-            
-            {/* Final Per MT */}
-            <Input
-              col="col-span-12 md:col-span-4"
-              label="Final - Per MT (A)"
-              value={approval.finalPerMT}
-              onChange={(v) => setApproval({ ...approval, finalPerMT: v })}
-              type="number"
-            />
-            
-            {/* Final Fix */}
-            <Input
-              col="col-span-12 md:col-span-4"
-              label="Final - Fix"
-              value={approval.finalFix}
-              onChange={(v) => setApproval({ ...approval, finalFix: v })}
-              type="number"
-            />
+            <Select col="col-span-12 md:col-span-4" label="Rate - Type" value={approval.rateType} options={RATE_TYPES} readOnly={true} />
+            <Input col="col-span-12 md:col-span-4" label="Final - Per MT (A)" value={approval.finalPerMT} type="number" readOnly={true} />
+            <Input col="col-span-12 md:col-span-4" label="Final - Fix" value={approval.finalFix} type="number" readOnly={true} />
           </div>
 
-          {/* A / B / A x B */}
           <div className="grid grid-cols-12 gap-3 mb-4">
             <div className="col-span-12 md:col-span-4">
-              <div className="flex flex-col">
-                <label className="text-xs font-bold text-slate-600">Weight (B) - Auto Calculated</label>
-                <div className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-extrabold text-slate-900">
-                  {totalWeight}
-                </div>
-              </div>
+              <label className="text-xs font-bold text-slate-600">Weight (B)</label>
+              <div className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-extrabold text-slate-900">{totalWeight}</div>
             </div>
             <div className="col-span-12 md:col-span-4">
-              <div className="flex flex-col">
-                <label className="text-xs font-bold text-slate-600">Purchase Amount (A x B)</label>
-                <div className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-extrabold text-emerald-700">
-                  ₹{purchaseAmount.toLocaleString('en-IN')}
-                </div>
-              </div>
+              <label className="text-xs font-bold text-slate-600">Purchase Amount (A x B)</label>
+              <div className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-extrabold text-emerald-700">₹{purchaseAmount.toLocaleString('en-IN')}</div>
             </div>
           </div>
 
           <div className="grid grid-cols-12 gap-3 mb-4">
-            {/* Vehicle Number with Dropdown and Create Button */}
             <div className="col-span-12 md:col-span-4">
-              <label className="text-xs font-bold text-slate-600">Vehicle Number *</label>
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <TableSearchableDropdown
-                    items={vehicleSearch.vehicles}
-                    selectedId={approval.vehicleNo}
-                    onSelect={handleVehicleSelect}
-                    placeholder="Search vehicle..."
-                    displayField="vehicleNumber"
-                    codeField="rcNumber"
-                  />
-                </div>
-                <button
-                  onClick={handleCreateVehicle}
-                  className="rounded-lg bg-green-600 px-3 py-2 text-xs font-bold text-white hover:bg-green-700 transition whitespace-nowrap mt-1"
-                  type="button"
-                >
-                  + Create
-                </button>
-              </div>
+              <label className="text-xs font-bold text-slate-600">Vehicle Number</label>
+              <Input value={approval.vehicleNo} readOnly={true} />
             </div>
-
-            {/* Mobile */}
-            <Input
-              col="col-span-12 md:col-span-4"
-              label="Mobile"
-              value={approval.mobile}
-              onChange={(v) => setApproval({ ...approval, mobile: v })}
-            />
+            <Input col="col-span-12 md:col-span-4" label="Mobile" value={approval.mobile} readOnly={true} />
           </div>
 
           <div className="grid grid-cols-12 gap-3 mb-4">
-            {/* Purchase Type */}
-            <Select
-              col="col-span-12 md:col-span-4"
-              label="Purchase - Type"
-              value={approval.purchaseType}
-              onChange={(v) => setApproval({ ...approval, purchaseType: v })}
-              options={PURCHASE_TYPES}
-            />
-            
-            {/* Payment Terms */}
-            <Select
-              col="col-span-12 md:col-span-4"
-              label="Payment - Terms"
-              value={approval.paymentTerms}
-              onChange={(v) => setApproval({ ...approval, paymentTerms: v })}
-              options={PAYMENT_TERMS}
-            />
-            
-            {/* Approval Status */}
-            <Select
-              col="col-span-12 md:col-span-4"
-              label="Approval Status *"
-              value={approval.approvalStatus}
-              onChange={(v) => setApproval({ ...approval, approvalStatus: v })}
-              options={APPROVALS}
-            />
+            <Select col="col-span-12 md:col-span-4" label="Purchase - Type" value={approval.purchaseType} options={purchaseTypes.length > 0 ? purchaseTypes : PURCHASE_TYPES} readOnly={true} />
+            <Select col="col-span-12 md:col-span-4" label="Payment - Terms" value={approval.paymentTerms} options={paymentTerms.length > 0 ? paymentTerms : PAYMENT_TERMS} readOnly={true} />
+            <Select col="col-span-12 md:col-span-4" label="Approval Status *" value={approval.approvalStatus} onChange={(v) => setApproval(prev => ({ ...prev, approvalStatus: v }))} options={APPROVALS} readOnly={false} />
           </div>
 
-          {/* Remarks */}
           <div>
             <div className="text-sm font-extrabold text-slate-900 mb-3">Remarks</div>
             <textarea
               value={approval.remarks}
-              onChange={(e) => setApproval({ ...approval, remarks: e.target.value })}
+              onChange={(e) => setApproval(prev => ({ ...prev, remarks: e.target.value }))}
               className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
               rows={3}
               placeholder="Enter approval remarks..."
+              readOnly={false}
             />
           </div>
         </Card>
 
-        {/* ===== MEMO UPLOAD (EDITABLE) ===== */}
-        <Card title="Memo - Upload (Editable)">
-          <div className="rounded-xl border border-slate-200 p-4">
-            <div className="text-sm font-extrabold text-slate-900 mb-3">Memo Upload</div>
-            
-            <div className="grid grid-cols-12 gap-4">
-              <div className="col-span-12 md:col-span-6">
-                <label className="text-xs font-bold text-slate-600">Upload New Memo</label>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.png,.jpg,.jpeg"
-                  onChange={handleMemoUpload}
-                  disabled={uploading}
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 disabled:opacity-50"
-                />
-              </div>
-              
-              <div className="col-span-12 md:col-span-3">
-                <Select
-                  label="Memo Status"
-                  value={approval.memoStatus}
-                  onChange={(v) => setApproval({ ...approval, memoStatus: v })}
-                  options={MEMO_STATUS}
-                />
-              </div>
-              
-              <div className="col-span-12 md:col-span-3">
-                <label className="text-xs font-bold text-slate-600">Current File</label>
-                <div className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 truncate">
-                  {approval.memoFile?.originalName || "No file uploaded"}
-                </div>
-              </div>
-            </div>
-
-            {uploading && (
-              <div className="mt-3 text-sm text-blue-600 flex items-center gap-2">
-                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Uploading memo...
-              </div>
-            )}
-
-            {approval.memoFile && (
-              <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
-                <p className="text-sm font-medium text-green-800">Uploaded File:</p>
-                <p className="text-sm text-green-700 mt-1">{approval.memoFile.originalName}</p>
-                <p className="text-xs text-green-600 mt-0.5">Size: {(approval.memoFile.size / 1024).toFixed(1)} KB</p>
-                {approval.memoFile.filePath && (
-                  <a 
-                    href={approval.memoFile.filePath} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-sm text-sky-600 hover:underline mt-2 inline-block"
-                  >
-                    View File
-                  </a>
-                )}
-              </div>
-            )}
-          </div>
-        </Card>
+      {/* MEMO UPLOAD - EDITABLE */}
+<Card title="Memo - Upload (Editable)">
+  <div className="rounded-xl border border-slate-200 p-4">
+    <div className="text-sm font-extrabold text-slate-900 mb-3">Memo Upload</div>
+    
+    {/* File Upload */}
+    <input
+      type="file"
+      accept=".pdf,.png,.jpg,.jpeg"
+      onChange={handleMemoUpload}
+      disabled={uploading}
+      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 disabled:opacity-50"
+    />
+    
+    {/* Uploading Status */}
+    {uploading && (
+      <div className="mt-3 text-sm text-blue-600 flex items-center gap-2">
+        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Uploading memo...
+      </div>
+    )}
+    
+    {/* Memo Status - Editable */}
+    <div className="mt-3">
+      <label className="text-xs font-bold text-slate-600">Memo Status</label>
+      <select
+        value={approval.memoStatus || "Pending"}
+        onChange={(e) => setApproval(prev => ({ ...prev, memoStatus: e.target.value }))}
+        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+      >
+        {MEMO_STATUS.map((opt) => (
+          <option key={opt} value={opt}>{opt}</option>
+        ))}
+      </select>
+    </div>
+    
+    {/* Memo Approval Dropdown - Editable */}
+    <div className="mt-3">
+      <label className="text-xs font-bold text-slate-600">Memo Approval</label>
+      <select
+        value={approval.approvalStatus || ""}
+        onChange={(e) => setApproval(prev => ({ ...prev, approvalStatus: e.target.value }))}
+        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+      >
+        <option value="">Select Approval</option>
+        {APPROVALS.map((opt) => (
+          <option key={opt} value={opt}>{opt}</option>
+        ))}
+      </select>
+    </div>
+    
+    {/* Display Uploaded File Info */}
+    {approval.memoFile && (
+      <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
+        <p className="text-sm font-medium text-green-800">Uploaded File:</p>
+        <p className="text-sm text-green-700 mt-1">{approval.memoFile.originalName}</p>
+        <p className="text-xs text-green-600 mt-0.5">Size: {(approval.memoFile.size / 1024).toFixed(1)} KB</p>
+        {approval.memoFile.filePath && (
+          <a 
+            href={approval.memoFile.filePath} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-sm text-sky-600 hover:underline mt-2 inline-block"
+          >
+            View File
+          </a>
+        )}
+      </div>
+    )}
+  </div>
+</Card>
       </div>
     </div>
   );

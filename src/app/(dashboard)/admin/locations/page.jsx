@@ -1,13 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 
 export default function LocationPage() {
   const [locations, setLocations] = useState([]);
   const [name, setName] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
 
   // Fetch Locations
   const fetchLocations = async () => {
@@ -63,14 +66,71 @@ export default function LocationPage() {
         return;
       }
       
-      // Reset form
       setName('');
       setEditingId(null);
       setError(null);
+      setSuccess(`Location ${editingId ? 'updated' : 'added'} successfully!`);
+      setTimeout(() => setSuccess(null), 3000);
       fetchLocations();
     } catch (error) {
       console.error(`Error ${editingId ? 'updating' : 'adding'} location:`, error);
       setError(`Failed to ${editingId ? 'update' : 'add'} location.`);
+    }
+  };
+
+  // Handle Excel/CSV Upload
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+      // Extract location names (assuming first column has names)
+      const locationsArray = jsonData
+        .slice(1) // Skip header row if exists
+        .map(row => row[0]) // Get first column
+        .filter(name => name && name.toString().trim())
+        .map(name => name.toString().trim());
+
+      if (locationsArray.length === 0) {
+        setError('No valid location names found in file');
+        return;
+      }
+
+      // Send to backend
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/locations/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ names: locationsArray }),
+      });
+
+      const result = await res.json();
+      
+      if (!res.ok) {
+        setError(result.message || 'Failed to upload locations');
+      } else {
+        setSuccess(`Successfully added ${result.addedCount} locations. ${result.failedCount > 0 ? `Failed: ${result.failedCount}` : ''}`);
+        setTimeout(() => setSuccess(null), 3000);
+        fetchLocations();
+      }
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      setError('Failed to process file');
+    } finally {
+      setUploading(false);
+      e.target.value = ''; // Reset file input
     }
   };
 
@@ -79,7 +139,6 @@ export default function LocationPage() {
     setName(location.name);
     setEditingId(location._id);
     setError(null);
-    // Scroll to form
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -99,6 +158,8 @@ export default function LocationPage() {
         return;
       }
       setError(null);
+      setSuccess('Location deleted successfully!');
+      setTimeout(() => setSuccess(null), 3000);
       fetchLocations();
     } catch (error) {
       console.error('Error deleting location:', error);
@@ -113,17 +174,35 @@ export default function LocationPage() {
     setError(null);
   };
 
+  // Download Sample Excel Template
+  const downloadSampleTemplate = () => {
+    const sampleData = [
+      ['Location Name'],
+      ['Warehouse A'],
+      ['Warehouse B'],
+      ['Store Location 1'],
+      ['Store Location 2'],
+      ['Distribution Center']
+    ];
+    
+    const ws = XLSX.utils.aoa_to_sheet(sampleData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Locations');
+    XLSX.writeFile(wb, 'location_template.xlsx');
+  };
+
   useEffect(() => {
     fetchLocations();
   }, []);
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">From Location Master</h1>
+      <h1 className="text-2xl font-bold mb-4">Location Master</h1>
 
       {error && <div className="text-red-500 mb-4 bg-red-50 p-2 rounded">{error}</div>}
+      {success && <div className="text-green-500 mb-4 bg-green-50 p-2 rounded">{success}</div>}
 
-      {/* Add/Edit Form - Single Field */}
+      {/* Add/Edit Form */}
       <form onSubmit={handleSubmit} className="mb-6 bg-gray-50 p-4 rounded-lg">
         <div className="flex gap-4">
           <input
@@ -152,6 +231,33 @@ export default function LocationPage() {
           )}
         </div>
       </form>
+
+      {/* Excel Upload Section */}
+      <div className="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
+        <h3 className="font-semibold mb-2">Bulk Upload from Excel/CSV</h3>
+        <div className="flex gap-4 items-center">
+          <label className="cursor-pointer bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+            {uploading ? 'Uploading...' : 'Upload Excel/CSV File'}
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={handleFileUpload}
+              disabled={uploading}
+              className="hidden"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={downloadSampleTemplate}
+            className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+          >
+            Download Sample Template
+          </button>
+          <span className="text-sm text-gray-600">
+            Upload Excel or CSV file with location names in first column
+          </span>
+        </div>
+      </div>
 
       {/* Locations List */}
       {loading ? (

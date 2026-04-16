@@ -27,6 +27,7 @@ const PACK_TYPES = [
   { key: "PALLETIZATION", label: "Palletization" },
   { key: "UNIFORM - BAGS/BOXES", label: "Uniform - Bags/Boxes" },
   { key: "LOOSE - CARGO", label: "Loose - Cargo" },
+  { key: "NON-UNIFORM - GENERAL CARGO", label: "Non-uniform - General Cargo" },
 ];
 const APPROVAL_STATUS = ["Approved", "Rejected", "Pending"];
 const LOADING_STATUS = ["Loaded", "Partially Loaded", "Not Loaded"];
@@ -41,18 +42,16 @@ function num(v) {
 }
 
 /* =======================
-  File Display Component with Direct Preview (Click on Image)
+  File Display Component with Direct Preview
 ========================= */
 function FileDisplayItem({ file, label }) {
   const [showModal, setShowModal] = useState(false);
   
-  // Check if file is an image
   const isImage = (filePath) => {
     if (!filePath) return false;
     return filePath.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
   };
   
-  // Check if file is a video
   const isVideo = (filePath) => {
     if (!filePath) return false;
     return filePath.match(/\.(mp4|webm|ogg|mov|avi|mkv)$/i);
@@ -80,12 +79,10 @@ function FileDisplayItem({ file, label }) {
 
   return (
     <>
-      {/* File Card - Click anywhere to preview */}
       <div 
         onClick={handleClick}
         className="group relative bg-white rounded-lg border border-slate-200 overflow-hidden hover:shadow-lg hover:border-blue-400 transition-all cursor-pointer"
       >
-        {/* Image/Video Preview Area */}
         <div className="aspect-video bg-gray-100 flex items-center justify-center relative overflow-hidden">
           {isImage(file.path) ? (
             <img 
@@ -122,7 +119,6 @@ function FileDisplayItem({ file, label }) {
             </div>
           )}
           
-          {/* Hover overlay */}
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
             <svg className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -131,7 +127,6 @@ function FileDisplayItem({ file, label }) {
           </div>
         </div>
         
-        {/* File Info */}
         <div className="p-2 border-t border-slate-100">
           <p className="text-xs font-medium text-slate-700 truncate" title={getFileName()}>
             {getFileName()}
@@ -142,14 +137,12 @@ function FileDisplayItem({ file, label }) {
         </div>
       </div>
 
-      {/* Modal for Full Size Preview */}
       {showModal && (
         <div 
           className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4"
           onClick={() => setShowModal(false)}
         >
           <div className="relative max-w-6xl max-h-[90vh] w-full h-full">
-            {/* Close button */}
             <button
               onClick={() => setShowModal(false)}
               className="absolute -top-12 right-0 text-white hover:text-gray-300 text-3xl transition-colors z-10"
@@ -157,7 +150,6 @@ function FileDisplayItem({ file, label }) {
               ✕
             </button>
             
-            {/* Download button */}
             <a
               href={file.path}
               download
@@ -170,7 +162,6 @@ function FileDisplayItem({ file, label }) {
               Download
             </a>
             
-            {/* Content */}
             {isImage(file.path) && (
               <img 
                 src={file.path} 
@@ -192,7 +183,6 @@ function FileDisplayItem({ file, label }) {
               </video>
             )}
             
-            {/* File name overlay */}
             <div className="absolute bottom-4 left-0 right-0 text-center text-white text-sm bg-black/60 py-2 rounded-lg mx-auto w-max px-4">
               {getFileName()}
             </div>
@@ -282,13 +272,13 @@ function Select({ label, value, options = [], col = "", readOnly = true }) {
 function EditableSelect({ label, value, onChange, options = [], col = "" }) {
   return (
     <div className={col}>
-      <label className="text-xs font-bold text-slate-600">{label}</label>
+      {label && <label className="text-xs font-bold text-slate-600">{label}</label>}
       <select
         value={value || ""}
         onChange={(e) => onChange?.(e.target.value)}
         className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
       >
-        <option value="">Select {label}</option>
+        <option value="">Select {label || 'Option'}</option>
         {options.map((o) => (
           <option key={o} value={o}>
             {o}
@@ -302,7 +292,7 @@ function EditableSelect({ label, value, onChange, options = [], col = "" }) {
 function EditableInput({ label, value, onChange, col = "", type = "text" }) {
   return (
     <div className={col}>
-      <label className="text-xs font-bold text-slate-600">{label}</label>
+      {label && <label className="text-xs font-bold text-slate-600">{label}</label>}
       <input
         type={type}
         value={value || ""}
@@ -313,40 +303,64 @@ function EditableInput({ label, value, onChange, col = "", type = "text" }) {
   );
 }
 
+function TextArea({ label, value, onChange, rows = 3 }) {
+  return (
+    <div>
+      <label className="text-xs font-bold text-slate-600">{label}</label>
+      <textarea
+        value={value || ""}
+        onChange={(e) => onChange?.(e.target.value)}
+        rows={rows}
+        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+      />
+    </div>
+  );
+}
+
 /* =======================
-  Orders Table Component (Read-only)
+  Orders Table Component (Read-only with Scroll)
 ========================= */
 function OrdersTable({ rows }) {
   return (
-    <div className="overflow-auto rounded-xl border border-yellow-300">
-      <table className="min-w-full w-full text-sm">
-        <thead className="sticky top-0 bg-yellow-400">
+    <div className="overflow-x-auto rounded-xl border border-yellow-300">
+      <table className="min-w-max w-full text-sm">
+        <thead className="sticky top-0 bg-yellow-400 z-10">
           <tr>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Order</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Party Name</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Plant</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Order Type</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Pin Code</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">State</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">District</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">From</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">To</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Weight</th>
-           </tr>
+            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">Order No</th>
+            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[150px]">Party Name</th>
+            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[150px]">Plant</th>
+            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">Order Type</th>
+            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[100px]">Pin Code</th>
+            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">From</th>
+            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">To</th>
+            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">Taluka</th>
+            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">District</th>
+            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[100px]">State</th>
+            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[100px]">Weight (MT)</th>
+            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[130px]">Collection Charges</th>
+            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[140px]">Cancellation Charges</th>
+            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[130px]">Loading Charges</th>
+            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[130px]">Other Charges</th>
+          </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={row._id} className="hover:bg-yellow-50 even:bg-slate-50">
+          {rows.map((row, idx) => (
+            <tr key={row._id || idx} className="hover:bg-yellow-50 even:bg-slate-50">
               <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.orderNo || '-'}</td>
               <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.partyName || '-'}</td>
               <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.plantName || '-'}</td>
               <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.orderType || '-'}</td>
               <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.pinCode || '-'}</td>
-              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.state || '-'}</td>
-              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.district || '-'}</td>
-              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.from || '-'}</td>
-              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.to || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.fromName || row.from || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.toName || row.to || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.talukaName || row.taluka || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.districtName || row.district || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.stateName || row.state || '-'}</td>
               <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.weight || '0'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.collectionCharges || '0'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.cancellationCharges || '0'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.loadingCharges || '0'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.otherCharges || '0'}</td>
             </tr>
           ))}
         </tbody>
@@ -390,13 +404,36 @@ function PackTypeTable({ packType, rows }) {
         { key: "wtUom", label: "UOM" },
       ];
     }
+    if (packType === "LOOSE - CARGO") {
+      return [
+        { key: "uom", label: "UOM" },
+        { key: "productName", label: "PRODUCT NAME" },
+        { key: "actualWt", label: "ACTUAL - WT" },
+        { key: "chargedWt", label: "CHARGED - WT" },
+      ];
+    }
+    // NON-UNIFORM - GENERAL CARGO
     return [
-      { key: "uom", label: "UOM" },
+      { key: "nos", label: "NOS" },
       { key: "productName", label: "PRODUCT NAME" },
+      { key: "uom", label: "UOM" },
+      { key: "length", label: "LENGTH" },
+      { key: "width", label: "WIDTH" },
+      { key: "height", label: "HEIGHT" },
       { key: "actualWt", label: "ACTUAL - WT" },
       { key: "chargedWt", label: "CHARGED - WT" },
     ];
   }, [packType]);
+
+  if (!rows || rows.length === 0) {
+    return (
+      <div className="overflow-auto rounded-xl border border-yellow-300">
+        <div className="p-8 text-center text-slate-400">
+          No rows available.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="overflow-auto rounded-xl border border-yellow-300">
@@ -414,8 +451,8 @@ function PackTypeTable({ packType, rows }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
-            <tr key={r._id} className="hover:bg-yellow-50 even:bg-slate-50">
+          {rows.map((r, idx) => (
+            <tr key={r._id || idx} className="hover:bg-yellow-50 even:bg-slate-50">
               {packType === "PALLETIZATION" && (
                 <td className="border border-yellow-300 px-2 py-2 text-center">
                   <input
@@ -460,18 +497,32 @@ export default function ApproveLoadingPanel() {
     PALLETIZATION: [],
     "UNIFORM - BAGS/BOXES": [],
     "LOOSE - CARGO": [],
+    "NON-UNIFORM - GENERAL CARGO": [],
   });
   
-  // File states - for displaying existing files
+  // New fields state
+  const [detentionDays, setDetentionDays] = useState("");
+  const [detentionNumber, setDetentionNumber] = useState("");
+  const [hasHelper, setHasHelper] = useState(false);
+  const [helperInfo, setHelperInfo] = useState({
+    name: "",
+    mobileNo: "",
+    photo: [],
+    aadharPhoto: []
+  });
+  
+  // File states
   const [existingFiles, setExistingFiles] = useState({
     vbp: {},
     vft: {},
     vot: {},
     vl: {},
-    weighment: { weighSlip: [] }
+    weighment: { weighSlip: [] },
+    loadedVehicleSlips: [],
+    vehiclePhotos: []
   });
 
-  // Approval states - THESE ARE EDITABLE
+  // Approval states - EDITABLE
   const [vbpUploads, setVbpUploads] = useState({
     approval: "",
     remark: "",
@@ -507,6 +558,7 @@ export default function ApproveLoadingPanel() {
   const [arrivalDetails, setArrivalDetails] = useState({
     date: "",
     time: "",
+    outTime: "",
   });
 
   useEffect(() => {
@@ -563,8 +615,11 @@ export default function ApproveLoadingPanel() {
           vehicleOwnerName: panel.vehicleInfo.vehicleOwnerName || "",
           vehicleOwnerRC: panel.vehicleInfo.vehicleOwnerRC || "",
           ownerPanCard: panel.vehicleInfo.ownerPanCard || "",
+          ownerAadharCard: panel.vehicleInfo.ownerAadharCard || "",
           verified: panel.vehicleInfo.verified || false,
           vehicleType: panel.vehicleInfo.vehicleType || "",
+          message: panel.vehicleInfo.message || "",
+          remarks: panel.vehicleInfo.remarks || "",
           insuranceNumber: panel.vehicleInfo.insuranceNumber || "",
           chasisNumber: panel.vehicleInfo.chasisNumber || "",
           fitnessNumber: panel.vehicleInfo.fitnessNumber || "",
@@ -578,10 +633,26 @@ export default function ApproveLoadingPanel() {
           PALLETIZATION: panel.packData.PALLETIZATION || [],
           "UNIFORM - BAGS/BOXES": panel.packData["UNIFORM - BAGS/BOXES"] || [],
           "LOOSE - CARGO": panel.packData["LOOSE - CARGO"] || [],
+          "NON-UNIFORM - GENERAL CARGO": panel.packData["NON-UNIFORM - GENERAL CARGO"] || [],
         });
       }
       if (panel.activePack) {
         setActivePack(panel.activePack);
+      }
+
+      // Set detention info
+      if (panel.detentionDays) setDetentionDays(panel.detentionDays);
+      if (panel.detentionNumber) setDetentionNumber(panel.detentionNumber);
+      
+      // Set helper info
+      if (panel.hasHelper !== undefined) setHasHelper(panel.hasHelper);
+      if (panel.helperInfo) {
+        setHelperInfo({
+          name: panel.helperInfo.name || "",
+          mobileNo: panel.helperInfo.mobileNo || "",
+          photo: panel.helperInfo.photo || [],
+          aadharPhoto: panel.helperInfo.aadharPhoto || []
+        });
       }
 
       // Set existing files
@@ -642,6 +713,26 @@ export default function ApproveLoadingPanel() {
         });
       }
 
+      // Vehicle Photos
+      const vehiclePhotos = {};
+      if (panel.vehiclePhotos && panel.vehiclePhotos.length > 0) {
+        vehiclePhotos.photos = panel.vehiclePhotos.map(path => ({
+          path: path,
+          name: 'Vehicle Photo',
+          originalName: 'Vehicle Photo'
+        }));
+      }
+
+      // Loaded Vehicle Slips
+      const loadedVehicleSlips = {};
+      if (panel.loadedVehicleSlips && panel.loadedVehicleSlips.length > 0) {
+        loadedVehicleSlips.slips = panel.loadedVehicleSlips.map(path => ({
+          path: path,
+          name: 'Loaded Vehicle Slip',
+          originalName: 'Loaded Vehicle Slip'
+        }));
+      }
+
       setExistingFiles({
         vbp: vbpFiles,
         vft: vftFiles,
@@ -653,8 +744,26 @@ export default function ApproveLoadingPanel() {
             name: 'Weigh Slip',
             originalName: 'Weigh Slip'
           }] : []
-        }
+        },
+        vehiclePhotos: vehiclePhotos.photos || [],
+        loadedVehicleSlips: loadedVehicleSlips.slips || []
       });
+
+      // Helper files
+      if (panel.helperInfo) {
+        if (panel.helperInfo.photo && panel.helperInfo.photo.length > 0) {
+          setHelperInfo(prev => ({
+            ...prev,
+            photo: panel.helperInfo.photo.map(p => ({ path: p, name: 'Helper Photo', originalName: 'Helper Photo' }))
+          }));
+        }
+        if (panel.helperInfo.aadharPhoto && panel.helperInfo.aadharPhoto.length > 0) {
+          setHelperInfo(prev => ({
+            ...prev,
+            aadharPhoto: panel.helperInfo.aadharPhoto.map(p => ({ path: p, name: 'Helper Aadhar', originalName: 'Helper Aadhar' }))
+          }));
+        }
+      }
 
       // Set approval sections
       if (panel.vbpUploads) {
@@ -705,6 +814,7 @@ export default function ApproveLoadingPanel() {
         setArrivalDetails({
           date: panel.arrivalDetails.date ? new Date(panel.arrivalDetails.date).toISOString().split('T')[0] : "",
           time: panel.arrivalDetails.time || "",
+          outTime: panel.arrivalDetails.outTime || "",
         });
       }
 
@@ -735,7 +845,7 @@ export default function ApproveLoadingPanel() {
       
       const currentData = fetchData.data;
       
-      // Update only the approval sections
+      // Update only the editable sections
       const updatedData = {
         ...currentData,
         vbpUploads: {
@@ -773,6 +883,16 @@ export default function ApproveLoadingPanel() {
         arrivalDetails: {
           date: arrivalDetails.date ? new Date(arrivalDetails.date) : currentData.arrivalDetails?.date,
           time: arrivalDetails.time,
+          outTime: arrivalDetails.outTime,
+        },
+        detentionDays,
+        detentionNumber,
+        hasHelper,
+        helperInfo: {
+          name: helperInfo.name,
+          mobileNo: helperInfo.mobileNo,
+          photo: helperInfo.photo,
+          aadharPhoto: helperInfo.aadharPhoto
         }
       };
       
@@ -807,6 +927,16 @@ export default function ApproveLoadingPanel() {
 
   const calculateTotalWeight = () => {
     return orderRows.reduce((sum, row) => sum + num(row.weight), 0);
+  };
+
+  const getTotalVlPhotosCount = () => {
+    let total = 0;
+    if (existingFiles.vl) {
+      Object.values(existingFiles.vl).forEach(fileList => {
+        total += fileList.length;
+      });
+    }
+    return total;
   };
 
   if (loading) {
@@ -873,7 +1003,7 @@ export default function ApproveLoadingPanel() {
 
       {/* Main Content */}
       <div className="mx-auto max-w-full p-4">
-        {/* Vehicle Arrival Information - READ ONLY */}
+        {/* Vehicle Arrival Information - READ ONLY with Owner Aadhar Card */}
         <Card title="Vehicle Arrival Information (Read Only)">
           <div className="grid grid-cols-12 gap-3">
             <Input
@@ -887,12 +1017,22 @@ export default function ApproveLoadingPanel() {
               value={header.vehicleNegotiationNo}
             />
             <Input
-              col="col-span-12 md:col-span-3"
+              col="col-span-12 md:col-span-2"
+              label="Vehicle Number"
+              value={vehicleInfo.vehicleNo}
+            />
+            <Input
+              col="col-span-12 md:col-span-2"
+              label="Mobile Number"
+              value={vehicleInfo.driverMobileNo}
+            />
+            <Input
+              col="col-span-12 md:col-span-2"
               label="Branch"
               value={header.branchName}
             />
             <Input
-              col="col-span-12 md:col-span-3"
+              col="col-span-12 md:col-span-2"
               label="Date"
               value={header.date}
             />
@@ -901,10 +1041,15 @@ export default function ApproveLoadingPanel() {
               label="Delivery"
               value={header.delivery}
             />
+            <Input
+              col="col-span-12 md:col-span-2"
+              label="Owner Aadhar Card"
+              value={vehicleInfo.ownerAadharCard}
+            />
           </div>
         </Card>
 
-        {/* Billing Type / Charges - READ ONLY */}
+        {/* Billing Type / Charges - READ ONLY with all charges */}
         <div className="mt-4">
           <Card title="Billing Type / Charges (Read Only)">
             <div className="overflow-auto rounded-xl border border-yellow-300">
@@ -914,10 +1059,7 @@ export default function ApproveLoadingPanel() {
                     <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Billing Type</th>
                     <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Loading Points</th>
                     <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Drop Points</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Collection Charges</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Cancellation Charges</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Loading Charges</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Other Charges</th>
+      
                   </tr>
                 </thead>
                 <tbody>
@@ -925,10 +1067,7 @@ export default function ApproveLoadingPanel() {
                     <td className="border border-yellow-300 px-2 py-2 text-slate-700">{header.billingType || '-'}</td>
                     <td className="border border-yellow-300 px-2 py-2 text-slate-700">{header.noOfLoadingPoints || '-'}</td>
                     <td className="border border-yellow-300 px-2 py-2 text-slate-700">{header.noOfDroppingPoint || '-'}</td>
-                    <td className="border border-yellow-300 px-2 py-2 text-slate-700">{header.collectionCharges || '-'}</td>
-                    <td className="border border-yellow-300 px-2 py-2 text-slate-700">{header.cancellationCharges || '-'}</td>
-                    <td className="border border-yellow-300 px-2 py-2 text-slate-700">{header.loadingCharges || '-'}</td>
-                    <td className="border border-yellow-300 px-2 py-2 text-slate-700">{header.otherCharges || '-'}</td>
+
                   </tr>
                 </tbody>
               </table>
@@ -936,69 +1075,194 @@ export default function ApproveLoadingPanel() {
           </Card>
         </div>
 
-        {/* Orders Table - READ ONLY */}
+        {/* Orders Table - SCROLLABLE with all charges */}
         <div className="mt-4">
           <Card title="Order Details (Read Only)">
             <OrdersTable rows={orderRows} />
             <div className="flex justify-end mt-4">
               <div className="flex items-center gap-3 border border-yellow-300 px-6 py-3 bg-yellow-50 rounded-xl">
-                <div className="text-sm font-extrabold text-slate-900">Total Weight:</div>
+                <div className="text-sm font-extrabold text-slate-900">Total Weight (MT):</div>
                 <div className="text-xl font-extrabold text-emerald-700">{calculateTotalWeight()}</div>
               </div>
             </div>
           </Card>
         </div>
 
-        {/* Vehicle & Driver Details - READ ONLY */}
+        {/* Vehicle & Driver Details - READ ONLY with Message & Remarks */}
         <div className="mt-4">
           <Card title="Vehicle & Driver Details (Read Only)">
+            <div className="overflow-auto rounded-xl border border-yellow-300">
+              <table className="min-w-full w-full text-sm">
+                <thead className="sticky top-0 bg-yellow-400">
+                  <tr>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-center">Vehicle Information</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-center">Driver Information</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-center">Message & Remarks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="hover:bg-yellow-50 even:bg-slate-50">
+                    <td className="border border-yellow-300 px-4 py-3 align-top">
+                      <Input label="Vehicle No" value={vehicleInfo.vehicleNo} />
+                      <Input label="Vehicle Type" value={vehicleInfo.vehicleType} />
+                      <Input label="Vehicle Weight (MT)" value={vehicleInfo.vehicleWeight} />
+                      <Input label="Insurance Number" value={vehicleInfo.insuranceNumber} />
+                      <Input label="Chasis Number" value={vehicleInfo.chasisNumber} />
+                      <Input label="Fitness Number" value={vehicleInfo.fitnessNumber} />
+                      <Input label="PUC Number" value={vehicleInfo.pucNumber} />
+                      <Input label="Vehicle Owner Name" value={vehicleInfo.vehicleOwnerName} />
+                      <Input label="Vehicle Owner RC" value={vehicleInfo.vehicleOwnerRC} />
+                      <Input label="Owner Pan Card" value={vehicleInfo.ownerPanCard} />
+                      <div className="flex items-center mt-2">
+                        <input
+                          type="checkbox"
+                          checked={vehicleInfo.verified}
+                          disabled
+                          className="h-4 w-4 rounded border-slate-300 opacity-50"
+                        />
+                        <label className="ml-2 text-sm font-medium text-slate-700">Verified</label>
+                      </div>
+                    </td>
+                    <td className="border border-yellow-300 px-4 py-3 align-top">
+                      <Input label="Driver Name" value={vehicleInfo.driverName} />
+                      <Input label="Driver Mobile No" value={vehicleInfo.driverMobileNo} />
+                      <Input label="Driving License" value={vehicleInfo.drivingLicense} />
+                      
+                      {/* Helper Section */}
+                      {hasHelper && (
+                        <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                            <span className="text-xs font-bold text-blue-800">Helper / Co-Driver Details</span>
+                          </div>
+                          <Input label="Helper Name" value={helperInfo.name} />
+                          <Input label="Helper Mobile Number" value={helperInfo.mobileNo} />
+                          {helperInfo.photo && helperInfo.photo.length > 0 && (
+                            <div className="mt-2">
+                              <label className="text-xs font-bold text-slate-600">Helper Photo</label>
+                              <div className="grid grid-cols-2 gap-2 mt-1">
+                                {helperInfo.photo.map((photo, idx) => (
+                                  <FileDisplayItem key={idx} file={photo} label="Helper Photo" />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {helperInfo.aadharPhoto && helperInfo.aadharPhoto.length > 0 && (
+                            <div className="mt-2">
+                              <label className="text-xs font-bold text-slate-600">Helper Aadhar</label>
+                              <div className="grid grid-cols-2 gap-2 mt-1">
+                                {helperInfo.aadharPhoto.map((photo, idx) => (
+                                  <FileDisplayItem key={idx} file={photo} label="Helper Aadhar" />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td className="border border-yellow-300 px-4 py-3 align-top">
+                      <Input label="Message" value={vehicleInfo.message} />
+                      <Input label="Remarks" value={vehicleInfo.remarks} />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+
+        {/* Detention Information Card */}
+        <div className="mt-4">
+          <Card title="Detention Information (Read Only)">
             <div className="grid grid-cols-12 gap-4">
-              <div className="col-span-12 md:col-span-4">
-                <Input label="Vehicle No" value={vehicleInfo.vehicleNo} />
-                <Input label="Vehicle Type" value={vehicleInfo.vehicleType} />
-                <Input label="Vehicle Weight (MT)" value={vehicleInfo.vehicleWeight} />
-                <Input label="Insurance Number" value={vehicleInfo.insuranceNumber} />
-                <Input label="Chasis Number" value={vehicleInfo.chasisNumber} />
-                <Input label="Fitness Number" value={vehicleInfo.fitnessNumber} />
-                <Input label="PUC Number" value={vehicleInfo.pucNumber} />
-              </div>
-              <div className="col-span-12 md:col-span-4">
-                <Input label="Driver Name" value={vehicleInfo.driverName} />
-                <Input label="Driver Mobile No" value={vehicleInfo.driverMobileNo} />
-                <Input label="Driving License" value={vehicleInfo.drivingLicense} />
-                <div className="flex items-center mt-2">
-                  <input
-                    type="checkbox"
-                    checked={vehicleInfo.verified}
-                    disabled
-                    className="h-4 w-4 rounded border-slate-300 opacity-50"
-                  />
-                  <label className="ml-2 text-sm font-medium text-slate-700">Verified</label>
+              <div className="col-span-12 md:col-span-6">
+                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
+                  <label className="text-xs font-bold text-orange-700">Detention Days</label>
+                  <div className="mt-1 w-full rounded-lg border border-orange-200 bg-slate-50 px-3 py-2 text-sm">
+                    {detentionDays || '-'}
+                  </div>
+                  <p className="text-xs text-orange-600 mt-1">Number of days vehicle is detained</p>
                 </div>
               </div>
-              <div className="col-span-12 md:col-span-4">
-                <Input label="Vehicle Owner Name" value={vehicleInfo.vehicleOwnerName} />
-                <Input label="Vehicle Owner RC" value={vehicleInfo.vehicleOwnerRC} />
-                <Input label="Owner Pan Card" value={vehicleInfo.ownerPanCard} />
+              <div className="col-span-12 md:col-span-6">
+                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
+                  <label className="text-xs font-bold text-orange-700">Detention Number / Reference</label>
+                  <div className="mt-1 w-full rounded-lg border border-orange-200 bg-slate-50 px-3 py-2 text-sm">
+                    {detentionNumber || '-'}
+                  </div>
+                  <p className="text-xs text-orange-600 mt-1">Reference number or ID for detention</p>
+                </div>
               </div>
             </div>
           </Card>
         </div>
 
-        {/* Pack Type - READ ONLY */}
+        {/* Loaded Vehicle Slip Upload - READ ONLY */}
         <div className="mt-4">
-          <Card title="Pack Type (Read Only)">
-            <div className="mb-4">
-              <div className="flex items-center gap-3">
-                <div className="text-sm font-bold text-slate-700">Selected Pack Type:</div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm">
-                  {PACK_TYPES.find(p => p.key === activePack)?.label || activePack}
-                </div>
+          <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
+            <label className="text-xs font-bold text-indigo-700">Loaded Vehicle Slip</label>
+            {existingFiles.loadedVehicleSlips && existingFiles.loadedVehicleSlips.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-2">
+                {existingFiles.loadedVehicleSlips.map((file, idx) => (
+                  <FileDisplayItem key={idx} file={file} label="Loaded Vehicle Slip" />
+                ))}
               </div>
-            </div>
-            <PackTypeTable packType={activePack} rows={packData[activePack] || []} />
-          </Card>
+            ) : (
+              <div className="mt-1 w-full rounded-lg border border-indigo-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                No loaded vehicle slip uploaded
+              </div>
+            )}
+          </div>
         </div>
+
+       {/* Pack Type - READ ONLY with ALL pack types displayed */}
+<div className="mt-4">
+  <Card title="Pack Type (Read Only)">
+    <div className="space-y-6">
+      {/* PALLETIZATION Table */}
+      <div>
+        <div className="mb-3">
+          <div className="text-sm font-bold text-slate-800 bg-yellow-100 inline-block px-4 py-1.5 rounded-lg">
+            Palletization
+          </div>
+        </div>
+        <PackTypeTable packType="PALLETIZATION" rows={packData.PALLETIZATION || []} />
+      </div>
+
+      {/* UNIFORM - BAGS/BOXES Table */}
+      <div>
+        <div className="mb-3">
+          <div className="text-sm font-bold text-slate-800 bg-yellow-100 inline-block px-4 py-1.5 rounded-lg">
+            Uniform - Bags/Boxes
+          </div>
+        </div>
+        <PackTypeTable packType="UNIFORM - BAGS/BOXES" rows={packData["UNIFORM - BAGS/BOXES"] || []} />
+      </div>
+
+      {/* LOOSE - CARGO Table */}
+      <div>
+        <div className="mb-3">
+          <div className="text-sm font-bold text-slate-800 bg-yellow-100 inline-block px-4 py-1.5 rounded-lg">
+            Loose - Cargo
+          </div>
+        </div>
+        <PackTypeTable packType="LOOSE - CARGO" rows={packData["LOOSE - CARGO"] || []} />
+      </div>
+
+      {/* NON-UNIFORM - GENERAL CARGO Table */}
+      <div>
+        <div className="mb-3">
+          <div className="text-sm font-bold text-slate-800 bg-yellow-100 inline-block px-4 py-1.5 rounded-lg">
+            Non-uniform - General Cargo
+          </div>
+        </div>
+        <PackTypeTable packType="NON-UNIFORM - GENERAL CARGO" rows={packData["NON-UNIFORM - GENERAL CARGO"] || []} />
+      </div>
+    </div>
+  </Card>
+</div>
 
         {/* VBP Panel - EDITABLE with direct image preview */}
         <div className="mt-4">
@@ -1018,7 +1282,6 @@ export default function ApproveLoadingPanel() {
                 </div>
               </div>
               
-              {/* Display uploaded files in grid */}
               <FileGridGroup 
                 title="Vehicle Body Pictures"
                 files={existingFiles.vbp}
@@ -1036,7 +1299,7 @@ export default function ApproveLoadingPanel() {
           </Card>
         </div>
 
-        {/* VFT Panel - EDITABLE with direct image preview */}
+        {/* VFT Panel - EDITABLE */}
         <div className="mt-4">
           <Card title="VFT - PANEL (Vehicle Floor Tarpaulin Pictures) - Editable">
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
@@ -1049,7 +1312,6 @@ export default function ApproveLoadingPanel() {
                 />
               </div>
               
-              {/* Display uploaded files in grid */}
               <FileGridGroup 
                 title="Vehicle Floor Tarpaulin Pictures"
                 files={existingFiles.vft}
@@ -1059,7 +1321,7 @@ export default function ApproveLoadingPanel() {
           </Card>
         </div>
 
-        {/* VOT Panel - EDITABLE with direct image preview */}
+        {/* VOT Panel - EDITABLE */}
         <div className="mt-4">
           <Card title="VOT - PANEL (Vehicle Outer Tarpaulin Pictures) - Editable">
             <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200">
@@ -1072,7 +1334,6 @@ export default function ApproveLoadingPanel() {
                 />
               </div>
               
-              {/* Display uploaded files in grid */}
               <FileGridGroup 
                 title="Vehicle Outer Tarpaulin Pictures"
                 files={existingFiles.vot}
@@ -1082,10 +1343,16 @@ export default function ApproveLoadingPanel() {
           </Card>
         </div>
 
-        {/* VL Panel - EDITABLE with direct image preview */}
+        {/* VL Panel - EDITABLE with progress info */}
         <div className="mt-4">
           <Card title="VL - PANEL (Vehicle Loading Pictures) - Editable">
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <div className="mb-3">
+                <p className="text-xs text-slate-500">
+                  Total Photos: {getTotalVlPhotosCount()} 
+                </p>
+              </div>
+              
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-xs font-bold text-slate-600">Approval:</span>
                 <EditableSelect
@@ -1103,7 +1370,6 @@ export default function ApproveLoadingPanel() {
                 />
               </div>
               
-              {/* Display uploaded files in grid */}
               <FileGridGroup 
                 title="Vehicle Loading Pictures"
                 files={existingFiles.vl}
@@ -1113,7 +1379,7 @@ export default function ApproveLoadingPanel() {
           </Card>
         </div>
 
-        {/* Loaded Vehicle Weighment - EDITABLE with direct image preview */}
+        {/* Loaded Vehicle Weighment - EDITABLE */}
         <div className="mt-4">
           <Card title="Loaded Vehicle Weighment & Charges - Editable">
             <div className="grid grid-cols-12 gap-4">
@@ -1129,17 +1395,12 @@ export default function ApproveLoadingPanel() {
                     />
                   </div>
                   
-                  {/* Display weigh slip */}
                   {existingFiles.weighment?.weighSlip?.length > 0 && (
                     <div>
                       <h4 className="text-xs font-bold text-slate-600 mb-2">Weigh Slip:</h4>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {existingFiles.weighment.weighSlip.map((file, idx) => (
-                          <FileDisplayItem 
-                            key={`weighSlip-${idx}`}
-                            file={file}
-                            label="Weigh Slip"
-                          />
+                          <FileDisplayItem key={idx} file={file} label="Weigh Slip" />
                         ))}
                       </div>
                     </div>
@@ -1187,7 +1448,7 @@ export default function ApproveLoadingPanel() {
           </Card>
         </div>
 
-        {/* GPS Tracking - EDITABLE */}
+        {/* Vehicle GPS Tracking - EDITABLE */}
         <div className="mt-4">
           <Card title="Vehicle GPS Tracking - Editable">
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200">
@@ -1220,7 +1481,7 @@ export default function ApproveLoadingPanel() {
           </Card>
         </div>
 
-        {/* Arrival Details - EDITABLE */}
+        {/* Arrival Details - EDITABLE with Out Time */}
         <div className="mt-4">
           <Card title="Arrival Details - Editable">
             <div className="grid grid-cols-12 gap-4">
@@ -1239,6 +1500,65 @@ export default function ApproveLoadingPanel() {
                   value={arrivalDetails.time}
                   onChange={(v) => setArrivalDetails({ ...arrivalDetails, time: v })}
                 />
+              </div>
+              <div className="col-span-12 md:col-span-3">
+                <EditableInput
+                  label="Out Time"
+                  type="time"
+                  value={arrivalDetails.outTime}
+                  onChange={(v) => setArrivalDetails({ ...arrivalDetails, outTime: v })}
+                />
+              </div>
+              <div className="col-span-12 md:col-span-3">
+                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <p className="text-xs text-blue-800">
+                    <span className="font-bold">Note:</span> JV need for making the payment in Driver or Motor Owner Account.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Documents & Consignment Note Card */}
+        <div className="mt-4">
+          <Card title="Documents & Consignment Note (LR)">
+            <div className="grid grid-cols-12 gap-4">
+              <div className="col-span-12 md:col-span-4">
+                <div className="bg-white p-4 rounded-xl border border-slate-200">
+                  <h3 className="text-sm font-bold text-slate-800 mb-2">Consignment Note (LR)</h3>
+                  <button 
+                    onClick={() => window.open(`/api/loading-panel/${panelId}/generate-lr`, '_blank')}
+                    className="w-full rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                  >
+                    Generate LR
+                  </button>
+                  <p className="text-xs text-slate-500 mt-2">Click to generate Consignment Note (LR)</p>
+                </div>
+              </div>
+              <div className="col-span-12 md:col-span-4">
+                <div className="bg-white p-4 rounded-xl border border-slate-200">
+                  <h3 className="text-sm font-bold text-slate-800 mb-2">E-waybill</h3>
+                  <button 
+                    onClick={() => window.open(`/api/loading-panel/${panelId}/generate-ewaybill`, '_blank')}
+                    className="w-full rounded-lg bg-green-600 px-4 py-2 text-xs font-bold text-white hover:bg-green-700"
+                  >
+                    Generate E-waybill
+                  </button>
+                  <p className="text-xs text-slate-500 mt-2">Generate E-waybill for this shipment</p>
+                </div>
+              </div>
+              <div className="col-span-12 md:col-span-4">
+                <div className="bg-white p-4 rounded-xl border border-slate-200">
+                  <h3 className="text-sm font-bold text-slate-800 mb-2">Invoice</h3>
+                  <button 
+                    onClick={() => window.open(`/api/loading-panel/${panelId}/invoice`, '_blank')}
+                    className="w-full rounded-lg bg-purple-600 px-4 py-2 text-xs font-bold text-white hover:bg-purple-700"
+                  >
+                    View Invoice
+                  </button>
+                  <p className="text-xs text-slate-500 mt-2">View and download invoice</p>
+                </div>
               </div>
             </div>
           </Card>

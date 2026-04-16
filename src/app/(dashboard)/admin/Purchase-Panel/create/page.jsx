@@ -43,7 +43,6 @@ function useLoadingInfo() {
   try {
     const token = localStorage.getItem('token');
     
-    // Fetch all loading panels
     const loadingRes = await fetch('/api/loading-panel?format=table', {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -56,7 +55,6 @@ function useLoadingInfo() {
     
     const loadingData = await loadingRes.json();
     
-    // ✅ Fetch existing purchase panels to check which loading infos are already used
     const purchaseRes = await fetch('/api/purchase-panel?format=table', {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -74,7 +72,6 @@ function useLoadingInfo() {
       }
     }
     
-    // Filter available loading infos (have VNN and not used)
     if (loadingData.success && Array.isArray(loadingData.data)) {
       const availableInfos = loadingData.data.filter(info => 
         info.vehicleNegotiationNo && 
@@ -167,8 +164,10 @@ function defaultOrderRow() {
     plantName: "",
     orderType: "",
     pinCode: "",
-    state: "",
+    taluka: "",
     district: "",
+    state: "",
+    country: "",
     from: "",
     to: "",
     locationRate: "",
@@ -176,6 +175,10 @@ function defaultOrderRow() {
     weight: "",
     rate: "",
     totalAmount: "",
+    collectionCharges: "",
+    cancellationCharges: "",
+    loadingCharges: "",
+    otherCharges: "",
   };
 }
 
@@ -285,12 +288,12 @@ export default function CreatePurchasePanel() {
   const [deductions, setDeductions] = useState([]);
 
   /** =========================
-   * REGISTERED VEHICLE STATE (UPDATED)
+   * REGISTERED VEHICLE STATE
    ========================= */
   const [registeredVehicle, setRegisteredVehicle] = useState({
-    loadingPanelPlate: "",  // Auto-filled from VNN/Loading Info (read-only)
-    registeredPlate: "",    // User can edit this
-    isRegistered: false,    // User can check/uncheck
+    loadingPanelPlate: "",
+    registeredPlate: "",
+    isRegistered: false,
   });
 
   /** =========================
@@ -453,6 +456,16 @@ export default function CreatePurchasePanel() {
   };
 
   /** =========================
+   * BILLING COLUMNS - ALL 7 COLUMNS
+   ========================= */
+  const billingColumns = [
+    { key: "billingType", label: "Billing Type", options: BILLING_TYPES },
+    { key: "noOfLoadingPoints", label: "No. of Loading Points", type: "number" },
+    { key: "noOfDroppingPoint", label: "No. of Dropping Point", type: "number" },
+    
+  ];
+
+  /** =========================
    * LOADING INFO HANDLERS
    ========================= */
   const handleLoadingInfoSearch = (query) => {
@@ -478,7 +491,6 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
   try {
     console.log("📋 Selected Loading Info:", loadingInfo);
     
-    // Get the vehicleNegotiationNo from the loading info
     const vnnFromLoading = loadingInfo.vehicleNegotiationNo;
     
     if (!vnnFromLoading) {
@@ -490,7 +502,6 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
     console.log("🔍 Looking for Vehicle Negotiation with VNN:", vnnFromLoading);
     setSelectedVNNNo(vnnFromLoading);
     
-    // ===== STEP 1: Fetch Vehicle Negotiation data using VNN number =====
     const vnnData = await vehicleNegotiationHook.getNegotiationByVNN(vnnFromLoading);
     
     if (!vnnData) {
@@ -502,11 +513,9 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
     console.log("✅ Vehicle Negotiation Data loaded:", vnnData);
     setSelectedVNN(vnnData);
     
-    // Get the Vehicle Negotiation ID
     const vehicleNegotiationId = vnnData._id;
     console.log("🔑 Vehicle Negotiation ID:", vehicleNegotiationId);
     
-    // ===== STEP 2: Fetch Pricing Panel data using the same Vehicle Negotiation ID =====
     let pricingData = null;
     try {
       const token = localStorage.getItem('token');
@@ -542,7 +551,6 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
       console.error("Error fetching pricing panel:", error);
     }
     
-    // ===== STEP 3: Get driver details from the Loading Info itself =====
     let driverMobileNo = "";
     if (loadingInfo.driverNo) {
       driverMobileNo = loadingInfo.driverNo;
@@ -550,20 +558,15 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
       driverMobileNo = loadingInfo.vehicleInfo.driverMobileNo;
     }
     
-    // ===== STEP 4: Extract vendor code directly from VNN data (NO API CALL NEEDED) =====
     const approval = vnnData.approval || {};
     const vehicleInfo = vnnData.vehicleInfo || {};
     const negotiation = vnnData.negotiation || {};
     
-    // Get vendor code directly from approval section
-    const vendorCode = approval.vendorCode || "";  // ✅直接从approval获取vendorCode
+    const vendorCode = approval.vendorCode || "";
     const vendorName = approval.vendorName || vnnData.vendorName || "";
     
     console.log("✅ Vendor from VNN:", { vendorName, vendorCode });
     
-    // ===== STEP 5: Auto-fill all fields =====
-    
-    // HEADER INFORMATION
     setHeader({
       ...header,
       branch: vnnData.branch || "",
@@ -573,7 +576,6 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
       pricingSerialNo: pricingData?.pricingSerialNo || "",
     });
 
-    // BILLING INFORMATION
     setBilling({
       billingType: vnnData.billingType || "Multi - Order",
       noOfLoadingPoints: vnnData.loadingPoints?.toString() || "1",
@@ -584,27 +586,20 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
       otherCharges: vnnData.otherCharges || "Nil",
     });
 
-    // PURCHASE DETAILS FROM VNN APPROVAL
     setPurchaseDetails({
       ...purchaseDetails,
-      // Vendor info -直接从VNN获取
       vendorName: vendorName,
       vendorStatus: approval.vendorStatus || vnnData.vendorStatus || "Active",
-      vendorCode: vendorCode,  // ✅ 直接从approval获取，不需要API调用
-      
-      // Vehicle info
+      vendorCode: vendorCode,
       vehicleNo: approval.vehicleNo || vehicleInfo.vehicleNo || loadingInfo.vehicleNo || "",
       vehicleType: vehicleInfo.vehicleType || vnnData.vehicleType || approval.vehicleType || "",
       driverMobileNo: driverMobileNo,
-      
-      // Purchase terms
       purchaseType: approval.purchaseType || negotiation.purchaseType || "Loading & Unloading",
       paymentTerms: approval.paymentTerms || "80 % Advance",
       rateType: approval.rateType || "Per MT",
       rate: approval.finalPerMT?.toString() || approval.finalFix?.toString() || "",
     });
 
-    // VEHICLE REGISTRATION
     const vehiclePlate = approval.vehicleNo || vehicleInfo.vehicleNo || loadingInfo.vehicleNo || "";
     if (vehiclePlate) {
       setRegisteredVehicle({
@@ -614,13 +609,11 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
       });
     }
 
-    // APPROVAL STATUS
     setApproval({
       status: approval.approvalStatus || "Pending",
       remarks: `Auto-filled from VNN: ${vnnData.vnnNo}`,
     });
 
-    // ===== STEP 6: ORDERS FROM VNN ORDERS + PRICING DATA =====
     if (vnnData.orders && vnnData.orders.length > 0) {
       const newOrderRows = vnnData.orders.map(order => {
         let locationRate = "";
@@ -650,8 +643,10 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
           plantName: order.plantName || "",
           orderType: order.orderType || "Sales",
           pinCode: order.pinCode || "",
-          state: order.stateName || order.state || "",
+          taluka: order.talukaName || order.taluka || "",
           district: order.districtName || order.district || "",
+          state: order.stateName || order.state || "",
+          country: order.countryName || order.country || "",
           from: order.fromName || order.from || "",
           to: order.toName || order.to || "",
           locationRate: locationRate,
@@ -659,6 +654,10 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
           weight: order.weight?.toString() || "",
           rate: rate,
           totalAmount: totalAmount,
+          collectionCharges: order.collectionCharges?.toString() || "0",
+          cancellationCharges: order.cancellationCharges || "Nil",
+          loadingCharges: order.loadingCharges || "Nil",
+          otherCharges: order.otherCharges?.toString() || "0",
         };
       });
       
@@ -674,7 +673,6 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
       }));
     }
 
-    // Show success message
     let loadedMessage = `✅ Data loaded from Vehicle Negotiation: ${vnnData.vnnNo}`;
     if (pricingData) {
       loadedMessage += `\n✅ Also loaded from Pricing Panel: ${pricingData.pricingSerialNo}`;
@@ -731,7 +729,6 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
       })
     );
 
-    // Recalculate total weight and amount
     const totalWeight = orderRows.reduce((sum, row) => {
       if (row._id === rowId) {
         const newWeight = key === "weight" ? num(value) : num(row.weight);
@@ -857,19 +854,6 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
   };
 
   /** =========================
-   * BILLING COLUMNS FOR TABLE
-   ========================= */
-  const billingColumns = [
-    { key: "billingType", label: "Billing Type", options: BILLING_TYPES },
-    { key: "noOfLoadingPoints", label: "No. of Loading Points", type: "number" },
-    { key: "noOfDroppingPoint", label: "No. of Droping Point", type: "number" },
-    { key: "collectionCharges", label: "Collection Charges", type: "text" },
-    { key: "cancellationCharges", label: "Cancellation Charges", type: "text" },
-    { key: "loadingCharges", label: "Loading Charges", type: "text" },
-    { key: "otherCharges", label: "Other Charges", type: "text" },
-  ];
-
-  /** =========================
    * HANDLE SAVE
    ========================= */
   const handleSave = async () => {
@@ -901,7 +885,7 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
         additions,
         deductions,
         registeredVehicle: {
-          vehiclePlate: registeredVehicle.registeredPlate, // Save the registered plate
+          vehiclePlate: registeredVehicle.registeredPlate,
           isRegistered: registeredVehicle.isRegistered,
         },
         approval,
@@ -1092,102 +1076,102 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
 
       {/* Main Content */}
       <div className="mx-auto max-w-full p-4">
-      {/* Loading Info Search Section */}
-<div className="mb-4">
-  <Card title="Load from Loading Info">
-    <div className="grid grid-cols-12 gap-4">
-      <div className="col-span-12 md:col-span-4 relative" ref={loadingInfoDropdownRef}>
-        <label className="text-xs font-bold text-slate-600">Loading Info (Vehicle Arrival No)</label>
-        <div className="relative">
-          <input
-            type="text"
-            value={loadingInfoNo}
-            onChange={(e) => handleLoadingInfoSearch(e.target.value)}
-            onFocus={handleLoadingInfoInputFocus}
-            onBlur={handleLoadingInfoInputBlur}
-            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 pr-8"
-            placeholder="Search loading info..."
-          />
-          {loadingInfoHook.loading && (
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-              <svg className="animate-spin h-4 w-4 text-emerald-500" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            </div>
-          )}
-        </div>
-        
-        {showLoadingInfoDropdown && (
-          <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-            {loadingInfoHook.loading ? (
-              <div className="p-3 text-center text-sm text-slate-500">Loading...</div>
-            ) : filteredLoadingInfos.length > 0 ? (
-              filteredLoadingInfos.map((info) => (
-                <div
-                  key={info._id}
-                  onMouseDown={() => handleSelectLoadingInfo(info)}
-                  className="p-3 hover:bg-emerald-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors"
-                >
-                  <div className="font-medium text-slate-800">
-                    {info.vehicleArrivalNo}
-                  </div>
-                  <div className="text-xs text-slate-500 mt-1">
-                    Vehicle: {info.vehicleNo || 'N/A'} • VNN: {info.vehicleNegotiationNo || 'N/A'}
-                  </div>
-                  <div className="text-xs text-slate-400">
-                    Branch: {info.branch || 'N/A'}
-                  </div>
-                  {info.vehicleNegotiationNo && (
-                    <div className="text-xs text-emerald-600 mt-1 font-bold">
-                      ✓ Has VNN: {info.vehicleNegotiationNo}
+        {/* Loading Info Search Section */}
+        <div className="mb-4">
+          <Card title="Load from Loading Info">
+            <div className="grid grid-cols-12 gap-4">
+              <div className="col-span-12 md:col-span-4 relative" ref={loadingInfoDropdownRef}>
+                <label className="text-xs font-bold text-slate-600">Loading Info (Vehicle Arrival No)</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={loadingInfoNo}
+                    onChange={(e) => handleLoadingInfoSearch(e.target.value)}
+                    onFocus={handleLoadingInfoInputFocus}
+                    onBlur={handleLoadingInfoInputBlur}
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 pr-8"
+                    placeholder="Search loading info..."
+                  />
+                  {loadingInfoHook.loading && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <svg className="animate-spin h-4 w-4 text-emerald-500" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
                     </div>
                   )}
                 </div>
-              ))
-            ) : (
-              <div className="p-3 text-center text-sm text-slate-500">
-                No Loading Info found
+                
+                {showLoadingInfoDropdown && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                    {loadingInfoHook.loading ? (
+                      <div className="p-3 text-center text-sm text-slate-500">Loading...</div>
+                    ) : filteredLoadingInfos.length > 0 ? (
+                      filteredLoadingInfos.map((info) => (
+                        <div
+                          key={info._id}
+                          onMouseDown={() => handleSelectLoadingInfo(info)}
+                          className="p-3 hover:bg-emerald-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors"
+                        >
+                          <div className="font-medium text-slate-800">
+                            {info.vehicleArrivalNo}
+                          </div>
+                          <div className="text-xs text-slate-500 mt-1">
+                            Vehicle: {info.vehicleNo || 'N/A'} • VNN: {info.vehicleNegotiationNo || 'N/A'}
+                          </div>
+                          <div className="text-xs text-slate-400">
+                            Branch: {info.branch || 'N/A'}
+                          </div>
+                          {info.vehicleNegotiationNo && (
+                            <div className="text-xs text-emerald-600 mt-1 font-bold">
+                              ✓ Has VNN: {info.vehicleNegotiationNo}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-3 text-center text-sm text-slate-500">
+                        No Loading Info found
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="text-xs text-slate-400 mt-1">
+                  Select Loading Info to auto-fill from Vehicle Negotiation
+                </div>
               </div>
-            )}
-          </div>
-        )}
-        <div className="text-xs text-slate-400 mt-1">
-          Select Loading Info to auto-fill from Vehicle Negotiation
-        </div>
-      </div>
 
-      {selectedVNN && (
-        <div className="col-span-12 md:col-span-8">
-          <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <span className="text-xs font-bold text-slate-600">Loaded VNN:</span>
-                <span className="ml-2 text-sm font-bold text-green-800">{selectedVNN.vnnNo}</span>
-              </div>
-              <div>
-                <span className="text-xs font-bold text-slate-600">PSN:</span>
-                <span className="ml-2 text-sm font-bold text-purple-800">{header.pricingSerialNo || 'Not Found'}</span>
-              </div>
-              <div>
-                <span className="text-xs font-bold text-slate-600">Vendor:</span>
-                <span className="ml-2 text-sm text-slate-700">{selectedVNN.approval?.vendorName || 'N/A'}</span>
-              </div>
-              <div>
-                <span className="text-xs font-bold text-slate-600">Vehicle:</span>
-                <span className="ml-2 text-sm text-slate-700">{selectedVNN.approval?.vehicleNo || 'N/A'}</span>
-              </div>
-              <div>
-                <span className="text-xs font-bold text-slate-600">Orders:</span>
-                <span className="ml-2 text-sm text-slate-700">{selectedVNN.orders?.length || 0}</span>
-              </div>
+              {selectedVNN && (
+                <div className="col-span-12 md:col-span-8">
+                  <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <span className="text-xs font-bold text-slate-600">Loaded VNN:</span>
+                        <span className="ml-2 text-sm font-bold text-green-800">{selectedVNN.vnnNo}</span>
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-slate-600">PSN:</span>
+                        <span className="ml-2 text-sm font-bold text-purple-800">{header.pricingSerialNo || 'Not Found'}</span>
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-slate-600">Vendor:</span>
+                        <span className="ml-2 text-sm text-slate-700">{selectedVNN.approval?.vendorName || 'N/A'}</span>
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-slate-600">Vehicle:</span>
+                        <span className="ml-2 text-sm text-slate-700">{selectedVNN.approval?.vehicleNo || 'N/A'}</span>
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-slate-600">Orders:</span>
+                        <span className="ml-2 text-sm text-slate-700">{selectedVNN.orders?.length || 0}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
+          </Card>
         </div>
-      )}
-    </div>
-  </Card>
-</div>
 
         {/* Header Information */}
         <Card title="Purchase Information">
@@ -1214,7 +1198,6 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
               />
             </div>
 
-            {/* NEW: Pricing Serial No Field */}
             <div className="col-span-12 md:col-span-2">
               <label className="text-xs font-bold text-slate-600">Pricing Serial No</label>
               <input
@@ -1264,7 +1247,7 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
           </div>
         </Card>
 
-        {/* Billing Type / Charges Table */}
+        {/* Billing Type / Charges Table - ALL 7 COLUMNS */}
         <div className="mt-4">
           <Card title="Billing Type / Charges (Auto-filled from VNN)">
             <div className="overflow-auto rounded-xl border border-yellow-300">
@@ -1323,7 +1306,7 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
           </Card>
         </div>
 
-        {/* Orders Table */}
+        {/* Orders Table - WITH ALL FIELDS */}
         <div className="mt-4">
           <Card 
             title="Order Details (Auto-filled from VNN & Pricing Panel)"
@@ -1339,24 +1322,30 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
             }
           >
             <div className="overflow-auto rounded-xl border border-yellow-300">
-              <table className="min-w-full w-full text-sm">
+              <table className="min-w-max w-full text-sm">
                 <thead className="sticky top-0 bg-yellow-400 z-10">
                   <tr>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Order No</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Party Name</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Plant</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Order Type</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Pin Code</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">State</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">District</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">From</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">To</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Location Rate</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Price List</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Weight</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Rate</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Total Amount</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900">Actions</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">Order No</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[150px]">Party Name</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">Plant</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[100px]">Order Type</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[100px]">Pin Code</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">Taluka</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">District</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">State</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">Country</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">From</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">To</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[100px]">Location Rate</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[100px]">Price List</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[80px]">Weight</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[80px]">Rate</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[100px]">Total Amount</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[130px]">Collection Charges</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[140px]">Cancellation Charges</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[130px]">Loading Charges</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[130px]">Other Charges</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[80px]">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1413,10 +1402,10 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                       <td className="border border-yellow-300 px-2 py-2">
                         <input
                           type="text"
-                          value={row.state || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'state', e.target.value)}
+                          value={row.taluka || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'taluka', e.target.value)}
                           className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                          placeholder="State"
+                          placeholder="Taluka"
                         />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
@@ -1426,6 +1415,24 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                           onChange={(e) => updateOrderRow(row._id, 'district', e.target.value)}
                           className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
                           placeholder="District"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.state || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'state', e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          placeholder="State"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.country || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'country', e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          placeholder="Country"
                         />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
@@ -1492,6 +1499,42 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                         />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.collectionCharges || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'collectionCharges', e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          placeholder="Collection Charges"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.cancellationCharges || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'cancellationCharges', e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          placeholder="Cancellation Charges"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.loadingCharges || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'loadingCharges', e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          placeholder="Loading Charges"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.otherCharges || ""}
+                          onChange={(e) => updateOrderRow(row._id, 'otherCharges', e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          placeholder="Other Charges"
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
                         <div className="flex gap-1">
                           <button
                             onClick={() => duplicateOrderRow(row._id)}
@@ -1514,7 +1557,7 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                 </tbody>
                 <tfoot className="bg-yellow-100">
                   <tr>
-                    <td colSpan="13" className="border border-yellow-300 px-3 py-2 text-right font-bold">
+                    <td colSpan="19" className="border border-yellow-300 px-3 py-2 text-right font-bold">
                       Total Order Amount:
                     </td>
                     <td className="border border-yellow-300 px-3 py-2 font-bold text-emerald-800">
@@ -1779,11 +1822,10 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
           </Card>
         </div>
 
-        {/* Vehicle Registration Section - UPDATED */}
+        {/* Vehicle Registration Section */}
         <div className="mt-4">
           <Card title="Vehicle Registration">
             <div className="grid grid-cols-12 gap-4 items-center">
-              {/* Loading Panel Vehicle - Plate (Read-only, auto-filled) */}
               <div className="col-span-12 md:col-span-5">
                 <div className="flex items-center gap-4 p-3 bg-blue-50 rounded-xl border border-blue-200">
                   <div className="flex-1">
@@ -1800,7 +1842,6 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                 </div>
               </div>
 
-              {/* Registered Vehicle - Plate (Editable) */}
               <div className="col-span-12 md:col-span-5">
                 <div className="flex items-center gap-4 p-3 bg-white rounded-xl border border-slate-200">
                   <div className="flex-1">
@@ -1820,7 +1861,6 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                 </div>
               </div>
 
-              {/* Verified Registered Checkbox (Editable) */}
               <div className="col-span-12 md:col-span-2">
                 <div className="flex items-center gap-2 p-3 bg-white rounded-xl border border-slate-200 h-full">
                   <div className="flex flex-col items-start">
@@ -1846,7 +1886,6 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
               </div>
             </div>
 
-            {/* Display message if plates match or differ */}
             {registeredVehicle.loadingPanelPlate && registeredVehicle.registeredPlate && (
               <div className="mt-3 px-3">
                 {registeredVehicle.loadingPanelPlate === registeredVehicle.registeredPlate ? (
@@ -1872,82 +1911,6 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
         {/* Additions & Deductions Section */}
         <div className="mt-4">
           <div className="grid grid-cols-12 gap-4">
-            {/* Additions Column */}
-            <div className="col-span-12 md:col-span-6">
-              <Card 
-                title="Additions (+) - Extra Charges"
-                right={
-                  <button
-                    onClick={addAdditionRow}
-                    className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-green-700"
-                  >
-                    + Add Addition
-                  </button>
-                }
-              >
-                {additions.length === 0 ? (
-                  <div className="text-center py-8 text-slate-500 border-2 border-dashed border-green-200 rounded-lg">
-                    <svg className="mx-auto h-8 w-8 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    <p className="mt-2">No additions added. Click "Add Addition" to add charges.</p>
-                  </div>
-                ) : (
-                  <div className="overflow-auto rounded-xl border border-green-300">
-                    <table className="min-w-full w-full text-sm">
-                      <thead className="bg-green-100">
-                        <tr>
-                          <th className="border border-green-300 px-3 py-2 text-xs font-bold text-slate-800">Description</th>
-                          <th className="border border-green-300 px-3 py-2 text-xs font-bold text-slate-800">Amount (₹)</th>
-                          <th className="border border-green-300 px-3 py-2 text-xs font-bold text-slate-800">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {additions.map((row) => (
-                          <tr key={row._id} className="hover:bg-green-50">
-                            <td className="border border-green-300 px-2 py-2">
-                              <input
-                                type="text"
-                                value={row.description}
-                                onChange={(e) => updateAdditionRow(row._id, 'description', e.target.value)}
-                                className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                                placeholder="Description"
-                              />
-                            </td>
-                            <td className="border border-green-300 px-2 py-2">
-                              <input
-                                type="number"
-                                value={row.amount}
-                                onChange={(e) => updateAdditionRow(row._id, 'amount', e.target.value)}
-                                className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-right"
-                                placeholder="0.00"
-                              />
-                            </td>
-                            <td className="border border-green-300 px-2 py-2 text-center">
-                              <button
-                                onClick={() => removeAdditionRow(row._id)}
-                                className="rounded-lg bg-red-500 px-2 py-1.5 text-xs font-bold text-white hover:bg-red-600"
-                                title="Remove"
-                              >
-                                ✕
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                        <tr className="bg-green-100 font-bold">
-                          <td className="border border-green-300 px-3 py-2 text-right">Total Additions:</td>
-                          <td className="border border-green-300 px-3 py-2 text-right text-emerald-700">
-                            ₹{calculateTotalAdditions().toLocaleString()}
-                          </td>
-                          <td className="border border-green-300 px-3 py-2"></td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </Card>
-            </div>
-
             {/* Deductions Column */}
             <div className="col-span-12 md:col-span-6">
               <Card 
@@ -2016,6 +1979,82 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                             ₹{calculateTotalDeductions().toLocaleString()}
                           </td>
                           <td className="border border-red-300 px-3 py-2"></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Card>
+            </div>
+
+            {/* Additions Column */}
+            <div className="col-span-12 md:col-span-6">
+              <Card 
+                title="Additions (+) - Extra Charges"
+                right={
+                  <button
+                    onClick={addAdditionRow}
+                    className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-green-700"
+                  >
+                    + Add Addition
+                  </button>
+                }
+              >
+                {additions.length === 0 ? (
+                  <div className="text-center py-8 text-slate-500 border-2 border-dashed border-green-200 rounded-lg">
+                    <svg className="mx-auto h-8 w-8 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    <p className="mt-2">No additions added. Click "Add Addition" to add charges.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-auto rounded-xl border border-green-300">
+                    <table className="min-w-full w-full text-sm">
+                      <thead className="bg-green-100">
+                        <tr>
+                          <th className="border border-green-300 px-3 py-2 text-xs font-bold text-slate-800">Description</th>
+                          <th className="border border-green-300 px-3 py-2 text-xs font-bold text-slate-800">Amount (₹)</th>
+                          <th className="border border-green-300 px-3 py-2 text-xs font-bold text-slate-800">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {additions.map((row) => (
+                          <tr key={row._id} className="hover:bg-green-50">
+                            <td className="border border-green-300 px-2 py-2">
+                              <input
+                                type="text"
+                                value={row.description}
+                                onChange={(e) => updateAdditionRow(row._id, 'description', e.target.value)}
+                                className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                                placeholder="Description"
+                              />
+                            </td>
+                            <td className="border border-green-300 px-2 py-2">
+                              <input
+                                type="number"
+                                value={row.amount}
+                                onChange={(e) => updateAdditionRow(row._id, 'amount', e.target.value)}
+                                className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-right"
+                                placeholder="0.00"
+                              />
+                            </td>
+                            <td className="border border-green-300 px-2 py-2 text-center">
+                              <button
+                                onClick={() => removeAdditionRow(row._id)}
+                                className="rounded-lg bg-red-500 px-2 py-1.5 text-xs font-bold text-white hover:bg-red-600"
+                                title="Remove"
+                              >
+                                ✕
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                        <tr className="bg-green-100 font-bold">
+                          <td className="border border-green-300 px-3 py-2 text-right">Total Additions:</td>
+                          <td className="border border-green-300 px-3 py-2 text-right text-emerald-700">
+                            ₹{calculateTotalAdditions().toLocaleString()}
+                          </td>
+                          <td className="border border-green-300 px-3 py-2"></td>
                         </tr>
                       </tbody>
                     </table>
@@ -2105,9 +2144,6 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                 <div className="bg-white p-4 rounded-xl border border-slate-200">
                   <h3 className="text-sm font-bold text-slate-800 mb-3">Purchase MEMO</h3>
                   <div className="flex gap-3">
-                    <button className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700">
-                      Generate MEMO
-                    </button>
                     <button className="rounded-lg bg-green-600 px-4 py-2 text-xs font-bold text-white hover:bg-green-700">
                       Upload MEMO
                     </button>
@@ -2178,14 +2214,6 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                 </div>
               </div>
               <div className="col-span-12 md:col-span-6">
-                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 h-full flex items-center">
-                  <p className="text-xs text-blue-800 flex items-center gap-2">
-                    <svg className="h-4 w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span><span className="font-bold">Note:</span> JV need for making the payment in Driver or Motor Owner Account.</span>
-                  </p>
-                </div>
               </div>
             </div>
           </Card>
