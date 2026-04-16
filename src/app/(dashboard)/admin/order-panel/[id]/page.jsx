@@ -2869,10 +2869,6 @@ export default function EditOrderPanel() {
     delivery: "Normal",
     date: new Date().toISOString().split('T')[0],
     partyName: "",
-    collectionCharges: "",
-    cancellationCharges: "",
-    loadingCharges: "",
-    otherCharges: "",
     customerId: null,
     customerCode: "",
     customerName: "",
@@ -3061,10 +3057,6 @@ export default function EditOrderPanel() {
         delivery: order.delivery || "Normal",
         date: order.date ? new Date(order.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
         partyName: order.partyName || order.customerName || "",
-        collectionCharges: order.collectionCharges?.toString() || "",
-        cancellationCharges: order.cancellationCharges || "",
-        loadingCharges: order.loadingCharges || "",
-        otherCharges: order.otherCharges?.toString() || "",
         customerId: order.customerId || null,
         customerCode: order.customerCode || "",
         customerName: order.customerName || "",
@@ -3508,10 +3500,6 @@ export default function EditOrderPanel() {
         customerName: selectedCustomer?.customerName || '',
         contactPerson: selectedCustomer?.contactPersonName || '',
         partyName: selectedCustomer?.customerName || top.partyName || '',
-        collectionCharges: num(top.collectionCharges) || 0,
-        cancellationCharges: top.cancellationCharges || 'Nil',
-        loadingCharges: top.loadingCharges || 'Nil',
-        otherCharges: num(top.otherCharges) || 0,
         plantRows: plantRows.map(row => ({
           _id: row._id,
           plantCode: row.plantCode || null,
@@ -3535,6 +3523,7 @@ export default function EditOrderPanel() {
           status: row.status || "Open",
           rate: 0,
           locationRate: 0,
+          // ✅ Charges are here - per plant row (per order)
           collectionCharges: num(row.collectionCharges) || 0,
           cancellationCharges: row.cancellationCharges || 'Nil',
           loadingCharges: row.loadingCharges || 'Nil',
@@ -3691,7 +3680,7 @@ export default function EditOrderPanel() {
 
       {/* ===== Main Layout ===== */}
       <div className="mx-auto max-w-full p-4">
-        {/* Header info */}
+        {/* Header info - NO CHARGES HERE */}
         <Card title="Order Details">
           <div className="grid grid-cols-12 gap-3">
             <div className="col-span-12 md:col-span-4">
@@ -3791,47 +3780,11 @@ export default function EditOrderPanel() {
                 </div>
               </div>
             </div>
-
-            {/* Charges Fields - Conditionally Visible */}
-            {showCharges && (
-              <>
-                <Input
-                  col="col-span-6 md:col-span-3"
-                  label="Collection Charges"
-                  value={top.collectionCharges}
-                  onChange={(v) =>
-                    setTop((p) => ({ ...p, collectionCharges: v }))
-                  }
-                  type="number"
-                />
-                <Input
-                  col="col-span-6 md:col-span-3"
-                  label="Cancellation Charges"
-                  value={top.cancellationCharges}
-                  onChange={(v) =>
-                    setTop((p) => ({ ...p, cancellationCharges: v }))
-                  }
-                />
-                <Input
-                  col="col-span-6 md:col-span-3"
-                  label="Loading Charges"
-                  value={top.loadingCharges}
-                  onChange={(v) => setTop((p) => ({ ...p, loadingCharges: v }))}
-                />
-                <Input
-                  col="col-span-6 md:col-span-3"
-                  label="Other Charges"
-                  value={top.otherCharges}
-                  onChange={(v) => setTop((p) => ({ ...p, otherCharges: v }))}
-                  type="number"
-                />
-              </>
-            )}
           </div>
         </Card>
 
         <div className="mt-4">
-          {/* Plant Code / Route Section */}
+          {/* Plant Code / Route Section - CHARGES ARE HERE (per plant row) */}
           <Card title="Plant Code / Route">
             <div className="mb-4 flex justify-between items-center">
               <div className="text-sm text-slate-600">
@@ -3875,7 +3828,7 @@ export default function EditOrderPanel() {
             />
           </Card>
 
-          {/* PACK TYPE SECTIONS - Show ALL sections at once (like Create page) */}
+          {/* PACK TYPE SECTIONS - Show ALL sections at once */}
           <div className="mt-4 space-y-6">
             {PACK_TYPES.map((pack) => (
               <Card key={pack.key} title={`${pack.label} (${packData[pack.key]?.length || 0} rows)`}>
@@ -4480,7 +4433,7 @@ function PlantGridTable({
                   </select>
                 </td>
 
-                {/* Charges Columns */}
+                {/* Charges Columns - PER PLANT ROW */}
                 {showCharges && (
                   <>
                     <td className="border border-yellow-300 px-2 py-2">

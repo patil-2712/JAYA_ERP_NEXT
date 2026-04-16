@@ -1,3 +1,4 @@
+// PurchaseCounter.js
 import mongoose from 'mongoose';
 
 const purchaseCounterSchema = new mongoose.Schema({
@@ -53,6 +54,7 @@ export async function getNextPurchaseNumber(companyId) {
     return `${counter.prefix}-${currentYear}-${sequenceNumber}`;
   } catch (error) {
     console.error('Error generating purchase number:', error);
+    // Fallback: timestamp-based number
     const timestamp = Date.now().toString().slice(-6);
     return `PUR-${timestamp}`;
   }

@@ -780,162 +780,173 @@ export default function CreateOrderPanel() {
   /** =========================
    * SAVE ORDER FUNCTION
    ========================= */
-  const handleSave = async () => {
-    if (!top.branch) {
-      alert("Please select a branch");
-      return;
+const handleSave = async () => {
+  if (!top.branch) {
+    alert("Please select a branch");
+    return;
+  }
+  
+  const hasInvalidPlantRows = plantRows.some(row => !row.plantCode);
+  if (hasInvalidPlantRows) {
+    alert("Please select plant for all plant rows");
+    return;
+  }
+
+  setSaving(true);
+  setSaveError(null);
+  setSaveSuccess(false);
+
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error("No authentication token found. Please login again.");
     }
     
-    const hasInvalidPlantRows = plantRows.some(row => !row.plantCode);
-    if (hasInvalidPlantRows) {
-      alert("Please select plant for all plant rows");
-      return;
+    // Build packData from packRows
+    const packDataGrouped = {
+      PALLETIZATION: [],
+      'UNIFORM - BAGS/BOXES': [],
+      'LOOSE - CARGO': [],
+      'NON-UNIFORM - GENERAL CARGO': []
+    };
+    
+    packRows.forEach(row => {
+      if (row.packType === "PALLETIZATION") {
+        packDataGrouped.PALLETIZATION.push({
+          noOfPallets: num(row.noOfPallets),
+          unitPerPallets: num(row.unitPerPallets),
+          totalPkgs: num(row.totalPkgs),
+          pkgsType: row.pkgsType || "",
+          uom: row.uom || "MT",
+          skuSize: row.skuSize || "",
+          packWeight: num(row.packWeight),
+          productName: row.productName || "",
+          wtLtr: num(row.wtLtr),
+          actualWt: num(row.actualWt),
+          chargedWt: num(row.chargedWt),
+          wtUom: row.wtUom || "MT",
+          isUniform: row.isUniform || false
+        });
+      } else if (row.packType === "UNIFORM - BAGS/BOXES") {
+        packDataGrouped['UNIFORM - BAGS/BOXES'].push({
+          totalPkgs: num(row.totalPkgs),
+          pkgsType: row.pkgsType || "",
+          uom: row.uom || "MT",
+          skuSize: row.skuSize || "",
+          packWeight: num(row.packWeight),
+          productName: row.productName || "",
+          wtLtr: num(row.wtLtr),
+          actualWt: num(row.actualWt),
+          chargedWt: num(row.chargedWt),
+          wtUom: row.wtUom || "MT"
+        });
+      } else if (row.packType === "LOOSE - CARGO") {
+        packDataGrouped['LOOSE - CARGO'].push({
+          uom: row.uom || "MT",
+          productName: row.productName || "",
+          actualWt: num(row.actualWt),
+          chargedWt: num(row.chargedWt)
+        });
+      } else if (row.packType === "NON-UNIFORM - GENERAL CARGO") {
+        packDataGrouped['NON-UNIFORM - GENERAL CARGO'].push({
+          nos: num(row.nos),
+          productName: row.productName || "",
+          uom: row.uom || "MT",
+          length: num(row.length),
+          width: num(row.width),
+          height: num(row.height),
+          actualWt: num(row.actualWt),
+          chargedWt: num(row.chargedWt)
+        });
+      }
+    });
+    
+    // Remove empty arrays
+    Object.keys(packDataGrouped).forEach(key => {
+      if (packDataGrouped[key].length === 0) {
+        delete packDataGrouped[key];
+      }
+    });
+
+    const payload = {
+      branch: top.branch,
+      branchName: top.branchName,
+      branchCode: top.branchCode,
+      delivery: top.delivery,
+      date: top.date,
+      customerId: selectedCustomer?._id || null,
+      customerCode: selectedCustomer?.customerCode || '',
+      customerName: selectedCustomer?.customerName || '',
+      contactPerson: selectedCustomer?.contactPersonName || '',
+      partyName: selectedCustomer?.customerName || top.partyName || '',
+      
+      plantRows: plantRows.map(row => ({
+        plantCode: row.plantCode || '',
+        plantName: row.plantName || '',
+        plantCodeValue: row.plantCodeValue || '',
+        orderType: row.orderType || "Sales",
+        pinCode: row.pinCode || "",
+        from: row.from || null,
+        fromName: row.fromName || "",
+        to: row.to || null,
+        toName: row.toName || "",
+        taluka: row.taluka || "",
+        talukaName: row.talukaName || "",
+        district: row.district || "",
+        districtName: row.districtName || "",
+        state: row.state || "",
+        stateName: row.stateName || "",
+        country: row.country || "",
+        countryName: row.countryName || "",
+        weight: num(row.weight) || 0,
+        status: row.status || "Open",
+        rate: 0,
+        locationRate: 0,
+        collectionCharges: num(row.collectionCharges) || 0,
+        cancellationCharges: row.cancellationCharges || 'Nil',
+        loadingCharges: row.loadingCharges || 'Nil',
+        otherCharges: num(row.otherCharges) || 0
+      })),
+      
+      packData: packDataGrouped,
+      branches: branches,
+      plants: plants,
+      countries: countries,
+      states: states,
+      districts: districts
+    };
+    
+    const res = await fetch('/api/order-panel', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.message || `Failed to save order: ${res.status}`);
     }
 
-    setSaving(true);
-    setSaveError(null);
-    setSaveSuccess(false);
-
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error("No authentication token found. Please login again.");
-      }
-      
-      const payload = {
-        branch: top.branch,
-        branchName: top.branchName,
-        branchCode: top.branchCode,
-        delivery: top.delivery,
-        date: top.date,
-        customerId: selectedCustomer?._id || null,
-        customerCode: selectedCustomer?.customerCode || '',
-        customerName: selectedCustomer?.customerName || '',
-        contactPerson: selectedCustomer?.contactPersonName || '',
-        partyName: selectedCustomer?.customerName || top.partyName || '',
-        collectionCharges: num(top.collectionCharges) || 0,
-        cancellationCharges: top.cancellationCharges || 'Nil',
-        loadingCharges: top.loadingCharges || 'Nil',
-        otherCharges: num(top.otherCharges) || 0,
-        plantRows: plantRows.map(row => ({
-          plantCode: row.plantCode || '',
-          plantName: row.plantName || '',
-          plantCodeValue: row.plantCodeValue || '',
-          orderType: row.orderType || "Sales",
-          pinCode: row.pinCode || "",
-          from: row.from || null,
-          fromName: row.fromName || "",
-          to: row.to || null,
-          toName: row.toName || "",
-          taluka: row.taluka || "",
-          talukaName: row.talukaName || "",
-          district: row.district || "",
-          districtName: row.districtName || "",
-          state: row.state || "",
-          stateName: row.stateName || "",
-          country: row.country || "",
-          countryName: row.countryName || "",
-          weight: num(row.weight) || 0,
-          status: row.status || "Open",
-          rate: 0,
-          locationRate: 0,
-          collectionCharges: num(row.collectionCharges) || 0,
-          cancellationCharges: row.cancellationCharges || 'Nil',
-          loadingCharges: row.loadingCharges || 'Nil',
-          otherCharges: num(row.otherCharges) || 0
-        })),
-        packRows: packRows.map(row => {
-          if (row.packType === "PALLETIZATION") {
-            return {
-              packType: row.packType,
-              noOfPallets: num(row.noOfPallets),
-              unitPerPallets: num(row.unitPerPallets),
-              totalPkgs: num(row.totalPkgs),
-              pkgsType: row.pkgsType || "",
-              uom: row.uom || "MT",
-              skuSize: row.skuSize || "",
-              packWeight: num(row.packWeight),
-              productName: row.productName || "",
-              wtLtr: num(row.wtLtr),
-              actualWt: num(row.actualWt),
-              chargedWt: num(row.chargedWt),
-              wtUom: row.wtUom || "MT",
-              isUniform: row.isUniform || false
-            };
-          } else if (row.packType === "UNIFORM - BAGS/BOXES") {
-            return {
-              packType: row.packType,
-              totalPkgs: num(row.totalPkgs),
-              pkgsType: row.pkgsType || "",
-              uom: row.uom || "MT",
-              skuSize: row.skuSize || "",
-              packWeight: num(row.packWeight),
-              productName: row.productName || "",
-              wtLtr: num(row.wtLtr),
-              actualWt: num(row.actualWt),
-              chargedWt: num(row.chargedWt),
-              wtUom: row.wtUom || "MT"
-            };
-          } else if (row.packType === "LOOSE - CARGO") {
-            return {
-              packType: row.packType,
-              uom: row.uom || "MT",
-              productName: row.productName || "",
-              actualWt: num(row.actualWt),
-              chargedWt: num(row.chargedWt)
-            };
-          } else {
-            return {
-              packType: row.packType,
-              nos: num(row.nos),
-              productName: row.productName || "",
-              uom: row.uom || "MT",
-              length: num(row.length),
-              width: num(row.width),
-              height: num(row.height),
-              actualWt: num(row.actualWt),
-              chargedWt: num(row.chargedWt)
-            };
-          }
-        }),
-        branches: branches,
-        plants: plants,
-        countries: countries,
-        states: states,
-        districts: districts
-      };
-      
-      const res = await fetch('/api/order-panel', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || `Failed to save order: ${res.status}`);
-      }
-
-      setSaveSuccess(true);
-      setOrderNumber(data.data?.orderPanelNo || "Generated");
-      
-      const orderPanelNo = data.data?.orderPanelNo || data.data?.orderNo || "Generated";
-      alert(`✅ Order saved successfully!\nOrder Panel Number: ${orderPanelNo}`);
-      
-      resetForm();
-      
-    } catch (error) {
-      console.error('Error saving order:', error);
-      setSaveError(error.message || 'Failed to save order');
-      alert(`❌ Error: ${error.message}`);
-    } finally {
-      setSaving(false);
-    }
-  };
+    setSaveSuccess(true);
+    setOrderNumber(data.data?.orderPanelNo || "Generated");
+    
+    const orderPanelNo = data.data?.orderPanelNo || data.data?.orderNo || "Generated";
+    alert(`✅ Order saved successfully!\nOrder Panel Number: ${orderPanelNo}`);
+    
+    resetForm();
+    
+  } catch (error) {
+    console.error('Error saving order:', error);
+    setSaveError(error.message || 'Failed to save order');
+    alert(`❌ Error: ${error.message}`);
+  } finally {
+    setSaving(false);
+  }
+};
 
   /** =========================
    * RESET FORM FUNCTION

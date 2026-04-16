@@ -4004,162 +4004,164 @@ export default function VehicleNegotiationPanel() {
     }));
   };
 
-  const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
-    if (removePanelId) {
-      const panelToRemove = selectedOrderPanels.find(p => p._id === removePanelId);
-      
-      setSelectedOrderPanels(prev => prev.filter(p => p._id !== removePanelId));
-      setOrders(prev => prev.filter(order => order.orderPanelId !== removePanelId));
-      
-      if (panelToRemove) {
-        setHeader(prev => ({
-          ...prev,
-          collectionCharges: String(Math.max(0, (Number(prev.collectionCharges) || 0) - (Number(panelToRemove.collectionCharges) || 0))),
-          cancellationCharges: String(Math.max(0, (Number(prev.cancellationCharges) || 0) - (Number(panelToRemove.cancellationCharges) || 0))),
-          loadingCharges: String(Math.max(0, (Number(prev.loadingCharges) || 0) - (Number(panelToRemove.loadingCharges) || 0))),
-          otherCharges: String(Math.max(0, (Number(prev.otherCharges) || 0) - (Number(panelToRemove.otherCharges) || 0))),
-          loadingPoints: String(Math.max(0, (Number(prev.loadingPoints) || 0) - (Number(panelToRemove.loadingPoints) || 0))),
-          dropPoints: String(Math.max(0, (Number(prev.dropPoints) || 0) - (Number(panelToRemove.dropPoints) || 0)))
-        }));
-      }
-      
-      if (selectedOrderPanels.length === 1) {
-        setOrders([defaultOrderRow()]);
-        setHeader(prev => ({
-          ...prev,
-          branch: null,
-          branchName: "",
-          branchCode: "",
-          partyName: "",
-          customerId: null,
-          collectionCharges: "",
-          cancellationCharges: "",
-          loadingCharges: "",
-          otherCharges: "",
-          loadingPoints: "",
-          dropPoints: ""
-        }));
-        setSelectedCustomer(null);
-        setCustomerSearchQuery("");
-      }
-    } else {
-      if (selectedOrderPanels.some(p => p._id === fullPanel._id)) {
-        alert("This order panel is already selected");
-        return;
-      }
-      
-      const newSelectedPanels = [...selectedOrderPanels, fullPanel];
-      setSelectedOrderPanels(newSelectedPanels);
-      
-      if (fullPanel.plantRows && fullPanel.plantRows.length > 0) {
-        const newOrders = fullPanel.plantRows.map((row) => {
-          let plantId = null;
-          let plantName = '';
-          let plantCode = '';
-          
-          if (row.plantCode) {
-            if (typeof row.plantCode === 'object' && row.plantCode._id) {
-              plantId = row.plantCode._id;
-              plantName = row.plantCode.name || '';
-              plantCode = row.plantCode.code || '';
-            } else if (typeof row.plantCode === 'string' && isValidObjectId(row.plantCode)) {
-              plantId = row.plantCode;
-              plantName = row.plantName || '';
-              plantCode = row.plantCodeValue || '';
-            }
-          }
-          
-          if (!plantId && row.plantCodeValue) {
-            const plant = plants.find(p => p.code === row.plantCodeValue);
-            if (plant) {
-              plantId = plant._id;
-              plantName = plant.name;
-              plantCode = plant.code;
-            }
-          }
-          
-          return {
-            _id: uid(),
-            orderNo: fullPanel.orderPanelNo,
-            orderPanelId: fullPanel._id,
-            partyName: fullPanel.partyName || fullPanel.customerName || "",
-            customerId: fullPanel.customerId || null,
-            customerCode: fullPanel.customerCode || "",
-            contactPerson: fullPanel.contactPerson || "",
-            plantCode: plantId,
-            plantName: plantName || row.plantName || "",
-            plantCodeValue: plantCode || row.plantCodeValue || "",
-            orderType: row.orderType || "Sales",
-            pinCode: row.pinCode || "",
-            from: row.from || null,
-            fromName: row.fromName || "",
-            to: row.to || null,
-            toName: row.toName || "",
-            taluka: row.taluka || "",
-            talukaName: row.talukaName || "",
-            district: row.district || "",
-            districtName: row.districtName || "",
-            state: row.state || "",
-            stateName: row.stateName || "",
-            country: row.country || "",
-            countryName: row.countryName || "",
-            weight: row.weight || "",
-            status: row.status || "Open",
-            collectionCharges: fullPanel.collectionCharges?.toString() || "",
-            cancellationCharges: fullPanel.cancellationCharges?.toString() || "",
-            loadingCharges: fullPanel.loadingCharges?.toString() || "",
-            otherCharges: fullPanel.otherCharges?.toString() || "",
-          };
-        });
+const handleOrderPanelSelect = async (fullPanel, removePanelId = null) => {
+  if (removePanelId) {
+    const panelToRemove = selectedOrderPanels.find(p => p._id === removePanelId);
+    
+    setSelectedOrderPanels(prev => prev.filter(p => p._id !== removePanelId));
+    setOrders(prev => prev.filter(order => order.orderPanelId !== removePanelId));
+    
+    if (panelToRemove) {
+      setHeader(prev => ({
+        ...prev,
+        collectionCharges: String(Math.max(0, (Number(prev.collectionCharges) || 0) - (Number(panelToRemove.collectionCharges) || 0))),
+        cancellationCharges: String(Math.max(0, (Number(prev.cancellationCharges) || 0) - (Number(panelToRemove.cancellationCharges) || 0))),
+        loadingCharges: String(Math.max(0, (Number(prev.loadingCharges) || 0) - (Number(panelToRemove.loadingCharges) || 0))),
+        otherCharges: String(Math.max(0, (Number(prev.otherCharges) || 0) - (Number(panelToRemove.otherCharges) || 0))),
+        loadingPoints: String(Math.max(0, (Number(prev.loadingPoints) || 0) - (Number(panelToRemove.loadingPoints) || 0))),
+        dropPoints: String(Math.max(0, (Number(prev.dropPoints) || 0) - (Number(panelToRemove.dropPoints) || 0)))
+      }));
+    }
+    
+    if (selectedOrderPanels.length === 1) {
+      setOrders([defaultOrderRow()]);
+      setHeader(prev => ({
+        ...prev,
+        branch: null,
+        branchName: "",
+        branchCode: "",
+        partyName: "",
+        customerId: null,
+        collectionCharges: "",
+        cancellationCharges: "",
+        loadingCharges: "",
+        otherCharges: "",
+        loadingPoints: "",
+        dropPoints: ""
+      }));
+      setSelectedCustomer(null);
+      setCustomerSearchQuery("");
+    }
+  } else {
+    if (selectedOrderPanels.some(p => p._id === fullPanel._id)) {
+      alert("This order panel is already selected");
+      return;
+    }
+    
+    const newSelectedPanels = [...selectedOrderPanels, fullPanel];
+    setSelectedOrderPanels(newSelectedPanels);
+    
+    if (fullPanel.plantRows && fullPanel.plantRows.length > 0) {
+      const newOrders = fullPanel.plantRows.map((row) => {
+        let plantId = null;
+        let plantName = '';
+        let plantCode = '';
         
-        setOrders(prev => {
-          const existingOrdersFromPanel = prev.filter(o => o.orderPanelId === fullPanel._id);
-          if (existingOrdersFromPanel.length > 0) {
-            const otherOrders = prev.filter(o => o.orderPanelId !== fullPanel._id);
-            return [...otherOrders, ...newOrders];
+        if (row.plantCode) {
+          if (typeof row.plantCode === 'object' && row.plantCode._id) {
+            plantId = row.plantCode._id;
+            plantName = row.plantCode.name || '';
+            plantCode = row.plantCode.code || '';
+          } else if (typeof row.plantCode === 'string' && isValidObjectId(row.plantCode)) {
+            plantId = row.plantCode;
+            plantName = row.plantName || '';
+            plantCode = row.plantCodeValue || '';
           }
-          return [...prev, ...newOrders];
-        });
-      }
-
-      if (selectedOrderPanels.length === 0) {
-        setHeader(prev => ({
-          ...prev,
-          branch: fullPanel.branch || null,
-          branchName: fullPanel.branchName || "",
-          branchCode: fullPanel.branchCode || "",
-          delivery: fullPanel.delivery || "Urgent",
-          date: fullPanel.date ? new Date(fullPanel.date).toISOString().split('T')[0] : prev.date,
+        }
+        
+        if (!plantId && row.plantCodeValue) {
+          const plant = plants.find(p => p.code === row.plantCodeValue);
+          if (plant) {
+            plantId = plant._id;
+            plantName = plant.name;
+            plantCode = plant.code;
+          }
+        }
+        
+        // ✅ FIX: Get charges from each plant row, not from top level
+        return {
+          _id: uid(),
+          orderNo: fullPanel.orderPanelNo,
+          orderPanelId: fullPanel._id,
           partyName: fullPanel.partyName || fullPanel.customerName || "",
           customerId: fullPanel.customerId || null,
-          collectionCharges: fullPanel.collectionCharges?.toString() || "0",
-          cancellationCharges: fullPanel.cancellationCharges?.toString() || "0",
-          loadingCharges: fullPanel.loadingCharges?.toString() || "0",
-          otherCharges: fullPanel.otherCharges?.toString() || "0",
-          loadingPoints: fullPanel.loadingPoints?.toString() || "0",
-          dropPoints: fullPanel.dropPoints?.toString() || "0"
-        }));
-      } else {
-        setHeader(prev => ({
-          ...prev,
-          collectionCharges: String((Number(prev.collectionCharges) || 0) + (Number(fullPanel.collectionCharges) || 0)),
-          cancellationCharges: String((Number(prev.cancellationCharges) || 0) + (Number(fullPanel.cancellationCharges) || 0)),
-          loadingCharges: String((Number(prev.loadingCharges) || 0) + (Number(fullPanel.loadingCharges) || 0)),
-          otherCharges: String((Number(prev.otherCharges) || 0) + (Number(fullPanel.otherCharges) || 0)),
-          loadingPoints: String((Number(prev.loadingPoints) || 0) + (Number(fullPanel.loadingPoints) || 0)),
-          dropPoints: String((Number(prev.dropPoints) || 0) + (Number(fullPanel.dropPoints) || 0))
-        }));
-      }
-
-      if (selectedOrderPanels.length === 0 && fullPanel.customerId) {
-        const customer = customerSearch.customers.find(c => c._id === fullPanel.customerId);
-        if (customer) {
-          setSelectedCustomer(customer);
-          setCustomerSearchQuery(customer.customerName);
+          customerCode: fullPanel.customerCode || "",
+          contactPerson: fullPanel.contactPerson || "",
+          plantCode: plantId,
+          plantName: plantName || row.plantName || "",
+          plantCodeValue: plantCode || row.plantCodeValue || "",
+          orderType: row.orderType || "Sales",
+          pinCode: row.pinCode || "",
+          from: row.from || null,
+          fromName: row.fromName || "",
+          to: row.to || null,
+          toName: row.toName || "",
+          taluka: row.taluka || "",
+          talukaName: row.talukaName || "",
+          district: row.district || "",
+          districtName: row.districtName || "",
+          state: row.state || "",
+          stateName: row.stateName || "",
+          country: row.country || "",
+          countryName: row.countryName || "",
+          weight: row.weight || "",
+          status: row.status || "Open",
+          // ✅ FIX: Map charges from the plant row (per order)
+          collectionCharges: row.collectionCharges?.toString() || "",
+          cancellationCharges: row.cancellationCharges?.toString() || "Nil",
+          loadingCharges: row.loadingCharges?.toString() || "Nil",
+          otherCharges: row.otherCharges?.toString() || "",
+        };
+      });
+      
+      setOrders(prev => {
+        const existingOrdersFromPanel = prev.filter(o => o.orderPanelId === fullPanel._id);
+        if (existingOrdersFromPanel.length > 0) {
+          const otherOrders = prev.filter(o => o.orderPanelId !== fullPanel._id);
+          return [...otherOrders, ...newOrders];
         }
+        return [...prev, ...newOrders];
+      });
+    }
+
+    if (selectedOrderPanels.length === 0) {
+      setHeader(prev => ({
+        ...prev,
+        branch: fullPanel.branch || null,
+        branchName: fullPanel.branchName || "",
+        branchCode: fullPanel.branchCode || "",
+        delivery: fullPanel.delivery || "Urgent",
+        date: fullPanel.date ? new Date(fullPanel.date).toISOString().split('T')[0] : prev.date,
+        partyName: fullPanel.partyName || fullPanel.customerName || "",
+        customerId: fullPanel.customerId || null,
+        collectionCharges: fullPanel.collectionCharges?.toString() || "0",
+        cancellationCharges: fullPanel.cancellationCharges?.toString() || "0",
+        loadingCharges: fullPanel.loadingCharges?.toString() || "0",
+        otherCharges: fullPanel.otherCharges?.toString() || "0",
+        loadingPoints: fullPanel.loadingPoints?.toString() || "0",
+        dropPoints: fullPanel.dropPoints?.toString() || "0"
+      }));
+    } else {
+      setHeader(prev => ({
+        ...prev,
+        collectionCharges: String((Number(prev.collectionCharges) || 0) + (Number(fullPanel.collectionCharges) || 0)),
+        cancellationCharges: String((Number(prev.cancellationCharges) || 0) + (Number(fullPanel.cancellationCharges) || 0)),
+        loadingCharges: String((Number(prev.loadingCharges) || 0) + (Number(fullPanel.loadingCharges) || 0)),
+        otherCharges: String((Number(prev.otherCharges) || 0) + (Number(fullPanel.otherCharges) || 0)),
+        loadingPoints: String((Number(prev.loadingPoints) || 0) + (Number(fullPanel.loadingPoints) || 0)),
+        dropPoints: String((Number(prev.dropPoints) || 0) + (Number(fullPanel.dropPoints) || 0))
+      }));
+    }
+
+    if (selectedOrderPanels.length === 0 && fullPanel.customerId) {
+      const customer = customerSearch.customers.find(c => c._id === fullPanel.customerId);
+      if (customer) {
+        setSelectedCustomer(customer);
+        setCustomerSearchQuery(customer.customerName);
       }
     }
-  };
+  }
+};
 
   const updateOrder = (id, key, value) => {
     setOrders((prev) => prev.map((r) => (r._id === id ? { ...r, [key]: value } : r)));

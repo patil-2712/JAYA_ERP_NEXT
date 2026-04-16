@@ -38,64 +38,65 @@ function useLoadingInfo() {
   const [loadingInfos, setLoadingInfos] = useState([]);
   const [loading, setLoading] = useState(false);
 
- const fetchLoadingInfos = async () => {
-  setLoading(true);
-  try {
-    const token = localStorage.getItem('token');
-    
-    const loadingRes = await fetch('/api/loading-panel?format=table', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    
-    if (!loadingRes.ok) {
-      console.warn('Loading Info API returned', loadingRes.status);
-      setLoadingInfos([]);
-      return;
-    }
-    
-    const loadingData = await loadingRes.json();
-    
-    const purchaseRes = await fetch('/api/purchase-panel?format=table', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    
-    let usedLoadingInfos = new Set();
-    
-    if (purchaseRes.ok) {
-      const purchaseData = await purchaseRes.json();
-      if (purchaseData.success && Array.isArray(purchaseData.data)) {
-        purchaseData.data.forEach(item => {
-          if (item.loadingInfoNo && item.loadingInfoNo !== '') {
-            usedLoadingInfos.add(item.loadingInfoNo);
-          }
-        });
+  const fetchLoadingInfos = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      
+      const loadingRes = await fetch('/api/loading-panel?format=table', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (!loadingRes.ok) {
+        console.warn('Loading Info API returned', loadingRes.status);
+        setLoadingInfos([]);
+        return;
       }
+      
+      const loadingData = await loadingRes.json();
+      
+      const purchaseRes = await fetch('/api/purchase-panel?format=table', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      let usedLoadingInfos = new Set();
+      
+      if (purchaseRes.ok) {
+        const purchaseData = await purchaseRes.json();
+        if (purchaseData.success && Array.isArray(purchaseData.data)) {
+          purchaseData.data.forEach(item => {
+            if (item.loadingInfoNo && item.loadingInfoNo !== '') {
+              usedLoadingInfos.add(item.loadingInfoNo);
+            }
+          });
+        }
+      }
+      
+      if (loadingData.success && Array.isArray(loadingData.data)) {
+        const availableInfos = loadingData.data.filter(info => 
+          info.vehicleNegotiationNo && 
+          info.vehicleNegotiationNo !== 'N/A' &&
+          !usedLoadingInfos.has(info.vehicleArrivalNo)
+        );
+        
+        console.log(`📊 Found ${availableInfos.length} available loading infos out of ${loadingData.data.length} total`);
+        
+        const enhancedData = availableInfos.map(item => ({
+          ...item,
+          driverNo: item.driverNo || item.driverMobileNo || '',
+          vehicleInfo: item.vehicleInfo || {},
+          orderRows: item.orderRows || []
+        }));
+        
+        setLoadingInfos(enhancedData);
+      }
+    } catch (error) {
+      console.error('Error fetching loading info:', error);
+    } finally {
+      setLoading(false);
     }
-    
-    if (loadingData.success && Array.isArray(loadingData.data)) {
-      const availableInfos = loadingData.data.filter(info => 
-        info.vehicleNegotiationNo && 
-        info.vehicleNegotiationNo !== 'N/A' &&
-        !usedLoadingInfos.has(info.vehicleArrivalNo)
-      );
-      
-      console.log(`📊 Found ${availableInfos.length} available loading infos out of ${loadingData.data.length} total`);
-      
-      const enhancedData = availableInfos.map(item => ({
-        ...item,
-        driverNo: item.driverNo || item.driverMobileNo || '',
-        vehicleInfo: item.vehicleInfo || {},
-        orderRows: item.orderRows || []
-      }));
-      
-      setLoadingInfos(enhancedData);
-    }
-  } catch (error) {
-    console.error('Error fetching loading info:', error);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
+  
   const getLoadingInfoById = async (id) => {
     setLoading(true);
     try {
@@ -219,6 +220,7 @@ export default function CreatePurchasePanel() {
   const [saving, setSaving] = useState(false);
   const [apiError, setApiError] = useState(null);
   const [fetchingData, setFetchingData] = useState(false);
+  const [memoFileInfo, setMemoFileInfo] = useState(null);
 
   /** =========================
    * LOADING INFO SEARCH STATE
@@ -282,6 +284,17 @@ export default function CreatePurchasePanel() {
   });
 
   /** =========================
+   * LOADING CHARGES & EXPENSES STATE (All 5 fields)
+   ========================= */
+  const [loadingExpenses, setLoadingExpenses] = useState({
+    loadingCharges: "",
+    loadingStaffMunshiyana: "",
+    otherExpenses: "",
+    vehicleFloorTarpaulin: "",
+    vehicleOuterTarpaulin: "",
+  });
+
+  /** =========================
    * ADDITION & DEDUCTION STATE
    ========================= */
   const [additions, setAdditions] = useState([]);
@@ -317,6 +330,58 @@ export default function CreatePurchasePanel() {
    ========================= */
   const [selectedVNN, setSelectedVNN] = useState(null);
   const [selectedVNNNo, setSelectedVNNNo] = useState("");
+
+  /** =========================
+   * MEMO UPLOAD FUNCTION
+   ========================= */
+  const handleMemoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+    if (!allowedTypes.includes(file.type)) {
+      alert("❌ Please upload only PDF or image files (JPEG, PNG)");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("❌ File size should be less than 5MB");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/upload/excel', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        setMemoFileInfo({
+          filePath: data.filePath,
+          fullPath: data.fullPath,
+          filename: data.filename,
+          originalName: file.name,
+          size: file.size,
+          mimeType: file.type
+        });
+        alert("✅ Memo uploaded successfully!");
+      } else {
+        throw new Error(data.error || "Upload failed");
+      }
+    } catch (error) {
+      console.error("Error uploading memo:", error);
+      alert("❌ Failed to upload memo. Please try again.");
+    }
+  };
 
   /** =========================
    * FETCH DATA FROM APIs
@@ -456,13 +521,12 @@ export default function CreatePurchasePanel() {
   };
 
   /** =========================
-   * BILLING COLUMNS - ALL 7 COLUMNS
+   * BILLING COLUMNS - READ ONLY
    ========================= */
   const billingColumns = [
     { key: "billingType", label: "Billing Type", options: BILLING_TYPES },
     { key: "noOfLoadingPoints", label: "No. of Loading Points", type: "number" },
     { key: "noOfDroppingPoint", label: "No. of Dropping Point", type: "number" },
-    
   ];
 
   /** =========================
@@ -483,213 +547,292 @@ export default function CreatePurchasePanel() {
     }
   };
 
-const handleSelectLoadingInfo = async (loadingInfo) => {
-  setLoadingInfoNo(loadingInfo.vehicleArrivalNo);
-  setShowLoadingInfoDropdown(false);
-  setFetchingData(true);
-  
-  try {
-    console.log("📋 Selected Loading Info:", loadingInfo);
+  const handleSelectLoadingInfo = async (loadingInfo) => {
+    setLoadingInfoNo(loadingInfo.vehicleArrivalNo);
+    setShowLoadingInfoDropdown(false);
+    setFetchingData(true);
     
-    const vnnFromLoading = loadingInfo.vehicleNegotiationNo;
-    
-    if (!vnnFromLoading) {
-      alert("⚠️ This Loading Info has no Vehicle Negotiation reference");
-      setFetchingData(false);
-      return;
-    }
-    
-    console.log("🔍 Looking for Vehicle Negotiation with VNN:", vnnFromLoading);
-    setSelectedVNNNo(vnnFromLoading);
-    
-    const vnnData = await vehicleNegotiationHook.getNegotiationByVNN(vnnFromLoading);
-    
-    if (!vnnData) {
-      alert(`⚠️ No Vehicle Negotiation found for VNN: ${vnnFromLoading}`);
-      setFetchingData(false);
-      return;
-    }
-    
-    console.log("✅ Vehicle Negotiation Data loaded:", vnnData);
-    setSelectedVNN(vnnData);
-    
-    const vehicleNegotiationId = vnnData._id;
-    console.log("🔑 Vehicle Negotiation ID:", vehicleNegotiationId);
-    
-    let pricingData = null;
     try {
-      const token = localStorage.getItem('token');
+      console.log("📋 Selected Loading Info:", loadingInfo);
       
-      const pricingRes = await fetch('/api/pricing-panel?format=table', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const vnnFromLoading = loadingInfo.vehicleNegotiationNo;
       
-      if (pricingRes.ok) {
-        const pricingList = await pricingRes.json();
+      if (!vnnFromLoading) {
+        alert("⚠️ This Loading Info has no Vehicle Negotiation reference");
+        setFetchingData(false);
+        return;
+      }
+      
+      console.log("🔍 Looking for Vehicle Negotiation with VNN:", vnnFromLoading);
+      setSelectedVNNNo(vnnFromLoading);
+      
+      const vnnData = await vehicleNegotiationHook.getNegotiationByVNN(vnnFromLoading);
+      
+      if (!vnnData) {
+        alert(`⚠️ No Vehicle Negotiation found for VNN: ${vnnFromLoading}`);
+        setFetchingData(false);
+        return;
+      }
+      
+      console.log("✅ Vehicle Negotiation Data loaded:", vnnData);
+      setSelectedVNN(vnnData);
+      
+      const vehicleNegotiationId = vnnData._id;
+      console.log("🔑 Vehicle Negotiation ID:", vehicleNegotiationId);
+      
+      let pricingData = null;
+      let orderPanelData = null;
+      let loadingPanelData = null;
+      
+      try {
+        const token = localStorage.getItem('token');
         
-        if (pricingList.success && Array.isArray(pricingList.data)) {
-          for (const panel of pricingList.data) {
-            if (panel.vnn === vnnFromLoading || panel.vehicleNegotiationId === vehicleNegotiationId) {
-              
-              const fullPricingRes = await fetch(`/api/pricing-panel?id=${panel.panelId || panel._id}`, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              
-              if (fullPricingRes.ok) {
-                const fullData = await fullPricingRes.json();
-                if (fullData.success) {
-                  pricingData = fullData.data;
-                  console.log("✅ Found Pricing Panel:", pricingData.pricingSerialNo);
-                  break;
+        // Fetch pricing panel
+        const pricingRes = await fetch('/api/pricing-panel?format=table', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        
+        if (pricingRes.ok) {
+          const pricingList = await pricingRes.json();
+          
+          if (pricingList.success && Array.isArray(pricingList.data)) {
+            for (const panel of pricingList.data) {
+              if (panel.vnn === vnnFromLoading || panel.vehicleNegotiationId === vehicleNegotiationId) {
+                const fullPricingRes = await fetch(`/api/pricing-panel?id=${panel.panelId || panel._id}`, {
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+                
+                if (fullPricingRes.ok) {
+                  const fullData = await fullPricingRes.json();
+                  if (fullData.success) {
+                    pricingData = fullData.data;
+                    console.log("✅ Found Pricing Panel:", pricingData.pricingSerialNo);
+                    break;
+                  }
                 }
               }
             }
           }
         }
-      }
-    } catch (error) {
-      console.error("Error fetching pricing panel:", error);
-    }
-    
-    let driverMobileNo = "";
-    if (loadingInfo.driverNo) {
-      driverMobileNo = loadingInfo.driverNo;
-    } else if (loadingInfo.vehicleInfo?.driverMobileNo) {
-      driverMobileNo = loadingInfo.vehicleInfo.driverMobileNo;
-    }
-    
-    const approval = vnnData.approval || {};
-    const vehicleInfo = vnnData.vehicleInfo || {};
-    const negotiation = vnnData.negotiation || {};
-    
-    const vendorCode = approval.vendorCode || "";
-    const vendorName = approval.vendorName || vnnData.vendorName || "";
-    
-    console.log("✅ Vendor from VNN:", { vendorName, vendorCode });
-    
-    setHeader({
-      ...header,
-      branch: vnnData.branch || "",
-      branchName: vnnData.branchName || "",
-      delivery: vnnData.delivery || "",
-      date: vnnData.date ? new Date(vnnData.date).toISOString().split('T')[0] : header.date,
-      pricingSerialNo: pricingData?.pricingSerialNo || "",
-    });
-
-    setBilling({
-      billingType: vnnData.billingType || "Multi - Order",
-      noOfLoadingPoints: vnnData.loadingPoints?.toString() || "1",
-      noOfDroppingPoint: vnnData.dropPoints?.toString() || "1",
-      collectionCharges: vnnData.collectionCharges?.toString() || "0",
-      cancellationCharges: vnnData.cancellationCharges || "Nil",
-      loadingCharges: vnnData.loadingCharges || "Nil",
-      otherCharges: vnnData.otherCharges || "Nil",
-    });
-
-    setPurchaseDetails({
-      ...purchaseDetails,
-      vendorName: vendorName,
-      vendorStatus: approval.vendorStatus || vnnData.vendorStatus || "Active",
-      vendorCode: vendorCode,
-      vehicleNo: approval.vehicleNo || vehicleInfo.vehicleNo || loadingInfo.vehicleNo || "",
-      vehicleType: vehicleInfo.vehicleType || vnnData.vehicleType || approval.vehicleType || "",
-      driverMobileNo: driverMobileNo,
-      purchaseType: approval.purchaseType || negotiation.purchaseType || "Loading & Unloading",
-      paymentTerms: approval.paymentTerms || "80 % Advance",
-      rateType: approval.rateType || "Per MT",
-      rate: approval.finalPerMT?.toString() || approval.finalFix?.toString() || "",
-    });
-
-    const vehiclePlate = approval.vehicleNo || vehicleInfo.vehicleNo || loadingInfo.vehicleNo || "";
-    if (vehiclePlate) {
-      setRegisteredVehicle({
-        loadingPanelPlate: vehiclePlate,
-        registeredPlate: vehiclePlate,
-        isRegistered: approval.verified || vehicleInfo.verified || false,
-      });
-    }
-
-    setApproval({
-      status: approval.approvalStatus || "Pending",
-      remarks: `Auto-filled from VNN: ${vnnData.vnnNo}`,
-    });
-
-    if (vnnData.orders && vnnData.orders.length > 0) {
-      const newOrderRows = vnnData.orders.map(order => {
-        let locationRate = "";
-        let priceList = "";
-        let rate = "";
-        let totalAmount = "";
         
-        if (pricingData && pricingData.orders) {
-          const matchingPricingOrder = pricingData.orders.find(
-            po => po.orderNo === order.orderNo
-          );
-          
-          if (matchingPricingOrder) {
-            console.log(`✅ Found pricing data for order ${order.orderNo}:`, matchingPricingOrder);
-            locationRate = matchingPricingOrder.locationRate?.toString() || "";
-            priceList = matchingPricingOrder.priceList || "";
-            rate = matchingPricingOrder.rate?.toString() || "";
-            totalAmount = matchingPricingOrder.totalAmount?.toString() || "";
+        // Fetch Order Panel data
+        if (vnnData.selectedOrderPanels && vnnData.selectedOrderPanels.length > 0) {
+          const firstOrderPanel = vnnData.selectedOrderPanels[0];
+          if (firstOrderPanel && firstOrderPanel._id) {
+            const orderRes = await fetch(`/api/order-panel?id=${firstOrderPanel._id}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            
+            if (orderRes.ok) {
+              const orderData = await orderRes.json();
+              if (orderData.success && orderData.data) {
+                orderPanelData = orderData.data;
+                console.log("✅ Found Order Panel Data:", orderPanelData.orderPanelNo);
+              }
+            }
           }
         }
         
-        return {
-          _id: uid(),
-          orderNo: order.orderNo || "",
-          partyName: order.partyName || vnnData.customerName || "",
-          plantCode: order.plantCode || "",
-          plantName: order.plantName || "",
-          orderType: order.orderType || "Sales",
-          pinCode: order.pinCode || "",
-          taluka: order.talukaName || order.taluka || "",
-          district: order.districtName || order.district || "",
-          state: order.stateName || order.state || "",
-          country: order.countryName || order.country || "",
-          from: order.fromName || order.from || "",
-          to: order.toName || order.to || "",
-          locationRate: locationRate,
-          priceList: priceList,
-          weight: order.weight?.toString() || "",
-          rate: rate,
-          totalAmount: totalAmount,
-          collectionCharges: order.collectionCharges?.toString() || "0",
-          cancellationCharges: order.cancellationCharges || "Nil",
-          loadingCharges: order.loadingCharges || "Nil",
-          otherCharges: order.otherCharges?.toString() || "0",
-        };
+        // Fetch FULL Loading Panel data
+        const loadingPanelRes = await fetch(`/api/loading-panel?vehicleArrivalNo=${loadingInfo.vehicleArrivalNo}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        
+        if (loadingPanelRes.ok) {
+          const loadingPanelResult = await loadingPanelRes.json();
+          if (loadingPanelResult.success && loadingPanelResult.data) {
+            loadingPanelData = loadingPanelResult.data;
+            console.log("✅ Found Loading Panel Data:", loadingPanelData.vehicleArrivalNo);
+          }
+        }
+        
+      } catch (error) {
+        console.error("Error fetching additional data:", error);
+      }
+      
+      let driverMobileNo = "";
+      if (loadingInfo.driverNo) {
+        driverMobileNo = loadingInfo.driverNo;
+      } else if (loadingInfo.vehicleInfo?.driverMobileNo) {
+        driverMobileNo = loadingInfo.vehicleInfo.driverMobileNo;
+      }
+      
+      const approval = vnnData.approval || {};
+      const vehicleInfo = vnnData.vehicleInfo || {};
+      const negotiation = vnnData.negotiation || {};
+      
+      const vendorCode = approval.vendorCode || "";
+      const vendorName = approval.vendorName || vnnData.vendorName || "";
+      
+      console.log("✅ Vendor from VNN:", { vendorName, vendorCode });
+      
+      setHeader({
+        ...header,
+        branch: vnnData.branch || "",
+        branchName: vnnData.branchName || "",
+        delivery: vnnData.delivery || "",
+        date: vnnData.date ? new Date(vnnData.date).toISOString().split('T')[0] : header.date,
+        pricingSerialNo: pricingData?.pricingSerialNo || "",
       });
-      
-      setOrderRows(newOrderRows);
-      
-      const totalWeight = newOrderRows.reduce((sum, row) => sum + num(row.weight), 0);
-      const totalOrderAmount = newOrderRows.reduce((sum, row) => sum + num(row.totalAmount), 0);
-      
-      setPurchaseDetails(prev => ({
-        ...prev,
-        weight: totalWeight.toString(),
-        amount: totalOrderAmount.toString(),
-      }));
-    }
 
-    let loadedMessage = `✅ Data loaded from Vehicle Negotiation: ${vnnData.vnnNo}`;
-    if (pricingData) {
-      loadedMessage += `\n✅ Also loaded from Pricing Panel: ${pricingData.pricingSerialNo}`;
+      setBilling({
+        billingType: vnnData.billingType || "Multi - Order",
+        noOfLoadingPoints: vnnData.loadingPoints?.toString() || "1",
+        noOfDroppingPoint: vnnData.dropPoints?.toString() || "1",
+        collectionCharges: vnnData.collectionCharges?.toString() || "0",
+        cancellationCharges: vnnData.cancellationCharges || "Nil",
+        loadingCharges: vnnData.loadingCharges || "Nil",
+        otherCharges: vnnData.otherCharges || "Nil",
+      });
+
+      setPurchaseDetails({
+        ...purchaseDetails,
+        vendorName: vendorName,
+        vendorStatus: approval.vendorStatus || vnnData.vendorStatus || "Active",
+        vendorCode: vendorCode,
+        vehicleNo: approval.vehicleNo || vehicleInfo.vehicleNo || loadingInfo.vehicleNo || "",
+        vehicleType: vehicleInfo.vehicleType || vnnData.vehicleType || approval.vehicleType || "",
+        driverMobileNo: driverMobileNo,
+        purchaseType: approval.purchaseType || negotiation.purchaseType || "Loading & Unloading",
+        paymentTerms: approval.paymentTerms || "80 % Advance",
+        rateType: approval.rateType || "Per MT",
+        rate: approval.finalPerMT?.toString() || approval.finalFix?.toString() || "",
+      });
+
+      // Load Loading Expenses from Loading Panel data
+      let loadingChargesVal = "0";
+      let loadingStaffMunshiyanaVal = "0";
+      let otherExpensesVal = "0";
+      let vehicleFloorTarpaulinVal = "0";
+      let vehicleOuterTarpaulinVal = "0";
+      
+      if (loadingPanelData && loadingPanelData.loadedWeighment) {
+        loadingChargesVal = loadingPanelData.loadedWeighment.loadingCharges?.toString() || "0";
+        loadingStaffMunshiyanaVal = loadingPanelData.loadedWeighment.loadingStaffMunshiyana?.toString() || "0";
+        otherExpensesVal = loadingPanelData.loadedWeighment.otherExpenses?.toString() || "0";
+        vehicleFloorTarpaulinVal = loadingPanelData.loadedWeighment.vehicleFloorTarpaulin?.toString() || "0";
+        vehicleOuterTarpaulinVal = loadingPanelData.loadedWeighment.vehicleOuterTarpaulin?.toString() || "0";
+        console.log("✅ Loading Expenses from Loading Panel");
+      } else if (orderPanelData && orderPanelData.loadedWeighment) {
+        loadingChargesVal = orderPanelData.loadedWeighment.loadingCharges?.toString() || "0";
+        loadingStaffMunshiyanaVal = orderPanelData.loadedWeighment.loadingStaffMunshiyana?.toString() || "0";
+        otherExpensesVal = orderPanelData.loadedWeighment.otherExpenses?.toString() || "0";
+        vehicleFloorTarpaulinVal = orderPanelData.loadedWeighment.vehicleFloorTarpaulin?.toString() || "0";
+        vehicleOuterTarpaulinVal = orderPanelData.loadedWeighment.vehicleOuterTarpaulin?.toString() || "0";
+        console.log("✅ Loading Expenses from Order Panel");
+      } else if (approval) {
+        loadingChargesVal = approval.loadingCharges?.toString() || "0";
+        loadingStaffMunshiyanaVal = approval.loadingStaffMunshiyana?.toString() || "0";
+        otherExpensesVal = approval.otherExpenses?.toString() || "0";
+        vehicleFloorTarpaulinVal = approval.vehicleFloorTarpaulin?.toString() || "0";
+        vehicleOuterTarpaulinVal = approval.vehicleOuterTarpaulin?.toString() || "0";
+        console.log("✅ Loading Expenses from VNN Approval");
+      }
+      
+      setLoadingExpenses({
+        loadingCharges: loadingChargesVal,
+        loadingStaffMunshiyana: loadingStaffMunshiyanaVal,
+        otherExpenses: otherExpensesVal,
+        vehicleFloorTarpaulin: vehicleFloorTarpaulinVal,
+        vehicleOuterTarpaulin: vehicleOuterTarpaulinVal,
+      });
+
+      const vehiclePlate = approval.vehicleNo || vehicleInfo.vehicleNo || loadingInfo.vehicleNo || "";
+      if (vehiclePlate) {
+        setRegisteredVehicle({
+          loadingPanelPlate: vehiclePlate,
+          registeredPlate: vehiclePlate,
+          isRegistered: approval.verified || vehicleInfo.verified || false,
+        });
+      }
+
+      setApproval({
+        status: approval.approvalStatus || "Pending",
+        remarks: `Auto-filled from VNN: ${vnnData.vnnNo}`,
+      });
+
+      if (vnnData.orders && vnnData.orders.length > 0) {
+        const newOrderRows = vnnData.orders.map(order => {
+          let locationRate = "";
+          let priceList = "";
+          let rate = "";
+          let totalAmount = "";
+          
+          if (pricingData && pricingData.orders) {
+            const matchingPricingOrder = pricingData.orders.find(
+              po => po.orderNo === order.orderNo
+            );
+            
+            if (matchingPricingOrder) {
+              console.log(`✅ Found pricing data for order ${order.orderNo}:`, matchingPricingOrder);
+              locationRate = matchingPricingOrder.locationRate?.toString() || "";
+              priceList = matchingPricingOrder.priceList || "";
+              rate = matchingPricingOrder.rate?.toString() || "";
+              totalAmount = matchingPricingOrder.totalAmount?.toString() || "";
+            }
+          }
+          
+          return {
+            _id: uid(),
+            orderNo: order.orderNo || "",
+            partyName: order.partyName || vnnData.customerName || "",
+            plantCode: order.plantCode || "",
+            plantName: order.plantName || "",
+            orderType: order.orderType || "Sales",
+            pinCode: order.pinCode || "",
+            taluka: order.talukaName || order.taluka || "",
+            district: order.districtName || order.district || "",
+            state: order.stateName || order.state || "",
+            country: order.countryName || order.country || "",
+            from: order.fromName || order.from || "",
+            to: order.toName || order.to || "",
+            locationRate: locationRate,
+            priceList: priceList,
+            weight: order.weight?.toString() || "",
+            rate: rate,
+            totalAmount: totalAmount,
+            collectionCharges: order.collectionCharges?.toString() || "0",
+            cancellationCharges: order.cancellationCharges || "Nil",
+            loadingCharges: order.loadingCharges || "Nil",
+            otherCharges: order.otherCharges?.toString() || "0",
+          };
+        });
+        
+        setOrderRows(newOrderRows);
+        
+        const totalWeight = newOrderRows.reduce((sum, row) => sum + num(row.weight), 0);
+        const totalOrderAmount = newOrderRows.reduce((sum, row) => sum + num(row.totalAmount), 0);
+        
+        setPurchaseDetails(prev => ({
+          ...prev,
+          weight: totalWeight.toString(),
+          amount: totalOrderAmount.toString(),
+        }));
+      }
+
+      let loadedMessage = `✅ Data loaded from Vehicle Negotiation: ${vnnData.vnnNo}`;
+      if (pricingData) {
+        loadedMessage += `\n✅ Also loaded from Pricing Panel: ${pricingData.pricingSerialNo}`;
+      }
+      if (orderPanelData) {
+        loadedMessage += `\n✅ Also loaded from Order Panel: ${orderPanelData.orderPanelNo}`;
+      }
+      if (loadingPanelData && loadingPanelData.loadedWeighment) {
+        loadedMessage += `\n✅ Also loaded Loading Expenses from Loading Info`;
+      }
+      if (vendorCode) {
+        loadedMessage += `\n✅ Vendor Code: ${vendorCode}`;
+      }
+      
+      alert(loadedMessage);
+      
+    } catch (error) {
+      console.error("❌ Error loading data:", error);
+      alert(`❌ Failed to load data: ${error.message}`);
+    } finally {
+      setFetchingData(false);
     }
-    if (vendorCode) {
-      loadedMessage += `\n✅ Vendor Code: ${vendorCode}`;
-    }
-    
-    alert(loadedMessage);
-    
-  } catch (error) {
-    console.error("❌ Error loading data:", error);
-    alert(`❌ Failed to load data: ${error.message}`);
-  } finally {
-    setFetchingData(false);
-  }
-};
+  };
 
   const handleLoadingInfoInputFocus = () => {
     if (!showLoadingInfoDropdown) {
@@ -737,21 +880,44 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
       return sum + num(row.weight);
     }, 0);
 
-    const totalAmount = orderRows.reduce((sum, row) => {
+    const totalOrderAmount = orderRows.reduce((sum, row) => {
       if (row._id === rowId) {
-        if (key === "weight") {
-          return sum + (num(value) * num(row.rate));
+        let totalAmount = num(row.totalAmount);
+        let collectionCharges = num(row.collectionCharges);
+        let cancellationCharges = num(row.cancellationCharges);
+        let loadingCharges = num(row.loadingCharges);
+        let otherCharges = num(row.otherCharges);
+        
+        if (key === "collectionCharges") {
+          collectionCharges = num(value);
+        } else if (key === "cancellationCharges") {
+          cancellationCharges = num(value);
+        } else if (key === "loadingCharges") {
+          loadingCharges = num(value);
+        } else if (key === "otherCharges") {
+          otherCharges = num(value);
+        } else if (key === "weight") {
+          totalAmount = num(value) * num(row.rate);
         } else if (key === "rate") {
-          return sum + (num(row.weight) * num(value));
+          totalAmount = num(row.weight) * num(value);
         }
+        
+        return sum + totalAmount + collectionCharges + cancellationCharges + loadingCharges + otherCharges;
       }
-      return sum + num(row.totalAmount);
+      
+      let totalAmount = num(row.totalAmount);
+      let collectionCharges = num(row.collectionCharges);
+      let cancellationCharges = num(row.cancellationCharges);
+      let loadingCharges = num(row.loadingCharges);
+      let otherCharges = num(row.otherCharges);
+      
+      return sum + totalAmount + collectionCharges + cancellationCharges + loadingCharges + otherCharges;
     }, 0);
 
     setPurchaseDetails(prev => ({
       ...prev,
       weight: totalWeight.toString(),
-      amount: totalAmount.toString(),
+      amount: totalOrderAmount.toString(),
     }));
   };
 
@@ -834,7 +1000,15 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
    * CALCULATED VALUES
    ========================= */
   const calculateTotalOrderAmount = () => {
-    return orderRows.reduce((sum, row) => sum + num(row.totalAmount), 0);
+    return orderRows.reduce((sum, row) => {
+      const totalAmount = num(row.totalAmount);
+      const collectionCharges = num(row.collectionCharges);
+      const cancellationCharges = num(row.cancellationCharges);
+      const loadingCharges = num(row.loadingCharges);
+      const otherCharges = num(row.otherCharges);
+      
+      return sum + totalAmount + collectionCharges + cancellationCharges + loadingCharges + otherCharges;
+    }, 0);
   };
 
   const calculateTotalAdditions = () => {
@@ -845,12 +1019,37 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
     return deductions.reduce((sum, row) => sum + num(row.amount), 0);
   };
 
+  const calculateTotalLoadingExpenses = () => {
+    return (
+      num(loadingExpenses.loadingCharges) +
+      num(loadingExpenses.loadingStaffMunshiyana) +
+      num(loadingExpenses.otherExpenses) +
+      num(loadingExpenses.vehicleFloorTarpaulin) +
+      num(loadingExpenses.vehicleOuterTarpaulin)
+    );
+  };
+
+  // NEW: Calculate Advance Paid + Deduct at Office
+  const calculateAdvancePlusDeduct = () => {
+    return num(purchaseDetails.advance) + calculateTotalLoadingExpenses();
+  };
+
+  // UPDATED: Final Balance = Total Order Amount - Advance Paid
   const calculateBalance = () => {
-    const amount = num(purchaseDetails.amount);
+    const totalOrderAmount = calculateTotalOrderAmount();
+    const advance = num(purchaseDetails.advance);
+    
+    return totalOrderAmount - advance;
+  };
+
+  // Net Effect for Additions & Deductions section
+  const calculateNetEffect = () => {
     const advance = num(purchaseDetails.advance);
     const totalAdditions = calculateTotalAdditions();
     const totalDeductions = calculateTotalDeductions();
-    return amount - advance - totalDeductions + totalAdditions;
+    const totalLoadingExpenses = calculateTotalLoadingExpenses();
+    
+    return advance + totalAdditions - totalDeductions - totalLoadingExpenses;
   };
 
   /** =========================
@@ -882,6 +1081,7 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
         billing,
         orders: orderRows,
         purchaseDetails,
+        loadingExpenses,
         additions,
         deductions,
         registeredVehicle: {
@@ -896,7 +1096,10 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
         totalOrderAmount: calculateTotalOrderAmount(),
         totalAdditions: calculateTotalAdditions(),
         totalDeductions: calculateTotalDeductions(),
+        totalLoadingExpenses: calculateTotalLoadingExpenses(),
         balance: calculateBalance(),
+        netEffect: calculateNetEffect(),
+        memoFile: memoFileInfo,
       };
 
       console.log("Saving purchase panel:", payload);
@@ -973,8 +1176,17 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
       purchaseDate: new Date().toISOString().split('T')[0],
     });
     
+    setLoadingExpenses({
+      loadingCharges: "",
+      loadingStaffMunshiyana: "",
+      otherExpenses: "",
+      vehicleFloorTarpaulin: "",
+      vehicleOuterTarpaulin: "",
+    });
+    
     setAdditions([]);
     setDeductions([]);
+    setMemoFileInfo(null);
     
     setRegisteredVehicle({
       loadingPanelPlate: "",
@@ -1173,7 +1385,7 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
           </Card>
         </div>
 
-        {/* Header Information */}
+        {/* Header Information - READ ONLY */}
         <Card title="Purchase Information">
           <div className="grid grid-cols-12 gap-3">
             <div className="col-span-12 md:col-span-2">
@@ -1203,51 +1415,45 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
               <input
                 type="text"
                 value={header.pricingSerialNo}
-                onChange={(e) => setHeader({ ...header, pricingSerialNo: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                placeholder="Enter or auto-filled from VNN"
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
+                placeholder="Auto-filled from VNN"
               />
             </div>
 
             <div className="col-span-12 md:col-span-3">
               <label className="text-xs font-bold text-slate-600">Branch *</label>
-              <SearchableDropdown
-                items={branches}
-                selectedId={header.branch}
-                onSelect={(branch) => setHeader({ 
-                  ...header, 
-                  branch: branch?._id || '',
-                  branchName: branch?.name || '',
-                  branchCode: branch?.code || ''
-                })}
-                placeholder="Search branch..."
-                displayField="name"
-                codeField="code"
+              <input
+                type="text"
+                value={`${header.branchName || ''} (${header.branchCode || ''})`}
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
               />
             </div>
 
             <div className="col-span-12 md:col-span-1">
               <label className="text-xs font-bold text-slate-600">Date</label>
               <input
-                type="date"
+                type="text"
                 value={header.date}
-                onChange={(e) => setHeader({ ...header, date: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
               />
             </div>
 
             <div className="col-span-12 md:col-span-2">
-              <Select
-                label="Delivery"
+              <label className="text-xs font-bold text-slate-600">Delivery</label>
+              <input
+                type="text"
                 value={header.delivery}
-                onChange={(v) => setHeader({ ...header, delivery: v })}
-                options={DELIVERY_OPTIONS}
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
               />
             </div>
           </div>
         </Card>
 
-        {/* Billing Type / Charges Table - ALL 7 COLUMNS */}
+        {/* Billing Type / Charges Table - READ ONLY */}
         <div className="mt-4">
           <Card title="Billing Type / Charges (Auto-filled from VNN)">
             <div className="overflow-auto rounded-xl border border-yellow-300">
@@ -1264,39 +1470,17 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                     ))}
                   </tr>
                 </thead>
-
                 <tbody>
                   <tr className="hover:bg-yellow-50 even:bg-slate-50">
                     {billingColumns.map((col) => (
                       <td key={col.key} className="border border-yellow-300 px-2 py-2">
-                        {col.options ? (
-                          <select
-                            value={billing[col.key] || ""}
-                            onChange={(e) => {
-                              if (col.key === "billingType") {
-                                handleBillingTypeChange(e.target.value);
-                              } else {
-                                setBilling(prev => ({ ...prev, [col.key]: e.target.value }));
-                              }
-                            }}
-                            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                          >
-                            <option value="">Select {col.label}</option>
-                            {col.options.map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            type={col.type || "text"}
-                            value={billing[col.key] || ""}
-                            onChange={(e) => setBilling(prev => ({ ...prev, [col.key]: e.target.value }))}
-                            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                            placeholder={`Enter ${col.label}`}
-                          />
-                        )}
+                        <input
+                          type={col.type || "text"}
+                          value={billing[col.key] || ""}
+                          readOnly
+                          className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm outline-none cursor-not-allowed"
+                          placeholder={`${col.label}`}
+                        />
                       </td>
                     ))}
                   </tr>
@@ -1306,21 +1490,9 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
           </Card>
         </div>
 
-        {/* Orders Table - WITH ALL FIELDS */}
+        {/* Orders Table - READ ONLY */}
         <div className="mt-4">
-          <Card 
-            title="Order Details (Auto-filled from VNN & Pricing Panel)"
-            right={
-              <div className="flex gap-2">
-                <button
-                  onClick={addOrderRow}
-                  className="rounded-xl bg-yellow-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-yellow-700 transition"
-                >
-                  + Add Order
-                </button>
-              </div>
-            }
-          >
+          <Card title="Order Details (Auto-filled from VNN & Pricing Panel)">
             <div className="overflow-auto rounded-xl border border-yellow-300">
               <table className="min-w-max w-full text-sm">
                 <thead className="sticky top-0 bg-yellow-400 z-10">
@@ -1355,8 +1527,8 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                         <input
                           type="text"
                           value={row.orderNo || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'orderNo', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          readOnly
+                          className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm"
                           placeholder="Order No"
                         />
                       </td>
@@ -1364,8 +1536,8 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                         <input
                           type="text"
                           value={row.partyName || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'partyName', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          readOnly
+                          className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm"
                           placeholder="Party Name"
                         />
                       </td>
@@ -1373,29 +1545,26 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                         <input
                           type="text"
                           value={row.plantName || row.plantCode || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'plantName', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          readOnly
+                          className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm"
                           placeholder="Plant"
                         />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <select
+                        <input
+                          type="text"
                           value={row.orderType || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'orderType', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none"
-                        >
-                          <option value="">Select</option>
-                          {ORDER_TYPES.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
-                        </select>
+                          readOnly
+                          className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm"
+                          placeholder="Order Type"
+                        />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
                         <input
                           type="text"
                           value={row.pinCode || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'pinCode', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          readOnly
+                          className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm"
                           placeholder="Pin Code"
                         />
                       </td>
@@ -1403,8 +1572,8 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                         <input
                           type="text"
                           value={row.taluka || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'taluka', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          readOnly
+                          className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm"
                           placeholder="Taluka"
                         />
                       </td>
@@ -1412,8 +1581,8 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                         <input
                           type="text"
                           value={row.district || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'district', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          readOnly
+                          className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm"
                           placeholder="District"
                         />
                       </td>
@@ -1421,8 +1590,8 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                         <input
                           type="text"
                           value={row.state || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'state', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          readOnly
+                          className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm"
                           placeholder="State"
                         />
                       </td>
@@ -1430,8 +1599,8 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                         <input
                           type="text"
                           value={row.country || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'country', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          readOnly
+                          className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm"
                           placeholder="Country"
                         />
                       </td>
@@ -1439,8 +1608,8 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                         <input
                           type="text"
                           value={row.from || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'from', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          readOnly
+                          className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm"
                           placeholder="From"
                         />
                       </td>
@@ -1448,8 +1617,8 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                         <input
                           type="text"
                           value={row.to || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'to', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          readOnly
+                          className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm"
                           placeholder="To"
                         />
                       </td>
@@ -1457,8 +1626,8 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                         <input
                           type="text"
                           value={row.locationRate || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'locationRate', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          readOnly
+                          className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm"
                           placeholder="Location Rate"
                         />
                       </td>
@@ -1466,8 +1635,8 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                         <input
                           type="text"
                           value={row.priceList || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'priceList', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          readOnly
+                          className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm"
                           placeholder="Price List"
                         />
                       </td>
@@ -1475,8 +1644,8 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                         <input
                           type="number"
                           value={row.weight || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'weight', e.target.value)}
-                          className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          readOnly
+                          className="w-20 rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm"
                           placeholder="0"
                         />
                       </td>
@@ -1484,26 +1653,26 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                         <input
                           type="number"
                           value={row.rate || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'rate', e.target.value)}
-                          className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          readOnly
+                          className="w-20 rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm"
                           placeholder="0"
                         />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
                         <input
                           type="number"
-                          value={row.totalAmount || (num(row.weight) * num(row.rate)).toString()}
+                          value={row.totalAmount || ""}
                           readOnly
-                          className="w-24 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm font-bold text-emerald-700"
+                          className="w-24 rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm font-bold text-emerald-700"
                           placeholder="Auto"
                         />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
                         <input
-                          type="text"
+                          type="number"
                           value={row.collectionCharges || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'collectionCharges', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          readOnly
+                          className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm"
                           placeholder="Collection Charges"
                         />
                       </td>
@@ -1511,8 +1680,8 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                         <input
                           type="text"
                           value={row.cancellationCharges || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'cancellationCharges', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          readOnly
+                          className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm"
                           placeholder="Cancellation Charges"
                         />
                       </td>
@@ -1520,17 +1689,17 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                         <input
                           type="text"
                           value={row.loadingCharges || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'loadingCharges', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          readOnly
+                          className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm"
                           placeholder="Loading Charges"
                         />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
                         <input
-                          type="text"
+                          type="number"
                           value={row.otherCharges || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'otherCharges', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                          readOnly
+                          className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm"
                           placeholder="Other Charges"
                         />
                       </td>
@@ -1557,13 +1726,12 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                 </tbody>
                 <tfoot className="bg-yellow-100">
                   <tr>
-                    <td colSpan="19" className="border border-yellow-300 px-3 py-2 text-right font-bold">
+                    <td colSpan="20" className="border border-yellow-300 px-3 py-2 text-right font-bold">
                       Total Order Amount:
                     </td>
                     <td className="border border-yellow-300 px-3 py-2 font-bold text-emerald-800">
                       ₹{calculateTotalOrderAmount().toLocaleString()}
                     </td>
-                    <td className="border border-yellow-300 px-3 py-2"></td>
                   </tr>
                 </tfoot>
               </table>
@@ -1571,7 +1739,7 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
           </Card>
         </div>
 
-        {/* Purchase Details Section */}
+        {/* Purchase Details Section - READ ONLY */}
         <div className="mt-4">
           <Card title="Purchase Details (Auto-filled from VNN)">
             <div className="grid grid-cols-12 gap-4">
@@ -1583,16 +1751,12 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                   <div className="space-y-3">
                     <div>
                       <label className="text-xs font-bold text-slate-600">Vendor Status</label>
-                      <select
-                        value={purchaseDetails.vendorStatus}
-                        onChange={(e) => setPurchaseDetails({ ...purchaseDetails, vendorStatus: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
-                      >
-                        <option value="">Select Status</option>
-                        {VENDOR_STATUS_OPTIONS.map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
+                      <input
+                        type="text"
+                        value={purchaseDetails.vendorStatus || "Active"}
+                        readOnly
+                        className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
+                      />
                     </div>
 
                     <div>
@@ -1600,9 +1764,8 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                       <input
                         type="text"
                         value={purchaseDetails.vendorName}
-                        onChange={(e) => setPurchaseDetails({ ...purchaseDetails, vendorName: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
-                        placeholder="Vendor Name"
+                        readOnly
+                        className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
                       />
                     </div>
 
@@ -1613,8 +1776,8 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                         value={purchaseDetails.vendorCode}
                         readOnly
                         className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
-                        placeholder="Auto-fetch from VNN"
                       />
+                      <p className="text-xs text-blue-600 mt-1">Auto-filled from Vehicle Negotiation</p>
                     </div>
 
                     <div>
@@ -1622,24 +1785,21 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                       <input
                         type="text"
                         value={purchaseDetails.vehicleNo}
-                        onChange={(e) => setPurchaseDetails({ ...purchaseDetails, vehicleNo: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
-                        placeholder="Enter vehicle number"
+                        readOnly
+                        className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
                       />
+                      <p className="text-xs text-blue-600 mt-1">Auto-filled from Vehicle Negotiation</p>
                     </div>
 
                     <div>
                       <label className="text-xs font-bold text-slate-600">Vehicle Type</label>
-                      <select
-                        value={purchaseDetails.vehicleType}
-                        onChange={(e) => setPurchaseDetails({ ...purchaseDetails, vehicleType: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
-                      >
-                        <option value="">Select Vehicle Type</option>
-                        {VEHICLE_TYPE_OPTIONS.map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
+                      <input
+                        type="text"
+                        value={purchaseDetails.vehicleType || ""}
+                        readOnly
+                        className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
+                      />
+                      <p className="text-xs text-blue-600 mt-1">Auto-filled from Vehicle Negotiation</p>
                     </div>
 
                     <div>
@@ -1647,9 +1807,8 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                       <input
                         type="text"
                         value={purchaseDetails.driverMobileNo}
-                        onChange={(e) => setPurchaseDetails({ ...purchaseDetails, driverMobileNo: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
-                        placeholder="Enter mobile number"
+                        readOnly
+                        className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
                       />
                     </div>
 
@@ -1666,52 +1825,43 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                 </div>
               </div>
 
-              {/* Middle Column - Purchase Terms */}
+              {/* Middle Column - Purchase Terms (READ ONLY) */}
               <div className="col-span-12 md:col-span-4">
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 h-full">
-                  <h3 className="text-sm font-bold text-slate-800 mb-3">Purchase Terms</h3>
+                  <h3 className="text-sm font-bold text-slate-800 mb-3">Purchase Terms (Auto-filled from VNN)</h3>
                   
                   <div className="space-y-3">
                     <div>
                       <label className="text-xs font-bold text-slate-600">Purchase - Type</label>
-                      <select
-                        value={purchaseDetails.purchaseType}
-                        onChange={(e) => setPurchaseDetails({ ...purchaseDetails, purchaseType: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
-                      >
-                        <option value="">Select Purchase Type</option>
-                        {PURCHASE_TYPE_OPTIONS.map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
+                      <input
+                        type="text"
+                        value={purchaseDetails.purchaseType || "Loading & Unloading"}
+                        readOnly
+                        className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
+                      />
+                      <p className="text-xs text-blue-600 mt-1">Auto-filled from Vehicle Negotiation</p>
                     </div>
 
                     <div>
                       <label className="text-xs font-bold text-slate-600">Payment Terms</label>
-                      <select
-                        value={purchaseDetails.paymentTerms}
-                        onChange={(e) => setPurchaseDetails({ ...purchaseDetails, paymentTerms: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
-                      >
-                        <option value="">Select Payment Terms</option>
-                        {PAYMENT_TERMS_OPTIONS.map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
+                      <input
+                        type="text"
+                        value={purchaseDetails.paymentTerms || "80 % Advance"}
+                        readOnly
+                        className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
+                      />
+                      <p className="text-xs text-blue-600 mt-1">Auto-filled from Vehicle Negotiation</p>
                     </div>
 
                     <div>
                       <label className="text-xs font-bold text-slate-600">Rate - Type</label>
-                      <select
-                        value={purchaseDetails.rateType}
-                        onChange={(e) => setPurchaseDetails({ ...purchaseDetails, rateType: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
-                      >
-                        <option value="">Select Rate Type</option>
-                        {RATE_TYPE_OPTIONS.map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
+                      <input
+                        type="text"
+                        value={purchaseDetails.rateType || "Per MT"}
+                        readOnly
+                        className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
+                      />
+                      <p className="text-xs text-blue-600 mt-1">Auto-filled from Vehicle Negotiation</p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
@@ -1720,17 +1870,8 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                         <input
                           type="number"
                           value={purchaseDetails.rate}
-                          onChange={(e) => {
-                            const rate = e.target.value;
-                            const weight = num(purchaseDetails.weight);
-                            const amount = num(rate) * weight;
-                            setPurchaseDetails({ 
-                              ...purchaseDetails, 
-                              rate,
-                              amount: amount.toString()
-                            });
-                          }}
-                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
+                          readOnly
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
                           placeholder="0"
                         />
                       </div>
@@ -1771,51 +1912,205 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                 </div>
               </div>
 
-              {/* Right Column - Tarpaulin Charges */}
-              <div className="col-span-12 md:col-span-4">
-                <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200 h-full">
-                  <h3 className="text-sm font-bold text-slate-800 mb-3">Vehicle Tarpaulin Charges</h3>
-                  
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-xs font-bold text-slate-600">Vehicle - Floor Tarpaulin</label>
-                      <div className="flex gap-2 items-center">
-                        <input
-                          type="number"
-                          value={purchaseDetails.vehicleFloorTarpaulin}
-                          onChange={(e) => setPurchaseDetails({ ...purchaseDetails, vehicleFloorTarpaulin: e.target.value })}
-                          className="mt-1 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
-                          placeholder="0"
-                        />
-                        <span className="text-xs font-medium text-slate-600 whitespace-nowrap bg-slate-100 px-2 py-1 rounded-lg">
-                          {purchaseDetails.vehicleType || "Truck"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-bold text-slate-600">Vehicle - Outer Tarpaulin</label>
-                      <div className="flex gap-2 items-center">
-                        <input
-                          type="number"
-                          value={purchaseDetails.vehicleOuterTarpaulin}
-                          onChange={(e) => setPurchaseDetails({ ...purchaseDetails, vehicleOuterTarpaulin: e.target.value })}
-                          className="mt-1 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
-                          placeholder="0"
-                        />
-                        <span className="text-xs font-medium text-slate-600 whitespace-nowrap bg-slate-100 px-2 py-1 rounded-lg">
-                          {purchaseDetails.vehicleType || "Truck"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 p-3 bg-white rounded-lg border border-yellow-100">
-                      <p className="text-xs text-slate-600 flex items-center gap-1">
-                        <span className="font-bold text-amber-600">Auto Fetch:</span>
-                        <span>All from Vehicle Negotiation</span>
-                      </p>
-                    </div>
+      {/* Right Column - Uploaded MEMO Display with Full Box Preview */}
+<div className="col-span-12 md:col-span-4">
+  <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200 h-full">
+    <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+      <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+      Uploaded MEMO
+    </h3>
+    
+    {memoFileInfo ? (
+      <div 
+        className="relative group cursor-pointer overflow-hidden rounded-xl border-2 border-green-300 bg-white shadow-lg hover:shadow-xl transition-all duration-300"
+        onClick={() => {
+          if (memoFileInfo.filePath) {
+            window.open(memoFileInfo.filePath, '_blank');
+          }
+        }}
+      >
+        {/* Image/File Preview - Full Box */}
+        <div className="relative w-full min-h-[280px] bg-gray-100">
+          {memoFileInfo.mimeType?.includes('image') ? (
+            <img 
+              src={memoFileInfo.filePath} 
+              alt={memoFileInfo.originalName}
+              className="w-full h-full min-h-[280px] object-contain transition-transform duration-300 group-hover:scale-105"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.parentElement.innerHTML = `
+                  <div class="flex flex-col items-center justify-center min-h-[280px] bg-gray-100">
+                    <svg class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span class="text-sm text-gray-500 mt-2">Preview not available</span>
+                    <span class="text-xs text-gray-400 mt-1">Click to view/download</span>
                   </div>
+                `;
+              }}
+            />
+          ) : memoFileInfo.mimeType?.includes('pdf') ? (
+            <div className="flex flex-col items-center justify-center min-h-[280px] bg-red-50">
+              <svg className="w-20 h-20 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              <span className="text-lg font-bold text-red-600 mt-3">PDF Document</span>
+              <span className="text-sm text-gray-500 mt-1">{memoFileInfo.originalName}</span>
+              <span className="text-xs text-gray-400 mt-2">Click to view PDF</span>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center min-h-[280px] bg-gray-100">
+              <svg className="w-20 h-20 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span className="text-lg font-medium text-gray-600 mt-3">{memoFileInfo.originalName}</span>
+              <span className="text-sm text-gray-500 mt-1">Click to download</span>
+            </div>
+          )}
+          
+          {/* Hover Overlay */}
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col items-center justify-center gap-2">
+            <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            <span className="text-white text-sm font-medium">Click to View Full Size</span>
+          </div>
+        </div>
+        
+        {/* File Info Footer */}
+        <div className="p-3 bg-white border-t border-green-100">
+          <div className="flex justify-between items-center">
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-slate-800 truncate" title={memoFileInfo.originalName}>
+                {memoFileInfo.originalName}
+              </p>
+              <div className="flex items-center gap-3 mt-1">
+                <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded-full">✓ Uploaded</span>
+                <span className="text-xs text-slate-500">{(memoFileInfo.size / 1024).toFixed(1)} KB</span>
+              </div>
+            </div>
+            {memoFileInfo.filePath && (
+              <a
+                href={memoFileInfo.filePath}
+                download
+                onClick={(e) => e.stopPropagation()}
+                className="p-2 text-sky-600 hover:text-sky-800 hover:bg-sky-50 rounded-lg transition-colors"
+                title="Download File"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    ) : (
+      <div className="flex flex-col items-center justify-center min-h-[280px] bg-white rounded-xl border-2 border-dashed border-green-300">
+        <svg className="w-16 h-16 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        <p className="text-sm font-medium text-slate-600">No MEMO uploaded yet</p>
+        <p className="text-xs text-slate-400 mt-1">Upload MEMO from the section below</p>
+      </div>
+    )}
+  </div>
+</div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Loading Charges & Expenses Section - WITH ALL 5 FIELDS */}
+        <div className="mt-4">
+          <Card title="Loading Charges & Expenses">
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-sm font-bold text-slate-800">Deduct at Office</h3>
+                <div className="bg-orange-100 text-orange-800 text-xs px-3 py-1 rounded-full font-medium">
+                  Will be deducted from Total Amount
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                {/* Loading Charges */}
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-slate-700">Loading Charges:</span>
+                  <input
+                    type="number"
+                    value={loadingExpenses.loadingCharges}
+                    onChange={(e) => setLoadingExpenses({ ...loadingExpenses, loadingCharges: e.target.value })}
+                    className="w-32 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-right focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                    placeholder="0"
+                  />
+                </div>
+                
+                {/* Loading Staff Munshiyana */}
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-slate-700">Loading Staff Munshiyana:</span>
+                  <input
+                    type="number"
+                    value={loadingExpenses.loadingStaffMunshiyana}
+                    onChange={(e) => setLoadingExpenses({ ...loadingExpenses, loadingStaffMunshiyana: e.target.value })}
+                    className="w-32 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-right focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                    placeholder="0"
+                  />
+                </div>
+                
+                {/* Other Expenses */}
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-slate-700">Other Expenses:</span>
+                  <input
+                    type="number"
+                    value={loadingExpenses.otherExpenses}
+                    onChange={(e) => setLoadingExpenses({ ...loadingExpenses, otherExpenses: e.target.value })}
+                    className="w-32 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-right focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                    placeholder="0"
+                  />
+                </div>
+                
+                {/* Vehicle - Floor Tarpaulin */}
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-slate-700">Vehicle - Floor Tarpaulin:</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={loadingExpenses.vehicleFloorTarpaulin}
+                      onChange={(e) => setLoadingExpenses({ ...loadingExpenses, vehicleFloorTarpaulin: e.target.value })}
+                      className="w-32 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-right focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                      placeholder="0"
+                    />
+                    <span className="text-xs font-medium text-slate-600 whitespace-nowrap bg-slate-100 px-2 py-1 rounded-lg">
+                      {purchaseDetails.vehicleType || "Truck"}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Vehicle - Outer Tarpaulin */}
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-slate-700">Vehicle - Outer Tarpaulin:</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={loadingExpenses.vehicleOuterTarpaulin}
+                      onChange={(e) => setLoadingExpenses({ ...loadingExpenses, vehicleOuterTarpaulin: e.target.value })}
+                      className="w-32 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-right focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                      placeholder="0"
+                    />
+                    <span className="text-xs font-medium text-slate-600 whitespace-nowrap bg-slate-100 px-2 py-1 rounded-lg">
+                      {purchaseDetails.vehicleType || "Truck"}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Total Line */}
+                <div className="flex justify-between items-center pt-2 border-t border-slate-200 mt-2">
+                  <span className="text-sm font-bold text-slate-800">Total (to be deducted at office):</span>
+                  <span className="font-bold text-orange-700 text-lg">
+                    ₹{calculateTotalLoadingExpenses().toLocaleString()}
+                  </span>
                 </div>
               </div>
             </div>
@@ -1908,164 +2203,179 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
           </Card>
         </div>
 
-        {/* Additions & Deductions Section */}
+        {/* Additions & Deductions Section - Shows Advance Paid + Deduct at Office */}
         <div className="mt-4">
           <div className="grid grid-cols-12 gap-4">
-            {/* Deductions Column */}
-            <div className="col-span-12 md:col-span-6">
-              <Card 
-                title="Deductions (-) - Adjustments"
-                right={
-                  <button
-                    onClick={addDeductionRow}
-                    className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700"
-                  >
-                    + Add Deduction
-                  </button>
-                }
-              >
-                {deductions.length === 0 ? (
-                  <div className="text-center py-8 text-slate-500 border-2 border-dashed border-red-200 rounded-lg">
-                    <svg className="mx-auto h-8 w-8 text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                    </svg>
-                    <p className="mt-2">No deductions added. Click "Add Deduction" to add deductions.</p>
+            {/* Advance + Deduct at Office Summary */}
+            <div className="col-span-12">
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200 mb-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <div className="text-xs text-slate-500">Advance Paid</div>
+                    <div className="text-2xl font-bold text-emerald-700">₹{num(purchaseDetails.advance).toLocaleString()}</div>
                   </div>
-                ) : (
-                  <div className="overflow-auto rounded-xl border border-red-300">
-                    <table className="min-w-full w-full text-sm">
-                      <thead className="bg-red-100">
-                        <tr>
-                          <th className="border border-red-300 px-3 py-2 text-xs font-bold text-slate-800">Description</th>
-                          <th className="border border-red-300 px-3 py-2 text-xs font-bold text-slate-800">Amount (₹)</th>
-                          <th className="border border-red-300 px-3 py-2 text-xs font-bold text-slate-800">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {deductions.map((row) => (
-                          <tr key={row._id} className="hover:bg-red-50">
-                            <td className="border border-red-300 px-2 py-2">
-                              <input
-                                type="text"
-                                value={row.description}
-                                onChange={(e) => updateDeductionRow(row._id, 'description', e.target.value)}
-                                className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                                placeholder="Description"
-                              />
-                            </td>
-                            <td className="border border-red-300 px-2 py-2">
-                              <input
-                                type="number"
-                                value={row.amount}
-                                onChange={(e) => updateDeductionRow(row._id, 'amount', e.target.value)}
-                                className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-right"
-                                placeholder="0.00"
-                              />
-                            </td>
-                            <td className="border border-red-300 px-2 py-2 text-center">
-                              <button
-                                onClick={() => removeDeductionRow(row._id)}
-                                className="rounded-lg bg-red-500 px-2 py-1.5 text-xs font-bold text-white hover:bg-red-600"
-                                title="Remove"
-                              >
-                                ✕
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                        <tr className="bg-red-100 font-bold">
-                          <td className="border border-red-300 px-3 py-2 text-right">Total Deductions:</td>
-                          <td className="border border-red-300 px-3 py-2 text-right text-red-700">
-                            ₹{calculateTotalDeductions().toLocaleString()}
-                          </td>
-                          <td className="border border-red-300 px-3 py-2"></td>
-                        </tr>
-                      </tbody>
-                    </table>
+                  <div className="text-center">
+                    <div className="text-xs text-slate-500">Deduct at Office</div>
+                    <div className="text-2xl font-bold text-orange-700">₹{calculateTotalLoadingExpenses().toLocaleString()}</div>
                   </div>
-                )}
-              </Card>
+                </div>
+              </div>
             </div>
 
-            {/* Additions Column */}
-            <div className="col-span-12 md:col-span-6">
-              <Card 
-                title="Additions (+) - Extra Charges"
-                right={
+           {/* Deductions Column */}
+<div className="col-span-12 md:col-span-6">
+  <Card 
+    title="Deductions (-) - Adjustments"
+    right={
+      <button
+        onClick={addDeductionRow}
+        className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700"
+      >
+        + Add Deduction
+      </button>
+    }
+  >
+    {deductions.length === 0 ? (
+      <div className="text-center py-8 text-slate-500 border-2 border-dashed border-red-200 rounded-lg">
+        <svg className="mx-auto h-8 w-8 text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+        </svg>
+        <p className="mt-2">No deductions added. Click "Add Deduction" to add deductions.</p>
+      </div>
+    ) : (
+      <div className="overflow-auto rounded-xl border border-red-300">
+        <table className="min-w-full w-full text-sm">
+          <thead className="bg-red-100">
+            <tr>
+              <th className="border border-red-300 px-3 py-2 text-xs font-bold text-slate-800">Description</th>
+              <th className="border border-red-300 px-3 py-2 text-xs font-bold text-slate-800">Amount (₹)</th>
+              <th className="border border-red-300 px-3 py-2 text-xs font-bold text-slate-800">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {deductions.map((row) => (
+              <tr key={row._id} className="hover:bg-red-50">
+                <td className="border border-red-300 px-2 py-2">
+                  <input
+                    type="text"
+                    value={row.description}
+                    onChange={(e) => updateDeductionRow(row._id, 'description', e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                    placeholder="Description"
+                  />
+                </td>
+                <td className="border border-red-300 px-2 py-2">
+                  <input
+                    type="number"
+                    value={row.amount}
+                    onChange={(e) => updateDeductionRow(row._id, 'amount', e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-right"
+                    placeholder="0.00"
+                  />
+                </td>
+                <td className="border border-red-300 px-2 py-2 text-center">
                   <button
-                    onClick={addAdditionRow}
-                    className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-green-700"
+                    onClick={() => removeDeductionRow(row._id)}
+                    className="rounded-lg bg-red-500 px-2 py-1.5 text-xs font-bold text-white hover:bg-red-600"
+                    title="Remove"
                   >
-                    + Add Addition
+                    ✕
                   </button>
-                }
-              >
-                {additions.length === 0 ? (
-                  <div className="text-center py-8 text-slate-500 border-2 border-dashed border-green-200 rounded-lg">
-                    <svg className="mx-auto h-8 w-8 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    <p className="mt-2">No additions added. Click "Add Addition" to add charges.</p>
-                  </div>
-                ) : (
-                  <div className="overflow-auto rounded-xl border border-green-300">
-                    <table className="min-w-full w-full text-sm">
-                      <thead className="bg-green-100">
-                        <tr>
-                          <th className="border border-green-300 px-3 py-2 text-xs font-bold text-slate-800">Description</th>
-                          <th className="border border-green-300 px-3 py-2 text-xs font-bold text-slate-800">Amount (₹)</th>
-                          <th className="border border-green-300 px-3 py-2 text-xs font-bold text-slate-800">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {additions.map((row) => (
-                          <tr key={row._id} className="hover:bg-green-50">
-                            <td className="border border-green-300 px-2 py-2">
-                              <input
-                                type="text"
-                                value={row.description}
-                                onChange={(e) => updateAdditionRow(row._id, 'description', e.target.value)}
-                                className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                                placeholder="Description"
-                              />
-                            </td>
-                            <td className="border border-green-300 px-2 py-2">
-                              <input
-                                type="number"
-                                value={row.amount}
-                                onChange={(e) => updateAdditionRow(row._id, 'amount', e.target.value)}
-                                className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-right"
-                                placeholder="0.00"
-                              />
-                            </td>
-                            <td className="border border-green-300 px-2 py-2 text-center">
-                              <button
-                                onClick={() => removeAdditionRow(row._id)}
-                                className="rounded-lg bg-red-500 px-2 py-1.5 text-xs font-bold text-white hover:bg-red-600"
-                                title="Remove"
-                              >
-                                ✕
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                        <tr className="bg-green-100 font-bold">
-                          <td className="border border-green-300 px-3 py-2 text-right">Total Additions:</td>
-                          <td className="border border-green-300 px-3 py-2 text-right text-emerald-700">
-                            ₹{calculateTotalAdditions().toLocaleString()}
-                          </td>
-                          <td className="border border-green-300 px-3 py-2"></td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </Card>
-            </div>
-          </div>
+                </td>
+              </tr>
+            ))}
+            <tr className="bg-red-100 font-bold">
+              <td className="border border-red-300 px-3 py-2 text-right">Total Deductions:</td>
+              <td className="border border-red-300 px-3 py-2 text-right text-red-700">
+                ₹{calculateTotalDeductions().toLocaleString()}
+              </td>
+              <td className="border border-red-300 px-3 py-2"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    )}
+  </Card>
+</div>
+
+           {/* Additions Column */}
+<div className="col-span-12 md:col-span-6">
+  <Card 
+    title="Additions (+) - Extra Charges"
+    right={
+      <button
+        onClick={addAdditionRow}
+        className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-green-700"
+      >
+        + Add Addition
+      </button>
+    }
+  >
+    {additions.length === 0 ? (
+      <div className="text-center py-8 text-slate-500 border-2 border-dashed border-green-200 rounded-lg">
+        <svg className="mx-auto h-8 w-8 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+        </svg>
+        <p className="mt-2">No additions added. Click "Add Addition" to add charges.</p>
+      </div>
+    ) : (
+      <div className="overflow-auto rounded-xl border border-green-300">
+        <table className="min-w-full w-full text-sm">
+          <thead className="bg-green-100">
+            <tr>
+              <th className="border border-green-300 px-3 py-2 text-xs font-bold text-slate-800">Description</th>
+              <th className="border border-green-300 px-3 py-2 text-xs font-bold text-slate-800">Amount (₹)</th>
+              <th className="border border-green-300 px-3 py-2 text-xs font-bold text-slate-800">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {additions.map((row) => (
+              <tr key={row._id} className="hover:bg-green-50">
+                <td className="border border-green-300 px-2 py-2">
+                  <input
+                    type="text"
+                    value={row.description}
+                    onChange={(e) => updateAdditionRow(row._id, 'description', e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                    placeholder="Description"
+                  />
+                </td>
+                <td className="border border-green-300 px-2 py-2">
+                  <input
+                    type="number"
+                    value={row.amount}
+                    onChange={(e) => updateAdditionRow(row._id, 'amount', e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-right"
+                    placeholder="0.00"
+                  />
+                </td>
+                <td className="border border-green-300 px-2 py-2 text-center">
+                  <button
+                    onClick={() => removeAdditionRow(row._id)}
+                    className="rounded-lg bg-red-500 px-2 py-1.5 text-xs font-bold text-white hover:bg-red-600"
+                    title="Remove"
+                  >
+                    ✕
+                  </button>
+                </td>
+              </tr>
+            ))}
+            <tr className="bg-green-100 font-bold">
+              <td className="border border-green-300 px-3 py-2 text-right">Total Additions:</td>
+              <td className="border border-green-300 px-3 py-2 text-right text-emerald-700">
+                ₹{calculateTotalAdditions().toLocaleString()}
+              </td>
+              <td className="border border-green-300 px-3 py-2"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    )}
+  </Card>
+</div>
         </div>
 
-        {/* Final Summary & Balance */}
+        {/* Final Summary & Balance - Updated Formula */}
         <div className="mt-4">
           <Card title="Purchase Summary & Balance">
             <div className="grid grid-cols-12 gap-4">
@@ -2078,12 +2388,15 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                       <span className="font-bold text-blue-800">₹{calculateTotalOrderAmount().toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-slate-600">Purchase Amount:</span>
-                      <span className="font-bold text-blue-800">₹{num(purchaseDetails.amount).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
                       <span className="text-sm text-slate-600">Advance Paid:</span>
                       <span className="font-bold text-emerald-700">₹{num(purchaseDetails.advance).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between pt-2 border-t border-blue-200">
+                      <span className="text-sm font-bold text-slate-800">Final Balance:</span>
+                      <span className="text-xl font-bold text-purple-800">₹{calculateBalance().toLocaleString()}</span>
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1">
+                      Formula: Total Order Amount - Advance Paid
                     </div>
                   </div>
                 </div>
@@ -2094,6 +2407,14 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                   <h3 className="text-sm font-bold text-slate-800 mb-3">Additions & Deductions</h3>
                   <div className="space-y-2">
                     <div className="flex justify-between">
+                      <span className="text-sm text-slate-600">Advance Paid:</span>
+                      <span className="font-bold text-emerald-700">₹{num(purchaseDetails.advance).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-slate-600">Deduct at Office:</span>
+                      <span className="font-bold text-orange-700">₹{calculateTotalLoadingExpenses().toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
                       <span className="text-sm text-slate-600">Total Additions (+):</span>
                       <span className="font-bold text-emerald-700">₹{calculateTotalAdditions().toLocaleString()}</span>
                     </div>
@@ -2103,8 +2424,8 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                     </div>
                     <div className="flex justify-between pt-2 border-t border-amber-200">
                       <span className="text-sm font-bold text-slate-800">Net Effect:</span>
-                      <span className={`font-bold ${calculateTotalAdditions() - calculateTotalDeductions() >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-                        ₹{(calculateTotalAdditions() - calculateTotalDeductions()).toLocaleString()}
+                      <span className={`font-bold ${calculateNetEffect() >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                        ₹{calculateNetEffect().toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -2113,11 +2434,15 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
 
               <div className="col-span-12 md:col-span-4">
                 <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-4 rounded-xl border border-purple-200">
-                  <h3 className="text-sm font-bold text-slate-800 mb-3">Final Balance</h3>
+                  <h3 className="text-sm font-bold text-slate-800 mb-3">Payment Info</h3>
                   <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-600">Balance Amount:</span>
-                      <span className="text-2xl font-bold text-purple-800">₹{calculateBalance().toLocaleString()}</span>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-slate-600">Purchase Amount:</span>
+                      <span className="font-bold text-blue-800">₹{num(purchaseDetails.amount).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-slate-600">Balance Due:</span>
+                      <span className="font-bold text-purple-800">₹{calculateBalance().toLocaleString()}</span>
                     </div>
                     <div className="mt-3 pt-2 border-t border-purple-200">
                       <div className="flex justify-between text-xs">
@@ -2136,17 +2461,33 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
           </Card>
         </div>
 
-        {/* Purchase MEMO & Approval */}
+        {/* Purchase MEMO & Approval - With Upload */}
         <div className="mt-4">
           <Card title="Purchase - MEMO & Approval">
             <div className="grid grid-cols-12 gap-4">
               <div className="col-span-12 md:col-span-6">
                 <div className="bg-white p-4 rounded-xl border border-slate-200">
                   <h3 className="text-sm font-bold text-slate-800 mb-3">Purchase MEMO</h3>
-                  <div className="flex gap-3">
-                    <button className="rounded-lg bg-green-600 px-4 py-2 text-xs font-bold text-white hover:bg-green-700">
-                      Upload MEMO
-                    </button>
+                  <div className="flex flex-col gap-3">
+                    <input
+                      type="file"
+                      accept=".pdf,.png,.jpg,.jpeg"
+                      onChange={handleMemoUpload}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
+                    />
+                    {memoFileInfo && (
+                      <div className="mt-2 p-2 bg-green-50 rounded-lg border border-green-200">
+                        <div className="flex items-center gap-2">
+                          <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <div>
+                            <p className="text-xs font-medium text-green-800">{memoFileInfo.originalName}</p>
+                            <p className="text-xs text-green-600">Uploaded successfully</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2213,20 +2554,15 @@ const handleSelectLoadingInfo = async (loadingInfo) => {
                   />
                 </div>
               </div>
-              <div className="col-span-12 md:col-span-6">
-              </div>
             </div>
           </Card>
         </div>
       </div>
     </div>
+	</div>
   );
+
 }
-
-/** =========================
- * REUSABLE COMPONENTS
- ========================= */
-
 function Card({ title, right, children }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white shadow-sm mb-4">
@@ -2236,119 +2572,7 @@ function Card({ title, right, children }) {
       </div>
       <div className="p-4">{children}</div>
     </div>
+	
   );
 }
 
-function Select({ label, value, onChange, options = [], col = "" }) {
-  return (
-    <div className={col}>
-      <label className="text-xs font-bold text-slate-600">{label}</label>
-      <select
-        value={value}
-        onChange={(e) => onChange?.(e.target.value)}
-        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-      >
-        <option value="">Select {label}</option>
-        {options.map((o) => (
-          <option key={o} value={o}>{o}</option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-function SearchableDropdown({ 
-  items, 
-  selectedId, 
-  onSelect, 
-  placeholder = "Search...",
-  displayField = 'name',
-  codeField = 'code',
-  disabled = false
-}) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filteredItems, setFilteredItems] = useState([]);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    setFilteredItems(items || []);
-    if (selectedId && items?.length > 0) {
-      const item = items.find(i => i._id === selectedId || i.name === selectedId);
-      setSelectedItem(item);
-      if (item) {
-        setSearchQuery(getDisplayValue(item));
-      }
-    } else {
-      setSelectedItem(null);
-      setSearchQuery("");
-    }
-  }, [items, selectedId]);
-
-  const getDisplayValue = (item) => {
-    if (!item) return "";
-    const display = item[displayField] || "";
-    const code = item[codeField] ? `(${item[codeField]})` : "";
-    return `${display} ${code}`.trim();
-  };
-
-  const handleSearch = (query) => {
-    setSearchQuery(query);
-    if (!query.trim()) {
-      setFilteredItems(items || []);
-    } else {
-      const filtered = (items || []).filter(item =>
-        (item[displayField]?.toLowerCase().includes(query.toLowerCase())) ||
-        (item[codeField]?.toLowerCase().includes(query.toLowerCase()))
-      );
-      setFilteredItems(filtered);
-    }
-  };
-
-  const handleSelectItem = (item) => {
-    setSelectedItem(item);
-    setSearchQuery(getDisplayValue(item));
-    setShowDropdown(false);
-    onSelect?.(item);
-  };
-
-  return (
-    <div className="relative" ref={dropdownRef}>
-      <input
-        type="text"
-        value={searchQuery}
-        onChange={(e) => handleSearch(e.target.value)}
-        onFocus={() => setShowDropdown(true)}
-        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-        placeholder={placeholder}
-        disabled={disabled}
-      />
-      {showDropdown && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-          {filteredItems?.length > 0 ? (
-            filteredItems.map((item) => (
-              <div
-                key={item._id}
-                onMouseDown={() => handleSelectItem(item)}
-                className={`p-2 hover:bg-slate-50 cursor-pointer border-b border-slate-100 ${
-                  selectedItem?._id === item._id ? 'bg-sky-50' : ''
-                }`}
-              >
-                <div className="font-medium text-slate-800 text-sm">
-                  {item[displayField]}
-                </div>
-                {item[codeField] && (
-                  <div className="text-xs text-slate-500">Code: {item[codeField]}</div>
-                )}
-              </div>
-            ))
-          ) : (
-            <div className="p-2 text-center text-sm text-slate-500">No items found</div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}

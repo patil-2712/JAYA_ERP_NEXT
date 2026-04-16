@@ -1,3 +1,4 @@
+// route.js
 import { NextResponse } from "next/server";
 import connectDb from "@/lib/db";
 import PurchasePanel from "./PurchasePanel";
@@ -12,7 +13,7 @@ function num(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
-// ✅ Role-based access check
+// Role-based access check
 function isAuthorized(user) {
   return (
     user?.type === "company" ||
@@ -37,7 +38,7 @@ async function validateUser(req) {
 }
 
 /* ========================================
-   GET /api/purchase-panel - Get All Purchases
+   GET /api/purchase-panel
 ======================================== */
 export async function GET(req) {
   try {
@@ -56,7 +57,7 @@ export async function GET(req) {
     const toDate = url.searchParams.get("toDate");
     const statusFilter = url.searchParams.get("status");
 
-    // ============ CASE 1: GET SINGLE PURCHASE BY ID ============
+    // CASE 1: GET SINGLE PURCHASE BY ID
     if (id) {
       if (!mongoose.Types.ObjectId.isValid(id)) {
         return NextResponse.json({ 
@@ -83,7 +84,7 @@ export async function GET(req) {
       }, { status: 200 });
     }
 
-    // ============ CASE 2: GET SINGLE PURCHASE BY PURCHASE NUMBER ============
+    // CASE 2: GET SINGLE PURCHASE BY PURCHASE NUMBER
     if (purchaseNo) {
       const purchase = await PurchasePanel.findOne({
         purchaseNo: purchaseNo,
@@ -103,11 +104,10 @@ export async function GET(req) {
       }, { status: 200 });
     }
 
-    // ============ CASE 3: TABLE FORMAT FOR LIST VIEW ============
+    // CASE 3: TABLE FORMAT FOR LIST VIEW
     if (format === 'table') {
       let query = { companyId: user.companyId };
 
-      // Search filter
       if (search) {
         query.$or = [
           { purchaseNo: { $regex: search, $options: 'i' } },
@@ -118,12 +118,10 @@ export async function GET(req) {
         ];
       }
 
-      // Status filter
       if (statusFilter) {
         query['approval.status'] = statusFilter;
       }
 
-      // Date range filter
       if (fromDate || toDate) {
         query.createdAt = {};
         if (fromDate) {
@@ -160,7 +158,7 @@ export async function GET(req) {
       }, { status: 200 });
     }
 
-    // ============ CASE 4: LIST FOR DROPDOWNS ============
+    // CASE 4: LIST FOR DROPDOWNS
     const purchases = await PurchasePanel.find({ 
       companyId: user.companyId 
     })
@@ -209,15 +207,21 @@ export async function POST(req) {
       plantName: row.plantName || '',
       orderType: row.orderType || 'Sales',
       pinCode: row.pinCode || '',
-      state: row.state || '',
+      taluka: row.taluka || '',
       district: row.district || '',
+      state: row.state || '',
+      country: row.country || '',
       from: row.from || '',
       to: row.to || '',
       locationRate: row.locationRate || '',
       priceList: row.priceList || '',
       weight: num(row.weight),
       rate: num(row.rate),
-      totalAmount: num(row.totalAmount) || (num(row.weight) * num(row.rate))
+      totalAmount: num(row.totalAmount) || (num(row.weight) * num(row.rate)),
+      collectionCharges: row.collectionCharges || '0',
+      cancellationCharges: row.cancellationCharges || 'Nil',
+      loadingCharges: row.loadingCharges || 'Nil',
+      otherCharges: row.otherCharges || '0'
     }));
 
     // Process additions
@@ -241,7 +245,16 @@ export async function POST(req) {
     
     const purchaseAmount = num(body.purchaseDetails?.amount) || totalOrderAmount;
     const advance = num(body.purchaseDetails?.advance);
-    const balance = purchaseAmount - advance - totalDeductions + totalAdditions;
+    const totalLoadingExpenses = (
+      num(body.loadingExpenses?.loadingCharges) +
+      num(body.loadingExpenses?.loadingStaffMunshiyana) +
+      num(body.loadingExpenses?.otherExpenses) +
+      num(body.loadingExpenses?.vehicleFloorTarpaulin) +
+      num(body.loadingExpenses?.vehicleOuterTarpaulin)
+    );
+    
+    const balance = totalOrderAmount - advance;
+    const netEffect = advance + totalAdditions - totalDeductions - totalLoadingExpenses;
 
     // Handle branch ID
     let branchId = null;
@@ -302,12 +315,22 @@ export async function POST(req) {
         purchaseDate: body.purchaseDetails?.purchaseDate ? new Date(body.purchaseDetails.purchaseDate) : new Date(),
       },
       
+      loadingExpenses: {
+        loadingCharges: num(body.loadingExpenses?.loadingCharges),
+        loadingStaffMunshiyana: num(body.loadingExpenses?.loadingStaffMunshiyana),
+        otherExpenses: num(body.loadingExpenses?.otherExpenses),
+        vehicleFloorTarpaulin: num(body.loadingExpenses?.vehicleFloorTarpaulin),
+        vehicleOuterTarpaulin: num(body.loadingExpenses?.vehicleOuterTarpaulin),
+      },
+      totalLoadingExpenses,
+      
       additions: processedAdditions,
       deductions: processedDeductions,
       totalAdditions,
       totalDeductions,
       totalOrderAmount,
       balance,
+      netEffect,
       
       registeredVehicle: {
         vehiclePlate: body.registeredVehicle?.vehiclePlate || body.registeredVehicle?.registeredPlate || '',
@@ -323,6 +346,8 @@ export async function POST(req) {
         date: body.arrivalDetails?.date ? new Date(body.arrivalDetails.date) : new Date(),
         time: body.arrivalDetails?.time || '',
       },
+      
+      memoFile: body.memoFile || null,
       
       companyId: user.companyId,
       createdBy: user.id,
@@ -408,10 +433,10 @@ export async function PUT(req) {
     }
 
     // Update references
-    if (body.vehicleNegotiationId) purchase.vehicleNegotiationId = body.vehicleNegotiationId;
-    if (body.vnnNo) purchase.vnnNo = body.vnnNo;
-    if (body.pricingSerialNo) purchase.pricingSerialNo = body.pricingSerialNo;
-    if (body.loadingInfoNo) purchase.loadingInfoNo = body.loadingInfoNo;
+    if (body.vehicleNegotiationId !== undefined) purchase.vehicleNegotiationId = body.vehicleNegotiationId;
+    if (body.vnnNo !== undefined) purchase.vnnNo = body.vnnNo;
+    if (body.pricingSerialNo !== undefined) purchase.pricingSerialNo = body.pricingSerialNo;
+    if (body.loadingInfoNo !== undefined) purchase.loadingInfoNo = body.loadingInfoNo;
 
     // Update header
     if (body.header) {
@@ -444,15 +469,21 @@ export async function PUT(req) {
         plantName: row.plantName || '',
         orderType: row.orderType || 'Sales',
         pinCode: row.pinCode || '',
-        state: row.state || '',
+        taluka: row.taluka || '',
         district: row.district || '',
+        state: row.state || '',
+        country: row.country || '',
         from: row.from || '',
         to: row.to || '',
         locationRate: row.locationRate || '',
         priceList: row.priceList || '',
         weight: num(row.weight),
         rate: num(row.rate),
-        totalAmount: num(row.totalAmount) || (num(row.weight) * num(row.rate))
+        totalAmount: num(row.totalAmount) || (num(row.weight) * num(row.rate)),
+        collectionCharges: row.collectionCharges || '0',
+        cancellationCharges: row.cancellationCharges || 'Nil',
+        loadingCharges: row.loadingCharges || 'Nil',
+        otherCharges: row.otherCharges || '0'
       }));
     }
 
@@ -471,6 +502,24 @@ export async function PUT(req) {
       };
     }
 
+    // Update loading expenses
+    if (body.loadingExpenses) {
+      purchase.loadingExpenses = {
+        loadingCharges: num(body.loadingExpenses.loadingCharges),
+        loadingStaffMunshiyana: num(body.loadingExpenses.loadingStaffMunshiyana),
+        otherExpenses: num(body.loadingExpenses.otherExpenses),
+        vehicleFloorTarpaulin: num(body.loadingExpenses.vehicleFloorTarpaulin),
+        vehicleOuterTarpaulin: num(body.loadingExpenses.vehicleOuterTarpaulin)
+      };
+      purchase.totalLoadingExpenses = (
+        purchase.loadingExpenses.loadingCharges +
+        purchase.loadingExpenses.loadingStaffMunshiyana +
+        purchase.loadingExpenses.otherExpenses +
+        purchase.loadingExpenses.vehicleFloorTarpaulin +
+        purchase.loadingExpenses.vehicleOuterTarpaulin
+      );
+    }
+
     // Update additions
     if (body.additions) {
       purchase.additions = body.additions.map(row => ({
@@ -480,6 +529,7 @@ export async function PUT(req) {
         description: row.description || '',
         amount: num(row.amount)
       }));
+      purchase.totalAdditions = purchase.additions.reduce((sum, row) => sum + (row.amount || 0), 0);
     }
 
     // Update deductions
@@ -491,7 +541,13 @@ export async function PUT(req) {
         description: row.description || '',
         amount: num(row.amount)
       }));
+      purchase.totalDeductions = purchase.deductions.reduce((sum, row) => sum + (row.amount || 0), 0);
     }
+
+    // Update totals
+    purchase.totalOrderAmount = purchase.orderRows.reduce((sum, row) => sum + (row.totalAmount || 0), 0);
+    purchase.balance = purchase.totalOrderAmount - (purchase.purchaseDetails?.advance || 0);
+    purchase.netEffect = (purchase.purchaseDetails?.advance || 0) + purchase.totalAdditions - purchase.totalDeductions - purchase.totalLoadingExpenses;
 
     // Update registered vehicle
     if (body.registeredVehicle) {
@@ -517,7 +573,11 @@ export async function PUT(req) {
       };
     }
 
-    // The pre-save hook will recalculate totals
+    // Update memo file
+    if (body.memoFile !== undefined) {
+      purchase.memoFile = body.memoFile;
+    }
+
     await purchase.save();
 
     return NextResponse.json({ 

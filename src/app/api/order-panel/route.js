@@ -963,6 +963,7 @@ export async function POST(req) {
       branchCode = body.branchCode || '';
     }
 
+    // ✅ FIXED: Process plantRows with ALL charge fields
     const processedPlantRows = (body.plantRows || []).map((row) => {
       const weight = num(row.weight);
       const rate = num(row.rate);
@@ -1000,7 +1001,12 @@ export async function POST(req) {
         status: row.status || "Open",
         rate: rate,
         locationRate: num(row.locationRate),
-        totalAmount: weight * rate
+        totalAmount: weight * rate,
+        // ✅ ADDED: Charge fields per plant row
+        collectionCharges: num(row.collectionCharges) || 0,
+        cancellationCharges: row.cancellationCharges || 'Nil',
+        loadingCharges: row.loadingCharges || 'Nil',
+        otherCharges: num(row.otherCharges) || 0
       };
     });
     
@@ -1016,7 +1022,7 @@ export async function POST(req) {
       }
     }
 
-    // Process packData with new pack type
+    // Process packData with all pack types
     const processPackData = (packData) => {
       const result = {
         PALLETIZATION: [],
@@ -1071,7 +1077,6 @@ export async function POST(req) {
         }));
       }
 
-      // NEW: Process NON-UNIFORM - GENERAL CARGO
       if (packData['NON-UNIFORM - GENERAL CARGO'] && Array.isArray(packData['NON-UNIFORM - GENERAL CARGO'])) {
         result['NON-UNIFORM - GENERAL CARGO'] = packData['NON-UNIFORM - GENERAL CARGO'].map(item => ({
           _id: new mongoose.Types.ObjectId(),
@@ -1201,6 +1206,7 @@ export async function PUT(req) {
     if (body.panelStatus) orderPanel.panelStatus = body.panelStatus;
 
     if (body.plantRows && Array.isArray(body.plantRows)) {
+      // ✅ FIXED: Update plantRows with ALL charge fields
       const processedPlantRows = body.plantRows.map((row) => {
         const weight = num(row.weight);
         const rate = num(row.rate);
@@ -1238,7 +1244,12 @@ export async function PUT(req) {
           status: row.status || "Open",
           rate: rate,
           locationRate: num(row.locationRate),
-          totalAmount: weight * rate
+          totalAmount: weight * rate,
+          // ✅ ADDED: Charge fields per plant row
+          collectionCharges: num(row.collectionCharges) || 0,
+          cancellationCharges: row.cancellationCharges || 'Nil',
+          loadingCharges: row.loadingCharges || 'Nil',
+          otherCharges: num(row.otherCharges) || 0
         };
       });
       
@@ -1247,7 +1258,7 @@ export async function PUT(req) {
       orderPanel.totalAmount = processedPlantRows.reduce((sum, row) => sum + row.totalAmount, 0);
     }
 
-    // Update packData with new pack type
+    // Update packData with all pack types
     if (body.packData) {
       orderPanel.packData = {
         PALLETIZATION: (body.packData.PALLETIZATION || []).map(item => ({
