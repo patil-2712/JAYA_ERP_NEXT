@@ -948,7 +948,22 @@ export default function CreateLoadingInfoPanel() {
   const [vehiclePhotoFiles, setVehiclePhotoFiles] = useState([]);
   const [detentionDays, setDetentionDays] = useState("");
   const [detentionNumber, setDetentionNumber] = useState("");
+  
+  /** =========================
+   * STATE FOR SLIP FILES
+   ========================= */
+  const [vehicleSlipFiles, setVehicleSlipFiles] = useState([]);
   const [loadedVehicleSlipFiles, setLoadedVehicleSlipFiles] = useState([]);
+  
+  /** =========================
+   * VL PHOTO DETAILS STATE (Height, Width, Nose)
+   ========================= */
+  const [vlPhotoDetails, setVlPhotoDetails] = useState({});
+
+  /** =========================
+   * VL FIELDS STATE - Initially 5 fields
+   ========================= */
+  const [vlFields, setVlFields] = useState([1, 2, 3, 4, 5]);
 
   /** =========================
    * EXISTING FILES STATE
@@ -968,6 +983,24 @@ export default function CreateLoadingInfoPanel() {
       weighSlip: []
     }
   });
+
+  const handleVehicleSlipSelect = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*,.pdf';
+    input.multiple = true;
+    
+    input.onchange = async (e) => {
+      const files = Array.from(e.target.files);
+      setVehicleSlipFiles(prev => [...prev, ...files]);
+    };
+    
+    input.click();
+  };
+
+  const removeVehicleSlip = (index) => {
+    setVehicleSlipFiles(prev => prev.filter((_, i) => i !== index));
+  };
 
   /** =========================
    * VEHICLE NEGOTIATION SEARCH STATE
@@ -1143,10 +1176,11 @@ export default function CreateLoadingInfoPanel() {
     approval: "",
   });
 
- const [vlUploads, setVlUploads] = useState({
-  approval: "",
-  loadingStatus: "Not Loaded",  // Change from "" to "Not Loaded"
-});
+  const [vlUploads, setVlUploads] = useState({
+    approval: "",
+    loadingStatus: "Not Loaded",
+  });
+  
   const [loadedWeighment, setLoadedWeighment] = useState({
     approval: "",
     loadingCharges: "",
@@ -1170,9 +1204,10 @@ export default function CreateLoadingInfoPanel() {
   const [arrivalDetails, setArrivalDetails] = useState({
     date: new Date().toISOString().split('T')[0],
     time: "",
+    outDate: "",
     outTime: "",
   });
-
+  
   /** =========================
    * CAMERA PHOTO CAPTURE STATE
    ========================= */
@@ -1412,7 +1447,6 @@ export default function CreateLoadingInfoPanel() {
       
       canvas.toBlob((blob) => {
         const now = new Date();
-        const timestamp = now.toLocaleString();
         const filename = `driver_photo_${now.getTime()}.jpg`;
         const file = new File([blob], filename, { type: 'image/jpeg' });
         
@@ -1421,11 +1455,11 @@ export default function CreateLoadingInfoPanel() {
           photo: [...prev.photo, file]
         }));
         
-        setArrivalDetails({
+        setArrivalDetails(prev => ({
+          ...prev,
           date: now.toISOString().split('T')[0],
           time: now.toLocaleTimeString(),
-          outTime: arrivalDetails.outTime,
-        });
+        }));
         
         alert(`✅ Driver photo captured successfully!\n📅 Date: ${now.toLocaleDateString()}\n⏰ Time: ${now.toLocaleTimeString()}`);
         
@@ -1435,7 +1469,7 @@ export default function CreateLoadingInfoPanel() {
   };
 
   /** =========================
-   * GENERATE LR FUNCTION - Auto-fills Out Time and Date
+   * GENERATE LR FUNCTION
    ========================= */
   const handleGenerateLR = () => {
     const now = new Date();
@@ -1444,7 +1478,7 @@ export default function CreateLoadingInfoPanel() {
     
     setArrivalDetails(prev => ({
       ...prev,
-      date: outDate,
+      outDate: outDate,
       outTime: outTime,
     }));
     
@@ -1454,75 +1488,129 @@ export default function CreateLoadingInfoPanel() {
   /** =========================
    * VEHICLE SELECT HANDLER
    ========================= */
-const handleVehicleSelect = async (vehicle) => {
-  setSelectedVehicle(vehicle);
-  
-  // Auto-fill vehicle information from Vehicle Master
-  setVehicleInfo(prev => ({
-    ...prev,
-    vehicleNo: vehicle.vehicleNumber || "",
-    vehicleOwnerName: "",
-    vehicleOwnerRC: "",
-    ownerPanCard: "",
-    vehicleType: vehicle.vehicleType || "",
-    vehicleWeight: vehicle.vehicleWeight?.toString() || "",
-    vehicleId: vehicle._id || "",
-    insuranceNumber: vehicle.insuranceNumber || "",
-    chasisNumber: vehicle.chasisNumber || "",
-    fitnessNumber: vehicle.fitnessNumber || "",
-    pucNumber: vehicle.pucNumber || "",
-    // DO NOT auto-fill driver fields - keep them as is
-    // driverName, driverMobileNo, drivingLicense remain unchanged
-  }));
+  const handleVehicleSelect = async (vehicle) => {
+    setSelectedVehicle(vehicle);
+    
+    setVehicleInfo(prev => ({
+      ...prev,
+      vehicleNo: vehicle.vehicleNumber || "",
+      vehicleOwnerName: "",
+      vehicleOwnerRC: "",
+      ownerPanCard: "",
+      vehicleType: vehicle.vehicleType || "",
+      vehicleWeight: vehicle.vehicleWeight?.toString() || "",
+      vehicleId: vehicle._id || "",
+      insuranceNumber: vehicle.insuranceNumber || "",
+      chasisNumber: vehicle.chasisNumber || "",
+      fitnessNumber: vehicle.fitnessNumber || "",
+      pucNumber: vehicle.pucNumber || "",
+    }));
 
-  // Search for owner by vehicle number from Owner Master (only for owner details, not driver)
-  if (vehicle.vehicleNumber) {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/owners?search=${encodeURIComponent(vehicle.vehicleNumber)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      
-      if (data.success && Array.isArray(data.data) && data.data.length > 0) {
-        const owner = data.data[0];
+    if (vehicle.vehicleNumber) {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`/api/owners?search=${encodeURIComponent(vehicle.vehicleNumber)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
         
-        // Only auto-fill OWNER details, NOT driver details
-        setVehicleInfo(prev => ({
-          ...prev,
-          vehicleOwnerName: owner.ownerName || "",
-          vehicleOwnerRC: owner.rcNumber || "",
-          ownerPanCard: owner.ownerPanCard || "",
-          // Message & Remarks - add owner info as reference but user can edit
-          message: `Vehicle Owner: ${owner.ownerName}\nContact: ${owner.mobileNumber1 || owner.mobileNumber2}\nRC Number: ${owner.rcNumber || ''}`,
-          remarks: `Pan Card: ${owner.ownerPanCard || 'N/A'}\nAdhar Card: ${owner.adharCardNumber || 'N/A'}`
-        }));
-        
-        // Set existing documents for owner
-        setExistingFiles(prev => ({
-          ...prev,
-          vehicle: {
-            ...prev.vehicle,
-            rc: owner.rcDocuments?.map(doc => ({ name: 'RC Document', path: doc })) || [],
-            pan: owner.panCardDocuments?.map(doc => ({ name: 'PAN Document', path: doc })) || [],
-          }
-        }));
-        
-        alert(`✅ Vehicle ${vehicle.vehicleNumber} loaded successfully!\nOwner: ${owner.ownerName}`);
-      } else {
+        if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+          const owner = data.data[0];
+          
+          setVehicleInfo(prev => ({
+            ...prev,
+            vehicleOwnerName: owner.ownerName || "",
+            vehicleOwnerRC: owner.rcNumber || "",
+            ownerPanCard: owner.ownerPanCard || "",
+            message: `Vehicle Owner: ${owner.ownerName}\nContact: ${owner.mobileNumber1 || owner.mobileNumber2}\nRC Number: ${owner.rcNumber || ''}`,
+            remarks: `Pan Card: ${owner.ownerPanCard || 'N/A'}\nAdhar Card: ${owner.adharCardNumber || 'N/A'}`
+          }));
+          
+          setExistingFiles(prev => ({
+            ...prev,
+            vehicle: {
+              ...prev.vehicle,
+              rc: owner.rcDocuments?.map(doc => ({ name: 'RC Document', path: doc })) || [],
+              pan: owner.panCardDocuments?.map(doc => ({ name: 'PAN Document', path: doc })) || [],
+            }
+          }));
+          
+          alert(`✅ Vehicle ${vehicle.vehicleNumber} loaded successfully!\nOwner: ${owner.ownerName}`);
+        } else {
+          alert(`✅ Vehicle ${vehicle.vehicleNumber} loaded successfully!`);
+        }
+      } catch (err) {
+        console.error("Error fetching owner:", err);
         alert(`✅ Vehicle ${vehicle.vehicleNumber} loaded successfully!`);
       }
-    } catch (err) {
-      console.error("Error fetching owner:", err);
-      alert(`✅ Vehicle ${vehicle.vehicleNumber} loaded successfully!`);
+    } else {
+      alert(`✅ Vehicle loaded successfully!`);
     }
-  } else {
-    alert(`✅ Vehicle loaded successfully!`);
-  }
-};
+  };
 
   const handleCreateVehicle = () => {
     router.push('/admin/vehicle2');
+  };
+
+  /** =========================
+   * VL FIELD FUNCTIONS
+   ========================= */
+  const handleAddMoreVlField = () => {
+    if (vlFields.length < 15) {
+      const nextNumber = vlFields.length + 1;
+      setVlFields([...vlFields, nextNumber]);
+      
+      if (!vlFiles[`vl${nextNumber}`]) {
+        setVlFiles(prev => ({
+          ...prev,
+          [`vl${nextNumber}`]: []
+        }));
+      }
+    } else {
+      alert("Maximum 15 VL fields allowed!");
+    }
+  };
+
+  const handleRemoveVlField = (fieldNum) => {
+    if (fieldNum <= 5) {
+      alert("Cannot remove first 5 VL fields (VL-1 to VL-5)");
+      return;
+    }
+    
+    const currentCount = vlFiles[`vl${fieldNum}`]?.length || 0;
+    if (currentCount > 0) {
+      if (!confirm(`Field VL-${fieldNum} has ${currentCount} photo(s). Removing this field will delete all its photos. Are you sure?`)) {
+        return;
+      }
+    }
+    
+    setVlFields(prev => prev.filter(num => num !== fieldNum));
+    
+    setVlFiles(prev => {
+      const newFiles = { ...prev };
+      delete newFiles[`vl${fieldNum}`];
+      return newFiles;
+    });
+    
+    setVlPhotoDetails(prev => {
+      const newDetails = { ...prev };
+      Object.keys(newDetails).forEach(key => {
+        if (key.startsWith(`vl${fieldNum}_`)) {
+          delete newDetails[key];
+        }
+      });
+      return newDetails;
+    });
+    
+    alert(`✅ VL-${fieldNum} field removed successfully`);
+  };
+
+  const getTotalVlPhotosCount = () => {
+    let total = 0;
+    for (let i = 1; i <= Math.max(...vlFields, 5); i++) {
+      total += vlFiles[`vl${i}`]?.length || 0;
+    }
+    return total;
   };
 
   /** =========================
@@ -1571,12 +1659,11 @@ const handleVehicleSelect = async (vehicle) => {
 
         if (fullNegotiation.approval) {
           const vehicleNumber = fullNegotiation.approval.vehicleNo || "";
-          const mobileNumber = fullNegotiation.approval.mobile || "";
           
           setVehicleInfo(prev => ({
             ...prev,
             vehicleNo: vehicleNumber,
-            driverMobileNo: mobileNumber,
+            driverMobileNo: fullNegotiation.approval.mobile || "",
             driverName: fullNegotiation.approval.driverName || prev.driverName,
             drivingLicense: fullNegotiation.approval.drivingLicense || prev.drivingLicense,
             vehicleWeight: fullNegotiation.approval.vehicleWeight?.toString() || "",
@@ -1631,7 +1718,6 @@ const handleVehicleSelect = async (vehicle) => {
           setOrderRows(newOrderRows);
         }
 
-        // Fetch pack data from selected order panels
         let mergedPackData = {
           PALLETIZATION: [],
           'UNIFORM - BAGS/BOXES': [],
@@ -1646,7 +1732,6 @@ const handleVehicleSelect = async (vehicle) => {
         if (selectedOrderPanels.length > 0) {
           for (const panel of selectedOrderPanels) {
             const orderPanelId = panel._id;
-            const orderPanelNo = panel.orderPanelNo;
             
             if (orderPanelId) {
               try {
@@ -2050,271 +2135,224 @@ const handleVehicleSelect = async (vehicle) => {
     }
   };
 
- const uploadAllFiles = async (token) => {
-  // Define uploadFile FIRST before using it
-  const uploadFile = async (file, section, field) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('section', section);
-    formData.append('field', field);
+  const uploadAllFiles = async (token) => {
+    const uploadFile = async (file, section, field) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('section', section);
+      formData.append('field', field);
 
-    try {
-      const response = await fetch('/api/upload/excel', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData,
-      });
+      try {
+        const response = await fetch('/api/upload/excel', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          body: formData,
+        });
 
-      if (!response.ok) {
-        const text = await response.text();
-        console.error(`Upload failed: ${response.status}`, text);
-        throw new Error(`Upload failed with status ${response.status}`);
+        if (!response.ok) {
+          const text = await response.text();
+          console.error(`Upload failed: ${response.status}`, text);
+          throw new Error(`Upload failed with status ${response.status}`);
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await response.json();
+          return data;
+        } else {
+          const text = await response.text();
+          console.error('Response is not JSON:', text.substring(0, 200));
+          throw new Error('Server returned non-JSON response');
+        }
+      } catch (error) {
+        console.error(`Error uploading ${section}/${field}:`, error);
+        throw error;
       }
+    };
 
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        const data = await response.json();
-        return data;
-      } else {
-        const text = await response.text();
-        console.error('Response is not JSON:', text.substring(0, 200));
-        throw new Error('Server returned non-JSON response');
-      }
-    } catch (error) {
-      console.error(`Error uploading ${section}/${field}:`, error);
-      throw error;
+    const uploadPromises = [];
+    const uploadedPaths = {
+      vehicle: {},
+      vbp: {},
+      vft: {},
+      vot: {},
+      vl: {},
+      weighment: {}
+    };
+
+    for (const file of vehiclePhotoFiles) {
+      uploadPromises.push(
+        uploadFile(file, 'vehicle', 'vehiclePhotos')
+          .then(data => {
+            if (data.success) {
+              if (!uploadedPaths.vehiclePhotos) uploadedPaths.vehiclePhotos = [];
+              uploadedPaths.vehiclePhotos.push(data.filePath);
+            }
+            return data;
+          })
+          .catch(error => {
+            console.error(`Failed to upload vehicle photo:`, error);
+            return null;
+          })
+      );
     }
-  };
 
-  const uploadPromises = [];
-  const uploadedPaths = {
-    vehicle: {},
-    vbp: {},
-    vft: {},
-    vot: {},
-    vl: {},
-    weighment: {}
-  };
+    for (const file of vehicleSlipFiles) {
+      uploadPromises.push(
+        uploadFile(file, 'weighment', 'vehicleSlip')
+          .then(data => {
+            if (data.success) {
+              if (!uploadedPaths.vehicleSlips) uploadedPaths.vehicleSlips = [];
+              uploadedPaths.vehicleSlips.push(data.filePath);
+            }
+            return data;
+          })
+          .catch(error => {
+            console.error(`Failed to upload vehicle slip:`, error);
+            return null;
+          })
+      );
+    }
 
-  // Upload vehicle photos
-  for (const file of vehiclePhotoFiles) {
-    uploadPromises.push(
-      uploadFile(file, 'vehicle', 'vehiclePhotos')
-        .then(data => {
-          if (data.success) {
-            if (!uploadedPaths.vehiclePhotos) uploadedPaths.vehiclePhotos = [];
-            uploadedPaths.vehiclePhotos.push(data.filePath);
-          }
-          return data;
-        })
-        .catch(error => {
-          console.error(`Failed to upload vehicle photo:`, error);
-          return null;
-        })
-    );
-  }
+    for (const file of loadedVehicleSlipFiles) {
+      uploadPromises.push(
+        uploadFile(file, 'weighment', 'loadedVehicleSlip')
+          .then(data => {
+            if (data.success) {
+              if (!uploadedPaths.loadedVehicleSlips) uploadedPaths.loadedVehicleSlips = [];
+              uploadedPaths.loadedVehicleSlips.push(data.filePath);
+            }
+            return data;
+          })
+          .catch(error => {
+            console.error(`Failed to upload loaded vehicle slip:`, error);
+            return null;
+          })
+      );
+    }
 
-  // Upload loaded vehicle slips
-  for (const file of loadedVehicleSlipFiles) {
-    uploadPromises.push(
-      uploadFile(file, 'weighment', 'loadedVehicleSlip')
-        .then(data => {
-          if (data.success) {
-            if (!uploadedPaths.loadedVehicleSlips) uploadedPaths.loadedVehicleSlips = [];
-            uploadedPaths.loadedVehicleSlips.push(data.filePath);
-          }
-          return data;
-        })
-        .catch(error => {
-          console.error(`Failed to upload loaded vehicle slip:`, error);
-          return null;
-        })
-    );
-  }
+    for (const [field, files] of Object.entries(helperInfo)) {
+      if (Array.isArray(files)) {
+        for (const file of files) {
+          uploadPromises.push(
+            uploadFile(file, 'helper', field)
+              .then(data => {
+                if (data.success) {
+                  if (!uploadedPaths.helper) uploadedPaths.helper = {};
+                  uploadedPaths.helper[field] = data.filePath;
+                }
+                return data;
+              })
+              .catch(error => {
+                console.error(`Failed to upload helper/${field}:`, error);
+                return null;
+              })
+          );
+        }
+      }
+    }
 
-  // Upload helper files
-  for (const [field, files] of Object.entries(helperInfo)) {
-    if (Array.isArray(files)) {
+    for (const [field, files] of Object.entries(vehicleFiles)) {
       for (const file of files) {
         uploadPromises.push(
-          uploadFile(file, 'helper', field)
+          uploadFile(file, 'vehicle', field)
             .then(data => {
-              if (data.success) {
-                if (!uploadedPaths.helper) uploadedPaths.helper = {};
-                uploadedPaths.helper[field] = data.filePath;
-              }
+              if (data.success) uploadedPaths.vehicle[field] = data.filePath;
               return data;
             })
             .catch(error => {
-              console.error(`Failed to upload helper/${field}:`, error);
+              console.error(`Failed to upload vehicle/${field}:`, error);
               return null;
             })
         );
       }
     }
-  }
 
-  // Upload vehicle files (RC, PAN, License, Photo, Aadhar)
-  for (const [field, files] of Object.entries(vehicleFiles)) {
-    for (const file of files) {
-      uploadPromises.push(
-        uploadFile(file, 'vehicle', field)
-          .then(data => {
-            if (data.success) uploadedPaths.vehicle[field] = data.filePath;
-            return data;
-          })
-          .catch(error => {
-            console.error(`Failed to upload vehicle/${field}:`, error);
-            return null;
-          })
-      );
-    }
-  }
-
-  // Upload VBP files
-  for (const [field, files] of Object.entries(vbpFiles)) {
-    for (const file of files) {
-      uploadPromises.push(
-        uploadFile(file, 'vbp', field)
-          .then(data => {
-            if (data.success) uploadedPaths.vbp[field] = data.filePath;
-            return data;
-          })
-          .catch(error => {
-            console.error(`Failed to upload vbp/${field}:`, error);
-            return null;
-          })
-      );
-    }
-  }
-
-  // Upload VFT files
-  for (const [field, files] of Object.entries(vftFiles)) {
-    for (const file of files) {
-      uploadPromises.push(
-        uploadFile(file, 'vft', field)
-          .then(data => {
-            if (data.success) uploadedPaths.vft[field] = data.filePath;
-            return data;
-          })
-          .catch(error => {
-            console.error(`Failed to upload vft/${field}:`, error);
-            return null;
-          })
-      );
-    }
-  }
-
-  // Upload VOT files
-  for (const [field, files] of Object.entries(votFiles)) {
-    for (const file of files) {
-      uploadPromises.push(
-        uploadFile(file, 'vot', field)
-          .then(data => {
-            if (data.success) uploadedPaths.vot[field] = data.filePath;
-            return data;
-          })
-          .catch(error => {
-            console.error(`Failed to upload vot/${field}:`, error);
-            return null;
-          })
-      );
-    }
-  }
-
-  // Upload VL files
-  for (const [field, files] of Object.entries(vlFiles)) {
-    for (const file of files) {
-      uploadPromises.push(
-        uploadFile(file, 'vl', field)
-          .then(data => {
-            if (data.success) uploadedPaths.vl[field] = data.filePath;
-            return data;
-          })
-          .catch(error => {
-            console.error(`Failed to upload vl/${field}:`, error);
-            return null;
-          })
-      );
-    }
-  }
-
-  // Upload weighment files
-  for (const [field, files] of Object.entries(weighmentFiles)) {
-    for (const file of files) {
-      uploadPromises.push(
-        uploadFile(file, 'weighment', field)
-          .then(data => {
-            if (data.success) uploadedPaths.weighment[field] = data.filePath;
-            return data;
-          })
-          .catch(error => {
-            console.error(`Failed to upload weighment/${field}:`, error);
-            return null;
-          })
-      );
-    }
-  }
-
-  await Promise.allSettled(uploadPromises);
-  console.log('Upload results completed');
-  return uploadedPaths;
-};
-
-  const getTotalVlPhotosCount = () => {
-    return vlFiles.vl1.length + vlFiles.vl2.length + vlFiles.vl3.length + 
-           vlFiles.vl4.length + vlFiles.vl5.length + vlFiles.vl6.length + 
-           vlFiles.vl7.length;
-  };
-
-  const handleAddMoreVlPhotos = () => {
-    const currentCounts = [
-      vlFiles.vl1.length,
-      vlFiles.vl2.length,
-      vlFiles.vl3.length,
-      vlFiles.vl4.length,
-      vlFiles.vl5.length,
-      vlFiles.vl6.length,
-      vlFiles.vl7.length
-    ];
-    
-    const totalPhotos = currentCounts.reduce((a, b) => a + b, 0);
-    
-    if (totalPhotos >= 25) {
-      alert("Maximum 25 photos already uploaded!");
-      return;
-    }
-    
-    for (let i = 0; i < currentCounts.length; i++) {
-      if (currentCounts[i] < 25 && totalPhotos < 25) {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.multiple = false;
-        
-        input.onchange = async (e) => {
-          const file = e.target.files[0];
-          if (!file) return;
-          
-          const newTotalPhotos = getTotalVlPhotosCount() + 1;
-          if (newTotalPhotos > 25) {
-            alert("Maximum 25 photos allowed! Cannot add more.");
-            return;
-          }
-          
-          const field = `vl${i + 1}`;
-          setVlFiles(prev => ({
-            ...prev,
-            [field]: [...prev[field], file]
-          }));
-        };
-        
-        input.click();
-        break;
+    for (const [field, files] of Object.entries(vbpFiles)) {
+      for (const file of files) {
+        uploadPromises.push(
+          uploadFile(file, 'vbp', field)
+            .then(data => {
+              if (data.success) uploadedPaths.vbp[field] = data.filePath;
+              return data;
+            })
+            .catch(error => {
+              console.error(`Failed to upload vbp/${field}:`, error);
+              return null;
+            })
+        );
       }
     }
+
+    for (const [field, files] of Object.entries(vftFiles)) {
+      for (const file of files) {
+        uploadPromises.push(
+          uploadFile(file, 'vft', field)
+            .then(data => {
+              if (data.success) uploadedPaths.vft[field] = data.filePath;
+              return data;
+            })
+            .catch(error => {
+              console.error(`Failed to upload vft/${field}:`, error);
+              return null;
+            })
+        );
+      }
+    }
+
+    for (const [field, files] of Object.entries(votFiles)) {
+      for (const file of files) {
+        uploadPromises.push(
+          uploadFile(file, 'vot', field)
+            .then(data => {
+              if (data.success) uploadedPaths.vot[field] = data.filePath;
+              return data;
+            })
+            .catch(error => {
+              console.error(`Failed to upload vot/${field}:`, error);
+              return null;
+            })
+        );
+      }
+    }
+
+    for (const [field, files] of Object.entries(vlFiles)) {
+      for (const file of files) {
+        uploadPromises.push(
+          uploadFile(file, 'vl', field)
+            .then(data => {
+              if (data.success) uploadedPaths.vl[field] = data.filePath;
+              return data;
+            })
+            .catch(error => {
+              console.error(`Failed to upload vl/${field}:`, error);
+              return null;
+            })
+        );
+      }
+    }
+
+    for (const [field, files] of Object.entries(weighmentFiles)) {
+      for (const file of files) {
+        uploadPromises.push(
+          uploadFile(file, 'weighment', field)
+            .then(data => {
+              if (data.success) uploadedPaths.weighment[field] = data.filePath;
+              return data;
+            })
+            .catch(error => {
+              console.error(`Failed to upload weighment/${field}:`, error);
+              return null;
+            })
+        );
+      }
+    }
+
+    await Promise.allSettled(uploadPromises);
+    console.log('Upload results completed');
+    return uploadedPaths;
   };
 
   const handleSave = async () => {
@@ -2397,7 +2435,9 @@ const handleVehicleSelect = async (vehicle) => {
         detentionDays: detentionDays,
         detentionNumber: detentionNumber,
         vehiclePhotos: uploadedPaths.vehiclePhotos || [],
+        vehicleSlips: uploadedPaths.vehicleSlips || [],
         loadedVehicleSlips: uploadedPaths.loadedVehicleSlips || [],
+        vlPhotoDetails: vlPhotoDetails,
         hasHelper: hasHelper,
         helperInfo: {
           name: helperInfo.name,
@@ -2543,7 +2583,10 @@ const handleVehicleSelect = async (vehicle) => {
     setVehiclePhotoFiles([]);
     setDetentionDays("");
     setDetentionNumber("");
+    setVehicleSlipFiles([]);
     setLoadedVehicleSlipFiles([]);
+    setVlFields([1, 2, 3, 4, 5]);
+    setVlPhotoDetails({});
     setHasHelper(false);
     setHelperInfo({
       name: "",
@@ -2657,7 +2700,7 @@ const handleVehicleSelect = async (vehicle) => {
       isTrackingActive: false,
     });
     
-    setArrivalDetails({ date: new Date().toISOString().split('T')[0], time: "", outTime: "" });
+    setArrivalDetails({ date: new Date().toISOString().split('T')[0], time: "", outDate: "", outTime: "" });
     
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
@@ -2798,6 +2841,34 @@ const handleVehicleSelect = async (vehicle) => {
 
       {/* Main Content */}
       <div className="mx-auto max-w-full p-4">
+        {/* Vehicle Slip Upload - Top section */}
+        <div className="mb-4">
+          <div className="bg-white p-4 rounded-xl border-2 border-dashed border-slate-300">
+            <label className="text-xs font-bold text-slate-600">Vehicle Slip</label>
+            <p className="text-xs text-slate-400 mb-1">Upload vehicle slip (Image/PDF)</p>
+            <button 
+              onClick={handleVehicleSlipSelect}
+              className="w-full rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 border border-slate-300 hover:bg-slate-200 transition flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              {vehicleSlipFiles.length > 0 ? `✓ ${vehicleSlipFiles.length} file(s)` : '+ Upload Vehicle Slip'}
+            </button>
+            <div className="mt-2">
+              {vehicleSlipFiles.map((file, idx) => (
+                <FileUploadItem 
+                  key={idx} 
+                  file={file} 
+                  index={idx}
+                  onRemove={removeVehicleSlip}
+                  label="Vehicle Slip"
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
         {/* Vehicle Arrival Information Card */}
         <Card title="Vehicle Arrival Information">
           <div className="grid grid-cols-12 gap-3">
@@ -2951,7 +3022,7 @@ const handleVehicleSelect = async (vehicle) => {
             </div>
 
             <div className="col-span-12 md:col-span-2">
-              <label className="text-xs font-bold text-slate-600">Owner Aadhar Card</label>
+              <label className="text-xs font-bold text-slate-600">Driving licence </label>
               <button 
                 onClick={() => handleFileSelect('vehicle', 'aadhar')}
                 className="mt-1 w-full rounded-lg bg-purple-50 px-3 py-2 text-xs font-bold text-purple-700 border border-purple-200 hover:bg-purple-100 transition flex items-center justify-center gap-2"
@@ -2971,43 +3042,6 @@ const handleVehicleSelect = async (vehicle) => {
                 />
               ))}
               <p className="text-xs text-slate-400 mt-1">Upload Owner's Aadhar Card (PDF/Image)</p>
-            </div>
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-slate-200">
-            <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-800">Driver Photo Capture</h3>
-                  <p className="text-xs text-slate-600 mt-1">Click to open camera and capture driver photo</p>
-                  <p className="text-xs text-green-600 mt-1">📸 Photo capture will auto-fill Arrival Date & Time</p>
-                </div>
-                <button
-                  onClick={startCamera}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition flex items-center gap-2"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  Open Camera
-                </button>
-              </div>
-              {vehicleFiles.photo.length > 0 && (
-                <div className="mt-3">
-                  <p className="text-xs font-bold text-slate-600 mb-2">Captured Photos:</p>
-                  {vehicleFiles.photo.map((file, idx) => (
-                    <FileUploadItem 
-                      key={idx} 
-                      file={file} 
-                      index={idx}
-                      onRemove={() => removeFile('vehicle', 'photo', idx)}
-                      label="Driver Photo"
-                      isCameraPhoto={true}
-                    />
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         </Card>
@@ -3376,44 +3410,41 @@ const handleVehicleSelect = async (vehicle) => {
                           <div className="text-xs text-slate-400 mt-1">Search by vehicle number or owner name</div>
                         </div>
 
-                        {/* Owner Search Dropdown */}
                         <div className="mt-3 pt-2 border-t border-slate-200">
                           <label className="text-xs font-bold text-slate-600">Or Search by Owner Name</label>
-                       <OwnerSearchDropdown
-  onSelect={(owner) => {
-    if (owner) {
-      setVehicleInfo(prev => ({
-        ...prev,
-        vehicleNo: owner.vehicleNumber || "",
-        vehicleOwnerName: owner.ownerName || "",
-        vehicleOwnerRC: owner.rcNumber || "",
-        ownerPanCard: owner.ownerPanCard || "",
-        // DO NOT auto-fill driver fields - keep existing or empty
-        // Message & Remarks - add owner info as reference
-        message: `Vehicle Owner: ${owner.ownerName}\nContact: ${owner.mobileNumber1 || owner.mobileNumber2}\nRC Number: ${owner.rcNumber || ''}`,
-        remarks: `Pan Card: ${owner.ownerPanCard || 'N/A'}\nAdhar Card: ${owner.adharCardNumber || 'N/A'}`
-      }));
-      
-      setSelectedVehicle({
-        _id: owner._id,
-        vehicleNumber: owner.vehicleNumber,
-        ownerName: owner.ownerName
-      });
-      
-      setExistingFiles(prev => ({
-        ...prev,
-        vehicle: {
-          ...prev.vehicle,
-          rc: owner.rcDocuments?.map(doc => ({ name: 'RC Document', path: doc })) || [],
-          pan: owner.panCardDocuments?.map(doc => ({ name: 'PAN Document', path: doc })) || [],
-        }
-      }));
-      
-      alert(`✅ Owner ${owner.ownerName} loaded!\nVehicle: ${owner.vehicleNumber}`);
-    }
-  }}
-  placeholder="Search by owner name, vehicle number, or RC number..."
-/>
+                          <OwnerSearchDropdown
+                            onSelect={(owner) => {
+                              if (owner) {
+                                setVehicleInfo(prev => ({
+                                  ...prev,
+                                  vehicleNo: owner.vehicleNumber || "",
+                                  vehicleOwnerName: owner.ownerName || "",
+                                  vehicleOwnerRC: owner.rcNumber || "",
+                                  ownerPanCard: owner.ownerPanCard || "",
+                                  message: `Vehicle Owner: ${owner.ownerName}\nContact: ${owner.mobileNumber1 || owner.mobileNumber2}\nRC Number: ${owner.rcNumber || ''}`,
+                                  remarks: `Pan Card: ${owner.ownerPanCard || 'N/A'}\nAdhar Card: ${owner.adharCardNumber || 'N/A'}`
+                                }));
+                                
+                                setSelectedVehicle({
+                                  _id: owner._id,
+                                  vehicleNumber: owner.vehicleNumber,
+                                  ownerName: owner.ownerName
+                                });
+                                
+                                setExistingFiles(prev => ({
+                                  ...prev,
+                                  vehicle: {
+                                    ...prev.vehicle,
+                                    rc: owner.rcDocuments?.map(doc => ({ name: 'RC Document', path: doc })) || [],
+                                    pan: owner.panCardDocuments?.map(doc => ({ name: 'PAN Document', path: doc })) || [],
+                                  }
+                                }));
+                                
+                                alert(`✅ Owner ${owner.ownerName} loaded!\nVehicle: ${owner.vehicleNumber}`);
+                              }
+                            }}
+                            placeholder="Search by owner name, vehicle number, or RC number..."
+                          />
                         </div>
 
                         <button
@@ -3658,91 +3689,90 @@ const handleVehicleSelect = async (vehicle) => {
                     </td>
 
                     {/* Driver Information Column */}
-                  <td className="border border-yellow-300 px-4 py-3 align-top">
-  <div className="space-y-3">
-    <div>
-      <label className="text-xs font-bold text-slate-600">Driver Name</label>
-      <input
-        type="text"
-        value={vehicleInfo.driverName}
-        onChange={(e) => setVehicleInfo({ ...vehicleInfo, driverName: e.target.value })}
-        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-        placeholder="Enter driver name"
-      />
-    </div>
+                    <td className="border border-yellow-300 px-4 py-3 align-top">
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-xs font-bold text-slate-600">Driver Name</label>
+                          <input
+                            type="text"
+                            value={vehicleInfo.driverName}
+                            onChange={(e) => setVehicleInfo({ ...vehicleInfo, driverName: e.target.value })}
+                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                            placeholder="Enter driver name"
+                          />
+                        </div>
 
-    <div>
-      <label className="text-xs font-bold text-slate-600">Driver Mobile No</label>
-      <input
-        type="text"
-        value={vehicleInfo.driverMobileNo}
-        onChange={(e) => setVehicleInfo({ ...vehicleInfo, driverMobileNo: e.target.value })}
-        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-        placeholder="Enter mobile number"
-      />
-    </div>
+                        <div>
+                          <label className="text-xs font-bold text-slate-600">Driver Mobile No</label>
+                          <input
+                            type="text"
+                            value={vehicleInfo.driverMobileNo}
+                            onChange={(e) => setVehicleInfo({ ...vehicleInfo, driverMobileNo: e.target.value })}
+                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                            placeholder="Enter mobile number"
+                          />
+                        </div>
 
-    <div>
-      <label className="text-xs font-bold text-slate-600">Driving License No</label>
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={vehicleInfo.drivingLicense}
-          onChange={(e) => setVehicleInfo({ ...vehicleInfo, drivingLicense: e.target.value })}
-          className="mt-1 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-          placeholder="License No"
-        />
-        <button 
-          onClick={() => handleFileSelect('vehicle', 'license')}
-          className="mt-1 rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 border border-blue-200 hover:bg-blue-100 whitespace-nowrap"
-        >
-          {vehicleFiles.license.length > 0 ? `✓ ${vehicleFiles.license.length}` : 'Select'}
-        </button>
-      </div>
-      {vehicleFiles.license.map((file, idx) => (
-        <FileUploadItem 
-          key={idx} 
-          file={file} 
-          index={idx}
-          onRemove={() => removeFile('vehicle', 'license', idx)}
-          label="License"
-        />
-      ))}
-    </div>
+                        <div>
+                          <label className="text-xs font-bold text-slate-600">Driving License No</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={vehicleInfo.drivingLicense}
+                              onChange={(e) => setVehicleInfo({ ...vehicleInfo, drivingLicense: e.target.value })}
+                              className="mt-1 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                              placeholder="License No"
+                            />
+                            <button 
+                              onClick={() => handleFileSelect('vehicle', 'license')}
+                              className="mt-1 rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 border border-blue-200 hover:bg-blue-100 whitespace-nowrap"
+                            >
+                              {vehicleFiles.license.length > 0 ? `✓ ${vehicleFiles.license.length}` : 'Select'}
+                            </button>
+                          </div>
+                          {vehicleFiles.license.map((file, idx) => (
+                            <FileUploadItem 
+                              key={idx} 
+                              file={file} 
+                              index={idx}
+                              onRemove={() => removeFile('vehicle', 'license', idx)}
+                              label="License"
+                            />
+                          ))}
+                        </div>
 
-    <div>
-      <label className="text-xs font-bold text-slate-600">Driver Photo</label>
-      <button 
-        onClick={() => handleFileSelect('vehicle', 'photo')}
-        className="mt-1 w-full rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 border border-blue-200 hover:bg-blue-100"
-      >
-        {vehicleFiles.photo.length > 0 ? `✓ ${vehicleFiles.photo.length} file(s)` : '+ Select Photo'}
-      </button>
-      {vehicleFiles.photo.map((file, idx) => (
-        <FileUploadItem 
-          key={idx} 
-          file={file} 
-          index={idx}
-          onRemove={() => removeFile('vehicle', 'photo', idx)}
-          label="Photo"
-        />
-      ))}
-    </div>
+                        <div>
+                          <label className="text-xs font-bold text-slate-600">Driver Photo</label>
+                          <button 
+                            onClick={() => handleFileSelect('vehicle', 'photo')}
+                            className="mt-1 w-full rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 border border-blue-200 hover:bg-blue-100"
+                          >
+                            {vehicleFiles.photo.length > 0 ? `✓ ${vehicleFiles.photo.length} file(s)` : '+ Select Photo'}
+                          </button>
+                          {vehicleFiles.photo.map((file, idx) => (
+                            <FileUploadItem 
+                              key={idx} 
+                              file={file} 
+                              index={idx}
+                              onRemove={() => removeFile('vehicle', 'photo', idx)}
+                              label="Photo"
+                            />
+                          ))}
+                        </div>
 
-    {/* Helper / Co-Driver section remains same */}
-    <div className="pt-3 border-t border-slate-200">
-      <label className="flex items-center gap-2 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={hasHelper}
-          onChange={(e) => setHasHelper(e.target.checked)}
-          className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-        />
-        <span className="text-xs font-bold text-slate-700">Helper / Co-Driver Available?</span>
-      </label>
-    </div>
+                        <div className="pt-3 border-t border-slate-200">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={hasHelper}
+                              onChange={(e) => setHasHelper(e.target.checked)}
+                              className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                            />
+                            <span className="text-xs font-bold text-slate-700">Helper / Co-Driver Available?</span>
+                          </label>
+                        </div>
 
-     {hasHelper && (
+                        {hasHelper && (
                           <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200 space-y-3">
                             <div className="flex items-center gap-2 mb-2">
                               <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3812,104 +3842,40 @@ const handleVehicleSelect = async (vehicle) => {
                             </div>
                           </div>
                         )}
-
-  </div>
-</td>
+                      </div>
+                    </td>
 
                     {/* Message & Remarks Column */}
-                   <td className="border border-yellow-300 px-4 py-3 align-top">
-  <div className="space-y-3">
-    <div>
-      <label className="text-xs font-bold text-slate-600">Message (Hindi/English)</label>
-      <textarea
-        value={vehicleInfo.message}
-        onChange={(e) => setVehicleInfo({ ...vehicleInfo, message: e.target.value })}
-        rows={3}
-        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-        placeholder="Enter message"
-      />
-    </div>
+                    <td className="border border-yellow-300 px-4 py-3 align-top">
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-xs font-bold text-slate-600">Message (Hindi/English)</label>
+                          <textarea
+                            value={vehicleInfo.message}
+                            onChange={(e) => setVehicleInfo({ ...vehicleInfo, message: e.target.value })}
+                            rows={3}
+                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                            placeholder="Enter message"
+                          />
+                        </div>
 
-    <div>
-      <label className="text-xs font-bold text-slate-600">Remarks</label>
-      <textarea
-        value={vehicleInfo.remarks}
-        onChange={(e) => setVehicleInfo({ ...vehicleInfo, remarks: e.target.value })}
-        rows={4}
-        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-        placeholder="Enter remarks"
-      />
-    </div>
-  </div>
-</td>
+                        <div>
+                          <label className="text-xs font-bold text-slate-600">Remarks</label>
+                          <textarea
+                            value={vehicleInfo.remarks}
+                            onChange={(e) => setVehicleInfo({ ...vehicleInfo, remarks: e.target.value })}
+                            rows={4}
+                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                            placeholder="Enter remarks"
+                          />
+                        </div>
+                      </div>
+                    </td>
                   </tr>
                 </tbody>
               </table>
             </div>
           </Card>
-        </div>
-
-        {/* Detention Information Card */}
-        <div className="mt-4">
-          <Card title="Detention Information">
-            <div className="grid grid-cols-12 gap-4">
-              <div className="col-span-12 md:col-span-6">
-                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
-                  <label className="text-xs font-bold text-orange-700">Detention Days</label>
-                  <input
-                    type="number"
-                    value={detentionDays}
-                    onChange={(e) => setDetentionDays(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-orange-200 bg-white px-3 py-2 text-sm outline-none focus:border-orange-500"
-                    placeholder="Enter number of detention days"
-                    min="0"
-                  />
-                  <p className="text-xs text-orange-600 mt-1">Number of days vehicle is detained</p>
-                </div>
-              </div>
-              <div className="col-span-12 md:col-span-6">
-                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
-                  <label className="text-xs font-bold text-orange-700">Detention Number / Reference</label>
-                  <input
-                    type="text"
-                    value={detentionNumber}
-                    onChange={(e) => setDetentionNumber(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-orange-200 bg-white px-3 py-2 text-sm outline-none focus:border-orange-500"
-                    placeholder="Enter detention reference number"
-                  />
-                  <p className="text-xs text-orange-600 mt-1">Reference number or ID for detention</p>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Loaded Vehicle Slip Upload */}
-        <div className="mt-4">
-          <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
-            <label className="text-xs font-bold text-indigo-700">Loaded Vehicle Slip</label>
-            <p className="text-xs text-slate-400 mb-1">Upload loaded vehicle slip (Image/PDF)</p>
-            <button 
-              onClick={handleLoadedVehicleSlipSelect}
-              className="w-full rounded-lg bg-indigo-100 px-3 py-2 text-xs font-bold text-indigo-700 border border-indigo-300 hover:bg-indigo-200 transition flex items-center justify-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-              {loadedVehicleSlipFiles.length > 0 ? `✓ ${loadedVehicleSlipFiles.length} file(s)` : '+ Upload Loaded Vehicle Slip'}
-            </button>
-            <div className="mt-2">
-              {loadedVehicleSlipFiles.map((file, idx) => (
-                <FileUploadItem 
-                  key={idx} 
-                  file={file} 
-                  index={idx}
-                  onRemove={removeLoadedVehicleSlip}
-                  label="Loaded Vehicle Slip"
-                />
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Pack Type Card */}
@@ -4104,17 +4070,20 @@ const handleVehicleSelect = async (vehicle) => {
                   <p className="text-xs text-slate-500 mt-1">
                     Minimum 5 photos required • Maximum 25 photos allowed • Current: {getTotalVlPhotosCount()} / 25
                   </p>
+                  <p className="text-xs text-blue-500 mt-1">
+                    Active Fields: {vlFields.length} • Max Fields: 15
+                  </p>
                 </div>
                 <div className="flex gap-2">
-                  {getTotalVlPhotosCount() < 25 && (
+                  {vlFields.length < 15 && getTotalVlPhotosCount() < 25 && (
                     <button
-                      onClick={handleAddMoreVlPhotos}
+                      onClick={handleAddMoreVlField}
                       className="rounded-lg bg-green-600 px-4 py-2 text-xs font-bold text-white hover:bg-green-700 transition flex items-center gap-1"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                       </svg>
-                      Add More Photo
+                      Add Field VL-{vlFields.length + 1}
                     </button>
                   )}
                   {getTotalVlPhotosCount() < 5 && (
@@ -4125,65 +4094,154 @@ const handleVehicleSelect = async (vehicle) => {
                 </div>
               </div>
               
-              <div className="grid grid-cols-8 gap-3">
-                {[1, 2, 3, 4, 5, 6, 7].map((num) => {
-                  const currentCount = vlFiles[`vl${num}`]?.length || 0;
+              <div className="grid grid-cols-12 gap-4">
+                {vlFields.map((fieldNum) => {
+                  const currentCount = vlFiles[`vl${fieldNum}`]?.length || 0;
                   const totalCount = getTotalVlPhotosCount();
                   const isMaxReached = totalCount >= 25;
                   const isDisabled = isMaxReached && currentCount === 0;
                   
                   return (
-                    <div key={num} className="col-span-1">
-                      <div className="text-xs font-bold text-slate-600 mb-1">VL - {num}</div>
-                      <button 
-                        onClick={() => handleFileSelect('vl', `vl${num}`)}
-                        disabled={isDisabled}
-                        className={`w-full rounded-lg px-2 py-3 text-xs font-bold border hover:bg-opacity-80 transition-all ${
-                          currentCount > 0 
-                            ? 'bg-green-50 text-green-700 border-green-200' 
+                    <div key={fieldNum} className="col-span-12 lg:col-span-6">
+                      <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="text-sm font-bold text-slate-800">
+                            VL(stack)-{fieldNum}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs px-2 py-1 rounded-full ${currentCount > 0 ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                              {currentCount} / 25 photos
+                            </span>
+                            {fieldNum > 5 && (
+                              <button
+                                onClick={() => handleRemoveVlField(fieldNum)}
+                                className="text-red-500 hover:text-red-700 p-1"
+                                title="Remove this field"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <button 
+                          onClick={() => handleFileSelect('vl', `vl${fieldNum}`)}
+                          disabled={isDisabled}
+                          className={`w-full rounded-lg py-2.5 text-sm font-bold border transition-all ${
+                            currentCount > 0 
+                              ? 'bg-green-50 text-green-700 border-green-300 hover:bg-green-100' 
+                              : isDisabled 
+                                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                                : 'bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100'
+                          }`}
+                          title={isDisabled ? "Maximum 25 photos reached" : `Upload VL(stack)-${fieldNum} photos`}
+                        >
+                          {currentCount > 0 
+                            ? `📸 + Add More Photos (${currentCount} uploaded)` 
                             : isDisabled 
-                              ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                              : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
-                        }`}
-                        title={isDisabled ? "Maximum 25 photos reached" : `Upload VL-${num} photos`}
-                      >
-                        {currentCount > 0 
-                          ? `✓ ${currentCount} file(s)` 
-                          : isDisabled 
-                            ? 'Max Reached' 
-                            : 'Select'}
-                      </button>
-                      <div className="mt-1 text-center">
-                        <span className={`text-xs ${currentCount > 0 ? 'text-green-600 font-medium' : 'text-slate-400'}`}>
-                          {currentCount} / 25
-                        </span>
+                              ? 'Max Reached' 
+                              : '+ Select Photos'}
+                        </button>
+
+                        {currentCount > 0 && (
+                          <div className="mt-2">
+                            <div className="w-full bg-slate-200 rounded-full h-1.5">
+                              <div 
+                                className="bg-green-500 h-1.5 rounded-full transition-all"
+                                style={{ width: `${(currentCount / 25) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {vlFiles[`vl${fieldNum}`] && vlFiles[`vl${fieldNum}`].length > 0 && (
+                          <div className="mt-3 space-y-2 max-h-96 overflow-y-auto">
+                            <div className="text-xs font-bold text-slate-600 mb-2">Uploaded Photos:</div>
+                            {vlFiles[`vl${fieldNum}`].map((file, fileIdx) => (
+                              <div key={fileIdx} className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                                <FileUploadItem 
+                                  file={file} 
+                                  index={fileIdx}
+                                  onRemove={() => removeFile('vl', `vl${fieldNum}`, fileIdx)}
+                                  label={`VL(stack)-${fieldNum}`}
+                                />
+                                
+                                <div className="grid grid-cols-3 gap-2 mt-2">
+                                  <div>
+                                    <label className="text-xs font-bold text-slate-600">Height (ft)</label>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={vlPhotoDetails[`vl${fieldNum}_${fileIdx}_height`] || ""}
+                                      onChange={(e) => setVlPhotoDetails(prev => ({
+                                        ...prev,
+                                        [`vl${fieldNum}_${fileIdx}_height`]: e.target.value
+                                      }))}
+                                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-emerald-500"
+                                      placeholder="Height in ft"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs font-bold text-slate-600">Width (ft)</label>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={vlPhotoDetails[`vl${fieldNum}_${fileIdx}_width`] || ""}
+                                      onChange={(e) => setVlPhotoDetails(prev => ({
+                                        ...prev,
+                                        [`vl${fieldNum}_${fileIdx}_width`]: e.target.value
+                                      }))}
+                                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-emerald-500"
+                                      placeholder="Width in ft"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs font-bold text-slate-600">Nose (ft)</label>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={vlPhotoDetails[`vl${fieldNum}_${fileIdx}_nose`] || ""}
+                                      onChange={(e) => setVlPhotoDetails(prev => ({
+                                        ...prev,
+                                        [`vl${fieldNum}_${fileIdx}_nose`]: e.target.value
+                                      }))}
+                                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-emerald-500"
+                                      placeholder="Nose in ft"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      {vlFiles[`vl${num}`] && vlFiles[`vl${num}`].map((file, idx) => (
-                        <FileUploadItem 
-                          key={idx} 
-                          file={file} 
-                          index={idx}
-                          onRemove={() => removeFile('vl', `vl${num}`, idx)}
-                          label={`VL-${num}`}
-                        />
-                      ))}
                     </div>
                   );
                 })}
-                <div className="col-span-1">
-                  <div className="text-xs font-bold text-slate-600 mb-1">Video - VL</div>
-                  <button 
-                    onClick={() => handleFileSelect('vl', 'videoVl', true)}
-                    className={`w-full rounded-lg px-2 py-3 text-xs font-bold border hover:bg-opacity-80 ${
-                      vlFiles.videoVl && vlFiles.videoVl.length > 0
-                        ? 'bg-green-50 text-green-700 border-green-200' 
-                        : 'bg-purple-50 text-purple-700 border-purple-200'
-                    }`}
-                  >
-                    {vlFiles.videoVl && vlFiles.videoVl.length > 0 
-                      ? `✓ ${vlFiles.videoVl.length} file(s)` 
-                      : 'Select'}
-                  </button>
+              </div>
+
+              <div className="mt-4">
+                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold text-purple-700 mb-1">Video - VL</div>
+                      <p className="text-xs text-slate-500">Upload video of vehicle loading (Optional)</p>
+                    </div>
+                    <button 
+                      onClick={() => handleFileSelect('vl', 'videoVl', true)}
+                      className={`rounded-lg px-4 py-2 text-xs font-bold border hover:bg-opacity-80 ${
+                        vlFiles.videoVl && vlFiles.videoVl.length > 0
+                          ? 'bg-green-50 text-green-700 border-green-300' 
+                          : 'bg-purple-100 text-purple-700 border-purple-300 hover:bg-purple-200'
+                      }`}
+                    >
+                      {vlFiles.videoVl && vlFiles.videoVl.length > 0 
+                        ? `✓ ${vlFiles.videoVl.length} video(s)` 
+                        : '+ Upload Video'}
+                    </button>
+                  </div>
                   {vlFiles.videoVl && vlFiles.videoVl.map((file, idx) => (
                     <FileUploadItem 
                       key={idx} 
@@ -4198,12 +4256,12 @@ const handleVehicleSelect = async (vehicle) => {
 
               <div className="mt-4">
                 <div className="flex justify-between text-xs text-slate-600 mb-1">
-                  <span>Upload Progress</span>
-                  <span>{getTotalVlPhotosCount()} / 25 photos</span>
+                  <span>Total Upload Progress</span>
+                  <span className="font-bold">{getTotalVlPhotosCount()} / 25 photos</span>
                 </div>
-                <div className="w-full bg-slate-200 rounded-full h-2">
+                <div className="w-full bg-slate-200 rounded-full h-2.5">
                   <div 
-                    className={`h-2 rounded-full transition-all duration-300 ${
+                    className={`h-2.5 rounded-full transition-all duration-300 ${
                       getTotalVlPhotosCount() >= 5 
                         ? 'bg-green-500' 
                         : 'bg-yellow-500'
@@ -4214,8 +4272,8 @@ const handleVehicleSelect = async (vehicle) => {
                   />
                 </div>
                 <div className="flex justify-between text-xs mt-1">
-                  <span className="text-red-500">Min: 5</span>
-                  <span className="text-green-500">Max: 25</span>
+                  <span className="text-red-500">⚠️ Minimum: 5 photos</span>
+                  <span className="text-green-500">✓ Maximum: 25 photos</span>
                 </div>
               </div>
 
@@ -4233,16 +4291,22 @@ const handleVehicleSelect = async (vehicle) => {
               </div>
               
               {getTotalVlPhotosCount() > 0 && getTotalVlPhotosCount() < 5 && (
-                <div className="mt-3 p-2 bg-red-50 rounded-lg border border-red-200">
-                  <p className="text-xs text-red-600">
+                <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                  <p className="text-xs text-red-600 flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
                     ⚠️ Please upload at least {5 - getTotalVlPhotosCount()} more photo(s). Minimum 5 photos required.
                   </p>
                 </div>
               )}
               
               {getTotalVlPhotosCount() >= 5 && (
-                <div className="mt-3 p-2 bg-green-50 rounded-lg border border-green-200">
-                  <p className="text-xs text-green-600">
+                <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                  <p className="text-xs text-green-600 flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
                     ✅ Great! You have uploaded {getTotalVlPhotosCount()} photo(s). Minimum requirement satisfied.
                   </p>
                 </div>
@@ -4354,6 +4418,20 @@ const handleVehicleSelect = async (vehicle) => {
                     </div>
                   </div>
                 </div>
+                <div className="mt-4">
+                  <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
+                    <label className="text-xs font-bold text-orange-700">Detention Days</label>
+                    <input
+                      type="number"
+                      value={detentionDays}
+                      onChange={(e) => setDetentionDays(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-orange-200 bg-white px-3 py-2 text-sm outline-none focus:border-orange-500"
+                      placeholder="Enter number of detention days"
+                      min="0"
+                    />
+                    <p className="text-xs text-orange-600 mt-1">Number of days vehicle is detained</p>
+                  </div>
+                </div>
               </div>
 
               <div className="col-span-12 md:col-span-6">
@@ -4426,101 +4504,144 @@ const handleVehicleSelect = async (vehicle) => {
                 </div>
               </div>
             </div>
-          </Card>
-        </div>
 
-        {/* Vehicle GPS Tracking Card */}
-        <div className="mt-4">
-          <Card title="Vehicle GPS Tracking">
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
+            {/* Arrival Details */}
+            <div className="mt-4">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <h3 className="text-sm font-bold text-slate-800 mb-3">Arrival Details</h3>
+                <div className="grid grid-cols-12 gap-4">
+                  <div className="col-span-12 md:col-span-3">
+                    <div className="bg-slate-50 p-3 rounded-lg">
+                      <label className="text-xs font-bold text-slate-600">Arrival Date</label>
+                      <input
+                        type="date"
+                        value={arrivalDetails.date}
+                        onChange={(e) => setArrivalDetails({ ...arrivalDetails, date: e.target.value })}
+                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                      />
+                      <p className="text-xs text-green-600 mt-1">Auto-filled from camera capture</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-800">Live Vehicle Tracking</h3>
-                    <p className="text-xs text-slate-600">Track vehicle location in real-time via API integration</p>
+                  <div className="col-span-12 md:col-span-3">
+                    <div className="bg-slate-50 p-3 rounded-lg">
+                      <label className="text-xs font-bold text-slate-600">Arrival Time</label>
+                      <input
+                        type="time"
+                        value={arrivalDetails.time}
+                        onChange={(e) => setArrivalDetails({ ...arrivalDetails, time: e.target.value })}
+                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                        placeholder="HH:MM"
+                      />
+                      <p className="text-xs text-green-600 mt-1">Auto-filled from camera capture</p>
+                    </div>
+                  </div>
+                  <div className="col-span-12 md:col-span-3">
+                    <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                      <label className="text-xs font-bold text-orange-700">Out Date</label>
+                      <input
+                        type="date"
+                        value={arrivalDetails.outDate || ""}
+                        onChange={(e) => setArrivalDetails({ ...arrivalDetails, outDate: e.target.value })}
+                        className="mt-1 w-full rounded-lg border border-orange-200 bg-white px-3 py-2 text-sm outline-none focus:border-orange-500"
+                      />
+                      <p className="text-xs text-orange-600 mt-1">Auto-filled when generating LR</p>
+                    </div>
+                  </div>
+                  <div className="col-span-12 md:col-span-3">
+                    <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                      <label className="text-xs font-bold text-orange-700">Out Time</label>
+                      <input
+                        type="time"
+                        value={arrivalDetails.outTime}
+                        onChange={(e) => setArrivalDetails({ ...arrivalDetails, outTime: e.target.value })}
+                        className="mt-1 w-full rounded-lg border border-orange-200 bg-white px-3 py-2 text-sm outline-none focus:border-orange-500"
+                        placeholder="HH:MM"
+                      />
+                      <p className="text-xs text-orange-600 mt-1">Auto-filled when generating LR</p>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="text"
-                    placeholder="Driver Mobile Number"
-                    value={gpsTracking.driverMobileNumber}
-                    onChange={(e) => setGpsTracking({ ...gpsTracking, driverMobileNumber: e.target.value })}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
-                  />
-                  <button 
-                    onClick={handleActivateTracking}
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
-                  >
-                    {gpsTracking.isTrackingActive ? 'Tracking Active' : 'Activate Tracking'}
-                  </button>
-                </div>
-              </div>
-              <div className="mt-3 text-xs text-slate-500">
-                <span className="font-bold">API Status:</span> {gpsTracking.isTrackingActive ? 'Active' : 'Ready'}
-                {gpsTracking.isTrackingActive && (
-                  <span className="ml-3 text-green-600">
-                    ✓ Tracking active for: {gpsTracking.driverMobileNumber}
-                  </span>
-                )}
               </div>
             </div>
           </Card>
         </div>
 
-        {/* Arrival Details Card */}
+        {/* Vehicle GPS Tracking Card */}
         <div className="mt-4">
-          <Card title="Arrival Details">
+          <Card title="Vehicle GPS Tracking & Driver Photo">
             <div className="grid grid-cols-12 gap-4">
-              <div className="col-span-12 md:col-span-3">
-                <div className="bg-slate-50 p-3 rounded-lg">
-                  <label className="text-xs font-bold text-slate-600">Arrival Date</label>
-                  <input
-                    type="date"
-                    value={arrivalDetails.date}
-                    onChange={(e) => setArrivalDetails({ ...arrivalDetails, date: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                  />
-                  <p className="text-xs text-green-600 mt-1">Auto-filled from camera capture</p>
+              <div className="col-span-12 md:col-span-6">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200 h-full">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-800">Live Vehicle Tracking</h3>
+                  </div>
+                  <p className="text-xs text-slate-600 mb-3">Track vehicle location in real-time via API integration</p>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="text"
+                      placeholder="Driver Mobile Number"
+                      value={gpsTracking.driverMobileNumber}
+                      onChange={(e) => setGpsTracking({ ...gpsTracking, driverMobileNumber: e.target.value })}
+                      className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    />
+                    <button 
+                      onClick={handleActivateTracking}
+                      className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 whitespace-nowrap"
+                    >
+                      {gpsTracking.isTrackingActive ? 'Tracking Active' : 'Activate Tracking'}
+                    </button>
+                  </div>
+                  <div className="mt-3 text-xs text-slate-500">
+                    <span className="font-bold">API Status:</span> {gpsTracking.isTrackingActive ? 'Active' : 'Ready'}
+                    {gpsTracking.isTrackingActive && (
+                      <span className="ml-3 text-green-600">
+                        ✓ Tracking active for: {gpsTracking.driverMobileNumber}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="col-span-12 md:col-span-3">
-                <div className="bg-slate-50 p-3 rounded-lg">
-                  <label className="text-xs font-bold text-slate-600">Arrival Time</label>
-                  <input
-                    type="time"
-                    value={arrivalDetails.time}
-                    onChange={(e) => setArrivalDetails({ ...arrivalDetails, time: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                    placeholder="HH:MM"
-                  />
-                  <p className="text-xs text-green-600 mt-1">Auto-filled from camera capture</p>
-                </div>
-              </div>
-              <div className="col-span-12 md:col-span-3">
-                <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
-                  <label className="text-xs font-bold text-orange-700">Out Time</label>
-                  <input
-                    type="time"
-                    value={arrivalDetails.outTime}
-                    onChange={(e) => setArrivalDetails({ ...arrivalDetails, outTime: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-orange-200 bg-white px-3 py-2 text-sm outline-none focus:border-orange-500"
-                    placeholder="HH:MM"
-                  />
-                  <p className="text-xs text-orange-600 mt-1">Auto-filled when generating LR</p>
-                </div>
-              </div>
-              <div className="col-span-12 md:col-span-3">
-                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                  <p className="text-xs text-blue-800">
-                    <span className="font-bold">Note:</span> JV need for making the payment in Driver or Motor Owner Account.
-                  </p>
+
+              <div className="col-span-12 md:col-span-6">
+                <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 h-full">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-800">Driver Photo Capture</h3>
+                      <p className="text-xs text-slate-600 mt-1">Click to open camera and capture driver photo</p>
+                      <p className="text-xs text-green-600 mt-1">📸 Photo capture will auto-fill Arrival Date & Time</p>
+                    </div>
+                    <button
+                      onClick={startCamera}
+                      className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      Open Camera
+                    </button>
+                  </div>
+                  {vehicleFiles.photo.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-xs font-bold text-slate-600 mb-2">Captured Photos:</p>
+                      {vehicleFiles.photo.map((file, idx) => (
+                        <FileUploadItem 
+                          key={idx} 
+                          file={file} 
+                          index={idx}
+                          onRemove={() => removeFile('vehicle', 'photo', idx)}
+                          label="Driver Photo"
+                          isCameraPhoto={true}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -4561,6 +4682,34 @@ const handleVehicleSelect = async (vehicle) => {
               </div>
             </div>
           </Card>
+        </div>
+
+        {/* Loaded Vehicle Slip Upload - Bottom section */}
+        <div className="mt-4">
+          <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
+            <label className="text-xs font-bold text-indigo-700">Loaded Vehicle Slip</label>
+            <p className="text-xs text-slate-400 mb-1">Upload loaded vehicle slip after loading (Image/PDF)</p>
+            <button 
+              onClick={handleLoadedVehicleSlipSelect}
+              className="w-full rounded-lg bg-indigo-100 px-3 py-2 text-xs font-bold text-indigo-700 border border-indigo-300 hover:bg-indigo-200 transition flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              {loadedVehicleSlipFiles.length > 0 ? `✓ ${loadedVehicleSlipFiles.length} file(s)` : '+ Upload Loaded Vehicle Slip'}
+            </button>
+            <div className="mt-2">
+              {loadedVehicleSlipFiles.map((file, idx) => (
+                <FileUploadItem 
+                  key={idx} 
+                  file={file} 
+                  index={idx}
+                  onRemove={removeLoadedVehicleSlip}
+                  label="Loaded Vehicle Slip"
+                />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

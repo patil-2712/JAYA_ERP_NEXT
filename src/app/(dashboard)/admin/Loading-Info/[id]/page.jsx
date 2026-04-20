@@ -1089,6 +1089,7 @@ export default function EditLoadingInfoPanel() {
   const [vehiclePhotoFiles, setVehiclePhotoFiles] = useState([]);
   const [detentionDays, setDetentionDays] = useState("");
   const [detentionNumber, setDetentionNumber] = useState("");
+  const [vehicleSlipFiles, setVehicleSlipFiles] = useState([]);
   const [loadedVehicleSlipFiles, setLoadedVehicleSlipFiles] = useState([]);
   const [hasHelper, setHasHelper] = useState(false);
   const [helperInfo, setHelperInfo] = useState({
@@ -1097,6 +1098,16 @@ export default function EditLoadingInfoPanel() {
     photo: [],
     aadharPhoto: []
   });
+  
+  /** =========================
+   * VL PHOTO DETAILS STATE (Height, Width, Nose)
+   ========================= */
+  const [vlPhotoDetails, setVlPhotoDetails] = useState({});
+
+  /** =========================
+   * VL FIELDS STATE - Initially 5 fields
+   ========================= */
+  const [vlFields, setVlFields] = useState([1, 2, 3, 4, 5]);
 
   /** =========================
    * EXISTING FILE PATHS (from database)
@@ -1116,8 +1127,9 @@ export default function EditLoadingInfoPanel() {
     weighment: {
       weighSlip: []
     },
-    loadedVehicleSlips: [],
-    vehiclePhotos: []
+    vehiclePhotos: [],
+    vehicleSlips: [],
+    loadedVehicleSlips: []
   });
 
   /** =========================
@@ -1159,11 +1171,12 @@ export default function EditLoadingInfoPanel() {
   });
 
   /** =========================
-   * ARRIVAL DETAILS
+   * ARRIVAL DETAILS with OUT DATE
    ========================= */
   const [arrivalDetails, setArrivalDetails] = useState({
     date: new Date().toISOString().split('T')[0],
     time: "",
+    outDate: "",
     outTime: "",
   });
 
@@ -1171,6 +1184,160 @@ export default function EditLoadingInfoPanel() {
    * READONLY MODE STATE
    ========================= */
   const [isReadOnly, setIsReadOnly] = useState(false);
+  
+  /** =========================
+   * CAMERA PHOTO CAPTURE STATE
+   ========================= */
+  const [showCamera, setShowCamera] = useState(false);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const [stream, setStream] = useState(null);
+
+  /** =========================
+   * ADD MORE VL FIELD FUNCTION
+   ========================= */
+  const handleAddMoreVlField = () => {
+    if (isReadOnly) return;
+    if (vlFields.length < 15) {
+      const nextNumber = vlFields.length + 1;
+      setVlFields([...vlFields, nextNumber]);
+      
+      if (!vlFiles[`vl${nextNumber}`]) {
+        setVlFiles(prev => ({
+          ...prev,
+          [`vl${nextNumber}`]: []
+        }));
+      }
+    } else {
+      alert("Maximum 15 VL fields allowed!");
+    }
+  };
+
+  /** =========================
+   * REMOVE VL FIELD FUNCTION
+   ========================= */
+  const handleRemoveVlField = (fieldNum) => {
+    if (isReadOnly) return;
+    if (fieldNum <= 5) {
+      alert("Cannot remove first 5 VL fields (VL-1 to VL-5)");
+      return;
+    }
+    
+    const currentCount = vlFiles[`vl${fieldNum}`]?.length || 0;
+    if (currentCount > 0) {
+      if (!confirm(`Field VL-${fieldNum} has ${currentCount} photo(s). Removing this field will delete all its photos. Are you sure?`)) {
+        return;
+      }
+    }
+    
+    setVlFields(prev => prev.filter(num => num !== fieldNum));
+    
+    setVlFiles(prev => {
+      const newFiles = { ...prev };
+      delete newFiles[`vl${fieldNum}`];
+      return newFiles;
+    });
+    
+    setVlPhotoDetails(prev => {
+      const newDetails = { ...prev };
+      Object.keys(newDetails).forEach(key => {
+        if (key.startsWith(`vl${fieldNum}_`)) {
+          delete newDetails[key];
+        }
+      });
+      return newDetails;
+    });
+    
+    alert(`✅ VL-${fieldNum} field removed successfully`);
+  };
+
+  /** =========================
+   * GET TOTAL VL PHOTOS COUNT
+   ========================= */
+  const getTotalVlPhotosCount = () => {
+    let total = 0;
+    for (let i = 1; i <= Math.max(...vlFields, 5); i++) {
+      total += vlFiles[`vl${i}`]?.length || 0;
+    }
+    return total;
+  };
+
+  /** =========================
+   * CAMERA FUNCTIONS
+   ========================= */
+  const startCamera = async () => {
+    if (isReadOnly) return;
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      setStream(mediaStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+      setShowCamera(true);
+    } catch (err) {
+      console.error("Error accessing camera:", err);
+      alert("Unable to access camera. Please check permissions.");
+    }
+  };
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    setShowCamera(false);
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      canvas.toBlob((blob) => {
+        const now = new Date();
+        const filename = `driver_photo_${now.getTime()}.jpg`;
+        const file = new File([blob], filename, { type: 'image/jpeg' });
+        
+        setVehicleFiles(prev => ({
+          ...prev,
+          photo: [...prev.photo, file]
+        }));
+        
+        setArrivalDetails(prev => ({
+          ...prev,
+          date: now.toISOString().split('T')[0],
+          time: now.toLocaleTimeString(),
+        }));
+        
+        alert(`✅ Driver photo captured successfully!\n📅 Date: ${now.toLocaleDateString()}\n⏰ Time: ${now.toLocaleTimeString()}`);
+        
+        stopCamera();
+      }, 'image/jpeg', 0.9);
+    }
+  };
+
+  /** =========================
+   * GENERATE LR FUNCTION
+   ========================= */
+  const handleGenerateLR = () => {
+    const now = new Date();
+    const outTime = now.toLocaleTimeString();
+    const outDate = now.toISOString().split('T')[0];
+    
+    setArrivalDetails(prev => ({
+      ...prev,
+      outDate: outDate,
+      outTime: outTime,
+    }));
+    
+    alert(`✅ Consignment Note (LR) Generated!\n📅 Out Date: ${outDate}\n⏰ Out Time: ${outTime}`);
+  };
 
   /** =========================
    * FETCH LOADING PANEL DATA
@@ -1302,6 +1469,55 @@ export default function EditLoadingInfoPanel() {
         }
       }
 
+      // Set detention info
+      if (panel.detentionDays) setDetentionDays(panel.detentionDays);
+      if (panel.detentionNumber) setDetentionNumber(panel.detentionNumber);
+      
+      // Set helper info
+      if (panel.hasHelper !== undefined) setHasHelper(panel.hasHelper);
+      if (panel.helperInfo) {
+        setHelperInfo({
+          name: panel.helperInfo.name || "",
+          mobileNo: panel.helperInfo.mobileNo || "",
+          photo: panel.helperInfo.photo || [],
+          aadharPhoto: panel.helperInfo.aadharPhoto || []
+        });
+      }
+      
+      // Set vehicle photos
+      if (panel.vehiclePhotos && panel.vehiclePhotos.length > 0) {
+        setExistingFiles(prev => ({
+          ...prev,
+          vehiclePhotos: panel.vehiclePhotos.map(path => ({ name: 'Vehicle Photo', path }))
+        }));
+      }
+      
+      // Set vehicle slips
+      if (panel.vehicleSlips && panel.vehicleSlips.length > 0) {
+        setExistingFiles(prev => ({
+          ...prev,
+          vehicleSlips: panel.vehicleSlips.map(path => ({ name: 'Vehicle Slip', path }))
+        }));
+      }
+      
+      // Set loaded vehicle slips
+      if (panel.loadedVehicleSlips && panel.loadedVehicleSlips.length > 0) {
+        setExistingFiles(prev => ({
+          ...prev,
+          loadedVehicleSlips: panel.loadedVehicleSlips.map(path => ({ name: 'Loaded Vehicle Slip', path }))
+        }));
+      }
+
+      // Set VL Photo Details
+      if (panel.vlPhotoDetails) {
+        setVlPhotoDetails(panel.vlPhotoDetails);
+      }
+
+      // Set VL Fields
+      if (panel.vlFields && panel.vlFields.length > 0) {
+        setVlFields(panel.vlFields);
+      }
+
       // Set pack data
       if (panel.packData) {
         const processedPackData = {
@@ -1365,46 +1581,6 @@ export default function EditLoadingInfoPanel() {
         }
       }
 
-      // Set deduction rows
-      if (panel.deductionRows && panel.deductionRows.length > 0) {
-        setDeductionRows(panel.deductionRows);
-      }
-      
-      if (panel.totalQuantity) {
-        setTotalQuantity(panel.totalQuantity);
-      }
-
-      // Set detention info
-      if (panel.detentionDays) setDetentionDays(panel.detentionDays);
-      if (panel.detentionNumber) setDetentionNumber(panel.detentionNumber);
-      
-      // Set helper info
-      if (panel.hasHelper !== undefined) setHasHelper(panel.hasHelper);
-      if (panel.helperInfo) {
-        setHelperInfo({
-          name: panel.helperInfo.name || "",
-          mobileNo: panel.helperInfo.mobileNo || "",
-          photo: panel.helperInfo.photo || [],
-          aadharPhoto: panel.helperInfo.aadharPhoto || []
-        });
-      }
-      
-      // Set vehicle photos
-      if (panel.vehiclePhotos && panel.vehiclePhotos.length > 0) {
-        setExistingFiles(prev => ({
-          ...prev,
-          vehiclePhotos: panel.vehiclePhotos.map(path => ({ name: 'Vehicle Photo', path }))
-        }));
-      }
-      
-      // Set loaded vehicle slips
-      if (panel.loadedVehicleSlips && panel.loadedVehicleSlips.length > 0) {
-        setExistingFiles(prev => ({
-          ...prev,
-          loadedVehicleSlips: panel.loadedVehicleSlips.map(path => ({ name: 'Loaded Vehicle Slip', path }))
-        }));
-      }
-
       // Set upload sections
       if (panel.vbpUploads) {
         setVbpUploads({
@@ -1456,11 +1632,15 @@ export default function EditLoadingInfoPanel() {
         });
         
         const vlExisting = {};
-        ['vl1','vl2','vl3','vl4','vl5','vl6','vl7','videoVl'].forEach(key => {
+        for (let i = 1; i <= 15; i++) {
+          const key = `vl${i}`;
           if (panel.vlUploads[key]) {
             vlExisting[key] = [{ name: `VL ${key}`, path: panel.vlUploads[key] }];
           }
-        });
+        }
+        if (panel.vlUploads.videoVl) {
+          vlExisting.videoVl = [{ name: 'Video VL', path: panel.vlUploads.videoVl }];
+        }
         setExistingFiles(prev => ({ ...prev, vl: vlExisting }));
       }
 
@@ -1495,6 +1675,7 @@ export default function EditLoadingInfoPanel() {
         setArrivalDetails({
           date: panel.arrivalDetails.date ? new Date(panel.arrivalDetails.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
           time: panel.arrivalDetails.time || "",
+          outDate: panel.arrivalDetails.outDate ? new Date(panel.arrivalDetails.outDate).toISOString().split('T')[0] : "",
           outTime: panel.arrivalDetails.outTime || "",
         });
       }
@@ -1629,6 +1810,33 @@ export default function EditLoadingInfoPanel() {
       }));
     } else {
       setVehiclePhotoFiles(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleVehicleSlipSelect = () => {
+    if (isReadOnly) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*,.pdf';
+    input.multiple = true;
+    
+    input.onchange = async (e) => {
+      const files = Array.from(e.target.files);
+      setVehicleSlipFiles(prev => [...prev, ...files]);
+    };
+    
+    input.click();
+  };
+
+  const removeVehicleSlip = (index, isExisting = false) => {
+    if (isReadOnly) return;
+    if (isExisting) {
+      setExistingFiles(prev => ({
+        ...prev,
+        vehicleSlips: prev.vehicleSlips.filter((_, i) => i !== index)
+      }));
+    } else {
+      setVehicleSlipFiles(prev => prev.filter((_, i) => i !== index));
     }
   };
 
@@ -2142,7 +2350,6 @@ export default function EditLoadingInfoPanel() {
     { key: "billingType", label: "Billing Type", options: BILLING_TYPES },
     { key: "noOfLoadingPoints", label: "No. of Loading Points", type: "number" },
     { key: "noOfDroppingPoint", label: "No. of Dropping Point", type: "number" },
-    
   ];
 
   /** =========================
@@ -2265,7 +2472,7 @@ export default function EditLoadingInfoPanel() {
   };
 
   /** =========================
-   * UPLOAD ALL FILES DURING SAVE
+   * UPLOAD ALL FILES DURING UPDATE
    ========================= */
   const uploadAllFiles = async (token) => {
     const uploadFile = async (file, section, field) => {
@@ -2314,6 +2521,7 @@ export default function EditLoadingInfoPanel() {
       weighment: {},
       helper: {},
       vehiclePhotos: [],
+      vehicleSlips: [],
       loadedVehicleSlips: []
     };
 
@@ -2329,6 +2537,23 @@ export default function EditLoadingInfoPanel() {
           })
           .catch(error => {
             console.error(`Failed to upload vehicle photo:`, error);
+            return null;
+          })
+      );
+    }
+
+    // Upload vehicle slips
+    for (const file of vehicleSlipFiles) {
+      uploadPromises.push(
+        uploadFile(file, 'weighment', 'vehicleSlip')
+          .then(data => {
+            if (data.success) {
+              uploadedPaths.vehicleSlips.push(data.filePath);
+            }
+            return data;
+          })
+          .catch(error => {
+            console.error(`Failed to upload vehicle slip:`, error);
             return null;
           })
       );
@@ -2498,6 +2723,12 @@ export default function EditLoadingInfoPanel() {
       return;
     }
 
+    const totalVlPhotos = getTotalVlPhotosCount();
+    if (totalVlPhotos < 5) {
+      alert(`Please upload at least 5 Vehicle Loading (VL) photos. Currently uploaded: ${totalVlPhotos}/5`);
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -2554,15 +2785,14 @@ export default function EditLoadingInfoPanel() {
 
       const finalVlUploads = {
         ...vlUploads,
-        vl1: existingFiles.vl?.vl1?.[0]?.path || uploadedPaths.vl.vl1 || '',
-        vl2: existingFiles.vl?.vl2?.[0]?.path || uploadedPaths.vl.vl2 || '',
-        vl3: existingFiles.vl?.vl3?.[0]?.path || uploadedPaths.vl.vl3 || '',
-        vl4: existingFiles.vl?.vl4?.[0]?.path || uploadedPaths.vl.vl4 || '',
-        vl5: existingFiles.vl?.vl5?.[0]?.path || uploadedPaths.vl.vl5 || '',
-        vl6: existingFiles.vl?.vl6?.[0]?.path || uploadedPaths.vl.vl6 || '',
-        vl7: existingFiles.vl?.vl7?.[0]?.path || uploadedPaths.vl.vl7 || '',
-        videoVl: existingFiles.vl?.videoVl?.[0]?.path || uploadedPaths.vl.videoVl || '',
       };
+      
+      // Add all vl fields up to 15
+      for (let i = 1; i <= 15; i++) {
+        const key = `vl${i}`;
+        finalVlUploads[key] = existingFiles.vl?.[key]?.[0]?.path || uploadedPaths.vl[key] || '';
+      }
+      finalVlUploads.videoVl = existingFiles.vl?.videoVl?.[0]?.path || uploadedPaths.vl.videoVl || '';
 
       const finalWeighment = {
         ...loadedWeighment,
@@ -2572,6 +2802,11 @@ export default function EditLoadingInfoPanel() {
       const finalVehiclePhotos = [
         ...(existingFiles.vehiclePhotos?.map(p => p.path) || []),
         ...(uploadedPaths.vehiclePhotos || [])
+      ];
+
+      const finalVehicleSlips = [
+        ...(existingFiles.vehicleSlips?.map(p => p.path) || []),
+        ...(uploadedPaths.vehicleSlips || [])
       ];
 
       const finalLoadedVehicleSlips = [
@@ -2617,6 +2852,7 @@ export default function EditLoadingInfoPanel() {
         detentionDays,
         detentionNumber,
         vehiclePhotos: finalVehiclePhotos,
+        vehicleSlips: finalVehicleSlips,
         loadedVehicleSlips: finalLoadedVehicleSlips,
         hasHelper,
         helperInfo: {
@@ -2624,7 +2860,9 @@ export default function EditLoadingInfoPanel() {
           mobileNo: helperInfo.mobileNo,
           photo: uploadedPaths.helper?.photo || helperInfo.photo,
           aadharPhoto: uploadedPaths.helper?.aadharPhoto || helperInfo.aadharPhoto
-        }
+        },
+        vlPhotoDetails,
+        vlFields
       };
 
       console.log("Updating loading panel:", payload);
@@ -2753,8 +2991,92 @@ export default function EditLoadingInfoPanel() {
         </div>
       </div>
 
+      {/* Camera Modal */}
+      {showCamera && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center">
+          <div className="bg-white rounded-2xl p-4 max-w-2xl w-full mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-slate-900">Capture Driver Photo</h3>
+              <button
+                onClick={stopCamera}
+                className="text-red-500 hover:text-red-700 p-2"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="relative">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                className="w-full rounded-lg bg-black"
+              />
+              <canvas ref={canvasRef} className="hidden" />
+            </div>
+            <div className="flex justify-center gap-4 mt-4">
+              <button
+                onClick={capturePhoto}
+                className="rounded-full bg-blue-600 px-6 py-3 text-white font-bold hover:bg-blue-700"
+              >
+                Capture Photo
+              </button>
+              <button
+                onClick={stopCamera}
+                className="rounded-full bg-gray-500 px-6 py-3 text-white font-bold hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <div className="mx-auto max-w-full p-4">
+        {/* Vehicle Slip Upload - Top section */}
+        <div className="mb-4">
+          <div className="bg-white p-4 rounded-xl border-2 border-dashed border-slate-300">
+            <label className="text-xs font-bold text-slate-600">Vehicle Slip</label>
+            <p className="text-xs text-slate-400 mb-1">Upload vehicle slip (Image/PDF)</p>
+            {!isReadOnly && (
+              <button 
+                onClick={handleVehicleSlipSelect}
+                className="w-full rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 border border-slate-300 hover:bg-slate-200 transition flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                {vehicleSlipFiles.length > 0 ? `✓ ${vehicleSlipFiles.length} new` : '+ Upload Vehicle Slip'}
+              </button>
+            )}
+            <div className="mt-2">
+              {existingFiles.vehicleSlips?.map((file, idx) => (
+                <FileUploadItem 
+                  key={`existing-vehicleSlip-${idx}`}
+                  file={file}
+                  index={idx}
+                  onRemove={() => removeVehicleSlip(idx, true)}
+                  label="Vehicle Slip"
+                  isExisting={true}
+                  readOnly={isReadOnly}
+                />
+              ))}
+              {vehicleSlipFiles.map((file, idx) => (
+                <FileUploadItem 
+                  key={`new-vehicleSlip-${idx}`}
+                  file={file}
+                  index={idx}
+                  onRemove={() => removeVehicleSlip(idx)}
+                  label="Vehicle Slip"
+                  readOnly={isReadOnly}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
         {/* Vehicle Arrival Information Card */}
         <Card title="Vehicle Arrival Information">
           <div className="grid grid-cols-12 gap-3">
@@ -2949,9 +3271,11 @@ export default function EditLoadingInfoPanel() {
               <p className="text-xs text-slate-400 mt-1">Upload Owner's Aadhar Card (PDF/Image)</p>
             </div>
           </div>
+
+         
         </Card>
 
-        {/* Billing Type / Charges Card - Fixed with all 7 columns */}
+        {/* Billing Type / Charges Card */}
         <div className="mt-4">
           <Card title="Billing Type / Charges">
             <div className="overflow-auto rounded-xl border border-yellow-300">
@@ -3017,7 +3341,7 @@ export default function EditLoadingInfoPanel() {
           </Card>
         </div>
 
-        {/* Order Details Card - Made Scrollable */}
+        {/* Order Details Card */}
         <div className="mt-4">
           <Card 
             title="Order Details"
@@ -3277,8 +3601,6 @@ export default function EditLoadingInfoPanel() {
           </Card>
         </div>
 
-    
-
         {/* Vehicle & Driver Details */}
         <div className="mt-4">
           <Card title="Vehicle & Driver Details">
@@ -3531,20 +3853,6 @@ export default function EditLoadingInfoPanel() {
                           />
                         </div>
 
-                        <div>
-                          <label className="text-xs font-bold text-slate-600">Owner Aadhar Card</label>
-                          <input
-                            type="text"
-                            value={vehicleInfo.ownerAadharCard}
-                            onChange={(e) => !isReadOnly && setVehicleInfo({ ...vehicleInfo, ownerAadharCard: e.target.value })}
-                            readOnly={isReadOnly}
-                            className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                              isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                            }`}
-                            placeholder="Enter Aadhar number"
-                          />
-                        </div>
-
                         <div className="grid grid-cols-3 gap-2">
                           <div>
                             <label className="text-xs font-bold text-slate-600">Owner RC Doc</label>
@@ -3778,6 +4086,7 @@ export default function EditLoadingInfoPanel() {
                               type="checkbox"
                               checked={hasHelper}
                               onChange={(e) => !isReadOnly && setHasHelper(e.target.checked)}
+                              disabled={isReadOnly}
                               className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                             />
                             <span className="text-xs font-bold text-slate-700">Helper / Co-Driver Available?</span>
@@ -3908,88 +4217,7 @@ export default function EditLoadingInfoPanel() {
           </Card>
         </div>
 
-        {/* Detention Information Card */}
-        <div className="mt-4">
-          <Card title="Detention Information">
-            <div className="grid grid-cols-12 gap-4">
-              <div className="col-span-12 md:col-span-6">
-                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
-                  <label className="text-xs font-bold text-orange-700">Detention Days</label>
-                  <input
-                    type="number"
-                    value={detentionDays}
-                    onChange={(e) => !isReadOnly && setDetentionDays(e.target.value)}
-                    readOnly={isReadOnly}
-                    className={`mt-1 w-full rounded-lg border border-orange-200 px-3 py-2 text-sm outline-none ${
-                      isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                    }`}
-                    placeholder="Enter number of detention days"
-                    min="0"
-                  />
-                  <p className="text-xs text-orange-600 mt-1">Number of days vehicle is detained</p>
-                </div>
-              </div>
-              <div className="col-span-12 md:col-span-6">
-                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
-                  <label className="text-xs font-bold text-orange-700">Detention Number / Reference</label>
-                  <input
-                    type="text"
-                    value={detentionNumber}
-                    onChange={(e) => !isReadOnly && setDetentionNumber(e.target.value)}
-                    readOnly={isReadOnly}
-                    className={`mt-1 w-full rounded-lg border border-orange-200 px-3 py-2 text-sm outline-none ${
-                      isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                    }`}
-                    placeholder="Enter detention reference number"
-                  />
-                  <p className="text-xs text-orange-600 mt-1">Reference number or ID for detention</p>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Loaded Vehicle Slip Upload */}
-        <div className="mt-4">
-          <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
-            <label className="text-xs font-bold text-indigo-700">Loaded Vehicle Slip</label>
-            <p className="text-xs text-slate-400 mb-1">Upload loaded vehicle slip (Image/PDF)</p>
-            {!isReadOnly && (
-              <button 
-                onClick={handleLoadedVehicleSlipSelect}
-                className="w-full rounded-lg bg-indigo-100 px-3 py-2 text-xs font-bold text-indigo-700 border border-indigo-300 hover:bg-indigo-200 transition flex items-center justify-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                {loadedVehicleSlipFiles.length > 0 ? `✓ ${loadedVehicleSlipFiles.length} file(s)` : '+ Upload Loaded Vehicle Slip'}
-              </button>
-            )}
-            <div className="mt-2">
-              {existingFiles.loadedVehicleSlips?.map((file, idx) => (
-                <FileUploadItem 
-                  key={`existing-loadedSlip-${idx}`}
-                  file={file}
-                  index={idx}
-                  onRemove={() => removeLoadedVehicleSlip(idx, true)}
-                  label="Loaded Vehicle Slip"
-                  isExisting={true}
-                  readOnly={isReadOnly}
-                />
-              ))}
-              {loadedVehicleSlipFiles.map((file, idx) => (
-                <FileUploadItem 
-                  key={`new-loadedSlip-${idx}`}
-                  file={file}
-                  index={idx}
-                  onRemove={() => removeLoadedVehicleSlip(idx)}
-                  label="Loaded Vehicle Slip"
-                  readOnly={isReadOnly}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
+       
 
         {/* Pack Type Section */}
         <div className="mt-4">
@@ -4390,75 +4618,220 @@ export default function EditLoadingInfoPanel() {
           </Card>
         </div>
 
-        {/* VL Panel */}
+        {/* VL Panel with Dynamic Fields */}
         <div className="mt-4">
           <Card title="VL - PANEL (Vehicle Loading Pictures)">
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-              <div className="grid grid-cols-8 gap-3">
-                {[1,2,3,4,5,6,7].map((num) => (
-                  <div key={num} className="col-span-1">
-                    <div className="text-xs font-bold text-slate-600 mb-1">VL - {num}</div>
-                    {!isReadOnly && (
-                      <button 
-                        onClick={() => handleFileSelect('vl', `vl${num}`)}
-                        className={`w-full rounded-lg px-2 py-3 text-xs font-bold border hover:bg-opacity-80 ${
-                          vlFiles[`vl${num}`] && vlFiles[`vl${num}`].length > 0
-                            ? 'bg-green-50 text-green-700 border-green-200' 
-                            : existingFiles.vl?.[`vl${num}`]?.length > 0
-                              ? 'bg-blue-50 text-blue-700 border-blue-200'
-                              : 'bg-gray-50 text-gray-700 border-gray-200'
-                        }`}
-                      >
-                        {vlFiles[`vl${num}`] && vlFiles[`vl${num}`].length > 0 
-                          ? `✓ ${vlFiles[`vl${num}`].length} new` 
-                          : existingFiles.vl?.[`vl${num}`]?.length > 0
-                            ? '✓ Existing'
-                            : 'Select'}
-                      </button>
-                    )}
-                    {existingFiles.vl?.[`vl${num}`]?.map((file, idx) => (
-                      <FileUploadItem 
-                        key={`existing-vl${num}-${idx}`}
-                        file={file}
-                        index={idx}
-                        onRemove={() => removeFile('vl', `vl${num}`, idx, true)}
-                        label={`VL-${num}`}
-                        isExisting={true}
-                        readOnly={isReadOnly}
-                      />
-                    ))}
-                    {vlFiles[`vl${num}`] && vlFiles[`vl${num}`].map((file, idx) => (
-                      <FileUploadItem 
-                        key={`new-vl${num}-${idx}`}
-                        file={file}
-                        index={idx}
-                        onRemove={() => removeFile('vl', `vl${num}`, idx)}
-                        label={`VL-${num}`}
-                        readOnly={isReadOnly}
-                      />
-                    ))}
-                  </div>
-                ))}
-                <div className="col-span-1">
-                  <div className="text-xs font-bold text-slate-600 mb-1">Video - VL</div>
-                  {!isReadOnly && (
-                    <button 
-                      onClick={() => handleFileSelect('vl', 'videoVl', true)}
-                      className={`w-full rounded-lg px-2 py-3 text-xs font-bold border hover:bg-opacity-80 ${
-                        vlFiles.videoVl && vlFiles.videoVl.length > 0
-                          ? 'bg-green-50 text-green-700 border-green-200' 
-                          : existingFiles.vl?.videoVl?.length > 0
-                            ? 'bg-blue-50 text-blue-700 border-blue-200'
-                            : 'bg-purple-50 text-purple-700 border-purple-200'
-                      }`}
+              <div className="mb-3 flex justify-between items-center">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Vehicle Loading Pictures (VL)</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Minimum 5 photos required • Maximum 25 photos allowed • Current: {getTotalVlPhotosCount()} / 25
+                  </p>
+                  <p className="text-xs text-blue-500 mt-1">
+                    Active Fields: {vlFields.length} • Max Fields: 15
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  {!isReadOnly && vlFields.length < 15 && getTotalVlPhotosCount() < 25 && (
+                    <button
+                      onClick={handleAddMoreVlField}
+                      className="rounded-lg bg-green-600 px-4 py-2 text-xs font-bold text-white hover:bg-green-700 transition flex items-center gap-1"
                     >
-                      {vlFiles.videoVl && vlFiles.videoVl.length > 0 
-                        ? `✓ ${vlFiles.videoVl.length} new` 
-                        : existingFiles.vl?.videoVl?.length > 0
-                          ? '✓ Existing'
-                          : 'Select'}
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add Field VL-{vlFields.length + 1}
                     </button>
                   )}
+                  {getTotalVlPhotosCount() < 5 && (
+                    <div className="text-xs text-red-500 font-medium flex items-center">
+                      ⚠️ Need {5 - getTotalVlPhotosCount()} more photo(s)
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-12 gap-4">
+                {vlFields.map((fieldNum) => {
+                  const currentCount = vlFiles[`vl${fieldNum}`]?.length || 0;
+                  const totalCount = getTotalVlPhotosCount();
+                  const isMaxReached = totalCount >= 25;
+                  const isDisabled = isMaxReached && currentCount === 0;
+                  
+                  return (
+                    <div key={fieldNum} className="col-span-12 lg:col-span-6">
+                      <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="text-sm font-bold text-slate-800">
+                            VL(stack)-{fieldNum}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs px-2 py-1 rounded-full ${currentCount > 0 ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                              {currentCount} / 25 photos
+                            </span>
+                            {!isReadOnly && fieldNum > 5 && (
+                              <button
+                                onClick={() => handleRemoveVlField(fieldNum)}
+                                className="text-red-500 hover:text-red-700 p-1"
+                                title="Remove this field"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <button 
+                          onClick={() => handleFileSelect('vl', `vl${fieldNum}`)}
+                          disabled={isDisabled || isReadOnly}
+                          className={`w-full rounded-lg py-2.5 text-sm font-bold border transition-all ${
+                            currentCount > 0 
+                              ? 'bg-green-50 text-green-700 border-green-300 hover:bg-green-100' 
+                              : isDisabled 
+                                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                                : isReadOnly
+                                  ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed'
+                                  : 'bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100'
+                          }`}
+                          title={isDisabled ? "Maximum 25 photos reached" : `Upload VL(stack)-${fieldNum} photos`}
+                        >
+                          {currentCount > 0 
+                            ? `📸 + Add More Photos (${currentCount} uploaded)` 
+                            : isDisabled 
+                              ? 'Max Reached' 
+                              : '+ Select Photos'}
+                        </button>
+
+                        {currentCount > 0 && (
+                          <div className="mt-2">
+                            <div className="w-full bg-slate-200 rounded-full h-1.5">
+                              <div 
+                                className="bg-green-500 h-1.5 rounded-full transition-all"
+                                style={{ width: `${(currentCount / 25) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {vlFiles[`vl${fieldNum}`] && vlFiles[`vl${fieldNum}`].length > 0 && (
+                          <div className="mt-3 space-y-2 max-h-96 overflow-y-auto">
+                            <div className="text-xs font-bold text-slate-600 mb-2">Uploaded Photos:</div>
+                            {vlFiles[`vl${fieldNum}`].map((file, fileIdx) => (
+                              <div key={fileIdx} className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                                <FileUploadItem 
+                                  file={file} 
+                                  index={fileIdx}
+                                  onRemove={() => removeFile('vl', `vl${fieldNum}`, fileIdx)}
+                                  label={`VL(stack)-${fieldNum}`}
+                                  readOnly={isReadOnly}
+                                />
+                                
+                                <div className="grid grid-cols-3 gap-2 mt-2">
+                                  <div>
+                                    <label className="text-xs font-bold text-slate-600">Height (ft)</label>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={vlPhotoDetails[`vl${fieldNum}_${fileIdx}_height`] || ""}
+                                      onChange={(e) => !isReadOnly && setVlPhotoDetails(prev => ({
+                                        ...prev,
+                                        [`vl${fieldNum}_${fileIdx}_height`]: e.target.value
+                                      }))}
+                                      readOnly={isReadOnly}
+                                      className={`mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-emerald-500 ${
+                                        isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                                      }`}
+                                      placeholder="Height in ft"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs font-bold text-slate-600">Width (ft)</label>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={vlPhotoDetails[`vl${fieldNum}_${fileIdx}_width`] || ""}
+                                      onChange={(e) => !isReadOnly && setVlPhotoDetails(prev => ({
+                                        ...prev,
+                                        [`vl${fieldNum}_${fileIdx}_width`]: e.target.value
+                                      }))}
+                                      readOnly={isReadOnly}
+                                      className={`mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-emerald-500 ${
+                                        isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                                      }`}
+                                      placeholder="Width in ft"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs font-bold text-slate-600">Nose (ft)</label>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={vlPhotoDetails[`vl${fieldNum}_${fileIdx}_nose`] || ""}
+                                      onChange={(e) => !isReadOnly && setVlPhotoDetails(prev => ({
+                                        ...prev,
+                                        [`vl${fieldNum}_${fileIdx}_nose`]: e.target.value
+                                      }))}
+                                      readOnly={isReadOnly}
+                                      className={`mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-emerald-500 ${
+                                        isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                                      }`}
+                                      placeholder="Nose in ft"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {/* Existing files for this VL field */}
+                        {existingFiles.vl?.[`vl${fieldNum}`]?.map((file, idx) => (
+                          <div key={`existing-vl-${fieldNum}-${idx}`} className="mt-2">
+                            <FileUploadItem 
+                              file={file}
+                              index={idx}
+                              onRemove={() => removeFile('vl', `vl${fieldNum}`, idx, true)}
+                              label={`VL(stack)-${fieldNum}`}
+                              isExisting={true}
+                              readOnly={isReadOnly}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4">
+                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold text-purple-700 mb-1">Video - VL</div>
+                      <p className="text-xs text-slate-500">Upload video of vehicle loading (Optional)</p>
+                    </div>
+                    {!isReadOnly && (
+                      <button 
+                        onClick={() => handleFileSelect('vl', 'videoVl', true)}
+                        className={`rounded-lg px-4 py-2 text-xs font-bold border hover:bg-opacity-80 ${
+                          vlFiles.videoVl && vlFiles.videoVl.length > 0
+                            ? 'bg-green-50 text-green-700 border-green-300' 
+                            : existingFiles.vl?.videoVl?.length > 0
+                              ? 'bg-blue-50 text-blue-700 border-blue-300'
+                              : 'bg-purple-100 text-purple-700 border-purple-300 hover:bg-purple-200'
+                        }`}
+                      >
+                        {vlFiles.videoVl && vlFiles.videoVl.length > 0 
+                          ? `✓ ${vlFiles.videoVl.length} new` 
+                          : existingFiles.vl?.videoVl?.length > 0
+                            ? '✓ Existing'
+                            : '+ Upload Video'}
+                      </button>
+                    )}
+                  </div>
                   {existingFiles.vl?.videoVl?.map((file, idx) => (
                     <FileUploadItem 
                       key={`existing-videoVl-${idx}`}
@@ -4483,6 +4856,8 @@ export default function EditLoadingInfoPanel() {
                 </div>
               </div>
 
+         
+
               <div className="mt-4 flex items-center gap-3">
                 <span className="text-xs font-bold text-slate-600">Vehicle - Loading Approval:</span>
                 <select
@@ -4496,6 +4871,7 @@ export default function EditLoadingInfoPanel() {
                   <option value="">Select</option>
                   <option value="Approved">Approved</option>
                   <option value="Rejected">Rejected</option>
+                  <option value="Pending">Pending</option>
                 </select>
               </div>
               <div className="mt-2 flex items-center gap-3">
@@ -4513,6 +4889,28 @@ export default function EditLoadingInfoPanel() {
                   <option value="Loaded">Loaded</option>
                 </select>
               </div>
+              
+              {getTotalVlPhotosCount() > 0 && getTotalVlPhotosCount() < 5 && (
+                <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                  <p className="text-xs text-red-600 flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    ⚠️ Please upload at least {5 - getTotalVlPhotosCount()} more photo(s). Minimum 5 photos required.
+                  </p>
+                </div>
+              )}
+              
+              {getTotalVlPhotosCount() >= 5 && (
+                <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                  <p className="text-xs text-green-600 flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    ✅ Great! You have uploaded {getTotalVlPhotosCount()} photo(s). Minimum requirement satisfied.
+                  </p>
+                </div>
+              )}
             </div>
           </Card>
         </div>
@@ -4582,9 +4980,27 @@ export default function EditLoadingInfoPanel() {
                         <option value="">Select</option>
                         <option value="Approved">Approved</option>
                         <option value="Rejected">Rejected</option>
+                        <option value="Pending">Pending</option>
                       </select>
                     </div>
+
                   </div>
+                  
+                </div>
+                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
+                  <label className="text-xs font-bold text-orange-700">Detention Days</label>
+                  <input
+                    type="number"
+                    value={detentionDays}
+                    onChange={(e) => !isReadOnly && setDetentionDays(e.target.value)}
+                    readOnly={isReadOnly}
+                    className={`mt-1 w-full rounded-lg border border-orange-200 px-3 py-2 text-sm outline-none ${
+                      isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                    }`}
+                    placeholder="Enter number of detention days"
+                    min="0"
+                  />
+                  <p className="text-xs text-orange-600 mt-1">Number of days vehicle is detained</p>
                 </div>
               </div>
 
@@ -4668,8 +5084,79 @@ export default function EditLoadingInfoPanel() {
                 </div>
               </div>
             </div>
+             {/* Arrival Details with Out Date and Out Time */}
+        <div className="mt-4">
+          <Card title="Arrival Details">
+            <div className="grid grid-cols-12 gap-4">
+              <div className="col-span-12 md:col-span-3">
+                <div className="bg-slate-50 p-3 rounded-lg">
+                  <label className="text-xs font-bold text-slate-600">Arrival Date</label>
+                  <input
+                    type="date"
+                    value={arrivalDetails.date}
+                    onChange={(e) => !isReadOnly && setArrivalDetails({ ...arrivalDetails, date: e.target.value })}
+                    readOnly={isReadOnly}
+                    className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
+                      isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                    }`}
+                  />
+                  <p className="text-xs text-green-600 mt-1">Auto-filled from camera capture</p>
+                </div>
+              </div>
+              <div className="col-span-12 md:col-span-3">
+                <div className="bg-slate-50 p-3 rounded-lg">
+                  <label className="text-xs font-bold text-slate-600">Arrival Time</label>
+                  <input
+                    type="time"
+                    value={arrivalDetails.time}
+                    onChange={(e) => !isReadOnly && setArrivalDetails({ ...arrivalDetails, time: e.target.value })}
+                    readOnly={isReadOnly}
+                    className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
+                      isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                    }`}
+                    placeholder="HH:MM"
+                  />
+                  <p className="text-xs text-green-600 mt-1">Auto-filled from camera capture</p>
+                </div>
+              </div>
+              <div className="col-span-12 md:col-span-3">
+                <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                  <label className="text-xs font-bold text-orange-700">Out Date</label>
+                  <input
+                    type="date"
+                    value={arrivalDetails.outDate || ""}
+                    onChange={(e) => !isReadOnly && setArrivalDetails({ ...arrivalDetails, outDate: e.target.value })}
+                    readOnly={isReadOnly}
+                    className={`mt-1 w-full rounded-lg border border-orange-200 px-3 py-2 text-sm outline-none ${
+                      isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                    }`}
+                  />
+                  <p className="text-xs text-orange-600 mt-1">Auto-filled when generating LR</p>
+                </div>
+              </div>
+              <div className="col-span-12 md:col-span-3">
+                <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                  <label className="text-xs font-bold text-orange-700">Out Time</label>
+                  <input
+                    type="time"
+                    value={arrivalDetails.outTime}
+                    onChange={(e) => !isReadOnly && setArrivalDetails({ ...arrivalDetails, outTime: e.target.value })}
+                    readOnly={isReadOnly}
+                    className={`mt-1 w-full rounded-lg border border-orange-200 px-3 py-2 text-sm outline-none ${
+                      isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                    }`}
+                    placeholder="HH:MM"
+                  />
+                  <p className="text-xs text-orange-600 mt-1">Auto-filled when generating LR</p>
+                </div>
+              </div>
+            </div>
           </Card>
         </div>
+          </Card>
+        </div>
+
+       
 
         {/* Vehicle GPS Tracking */}
         <div className="mt-4">
@@ -4717,9 +5204,53 @@ export default function EditLoadingInfoPanel() {
                   </span>
                 )}
               </div>
+              
             </div>
+             {/* Driver Photo Capture Section */}
+          <div className="mt-4 pt-4 border-t border-slate-200">
+            <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Driver Photo Capture</h3>
+                  <p className="text-xs text-slate-600 mt-1">Click to open camera and capture driver photo</p>
+                  <p className="text-xs text-green-600 mt-1">📸 Photo capture will auto-fill Arrival Date & Time</p>
+                </div>
+                {!isReadOnly && (
+                  <button
+                    onClick={startCamera}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Open Camera
+                  </button>
+                )}
+              </div>
+              {vehicleFiles.photo.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-xs font-bold text-slate-600 mb-2">Captured Photos:</p>
+                  {vehicleFiles.photo.map((file, idx) => (
+                    <FileUploadItem 
+                      key={idx} 
+                      file={file} 
+                      index={idx}
+                      onRemove={() => removeFile('vehicle', 'photo', idx)}
+                      label="Driver Photo"
+                      isCameraPhoto={true}
+                      readOnly={isReadOnly}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
           </Card>
+          
         </div>
+
+      
 
         {/* Documents Section */}
         <div className="mt-4">
@@ -4728,9 +5259,20 @@ export default function EditLoadingInfoPanel() {
               <div className="col-span-12 md:col-span-4">
                 <div className="bg-white p-4 rounded-xl border border-slate-200">
                   <h3 className="text-sm font-bold text-slate-800 mb-2">Consignment Note (LR)</h3>
-                  <button className="w-full rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700">
-                    Generate LR
-                  </button>
+                  {!isReadOnly && (
+                    <button 
+                      onClick={handleGenerateLR}
+                      className="w-full rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                    >
+                      Generate LR
+                    </button>
+                  )}
+                  {isReadOnly && (
+                    <button className="w-full rounded-lg bg-gray-400 px-4 py-2 text-xs font-bold text-white cursor-not-allowed" disabled>
+                      Generate LR
+                    </button>
+                  )}
+                  <p className="text-xs text-slate-500 mt-2">Click to generate LR and auto-fill Out Time & Date</p>
                 </div>
               </div>
               <div className="col-span-12 md:col-span-4">
@@ -4753,66 +5295,48 @@ export default function EditLoadingInfoPanel() {
           </Card>
         </div>
 
-        {/* Arrival Details with Out Time */}
+          {/* Loaded Vehicle Slip Upload - Bottom section */}
         <div className="mt-4">
-          <Card title="Arrival Details">
-            <div className="grid grid-cols-12 gap-4">
-              <div className="col-span-12 md:col-span-3">
-                <div className="bg-slate-50 p-3 rounded-lg">
-                  <label className="text-xs font-bold text-slate-600">Arrival Date</label>
-                  <input
-                    type="date"
-                    value={arrivalDetails.date}
-                    onChange={(e) => !isReadOnly && setArrivalDetails({ ...arrivalDetails, date: e.target.value })}
-                    readOnly={isReadOnly}
-                    className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                      isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                    }`}
-                  />
-                </div>
-              </div>
-              <div className="col-span-12 md:col-span-3">
-                <div className="bg-slate-50 p-3 rounded-lg">
-                  <label className="text-xs font-bold text-slate-600">Arrival Time</label>
-                  <input
-                    type="time"
-                    value={arrivalDetails.time}
-                    onChange={(e) => !isReadOnly && setArrivalDetails({ ...arrivalDetails, time: e.target.value })}
-                    readOnly={isReadOnly}
-                    className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                      isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                    }`}
-                    placeholder="HH:MM"
-                  />
-                </div>
-              </div>
-              <div className="col-span-12 md:col-span-3">
-                <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
-                  <label className="text-xs font-bold text-orange-700">Out Time</label>
-                  <input
-                    type="time"
-                    value={arrivalDetails.outTime}
-                    onChange={(e) => !isReadOnly && setArrivalDetails({ ...arrivalDetails, outTime: e.target.value })}
-                    readOnly={isReadOnly}
-                    className={`mt-1 w-full rounded-lg border border-orange-200 px-3 py-2 text-sm outline-none ${
-                      isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                    }`}
-                    placeholder="HH:MM"
-                  />
-                </div>
-              </div>
-              <div className="col-span-12 md:col-span-3">
-                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                  <p className="text-xs text-blue-800">
-                    <span className="font-bold">Note:</span> JV need for making the payment in Driver or Motor Owner Account.
-                  </p>
-                </div>
-              </div>
+          <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
+            <label className="text-xs font-bold text-indigo-700">Loaded Vehicle Slip</label>
+            <p className="text-xs text-slate-400 mb-1">Upload loaded vehicle slip after loading (Image/PDF)</p>
+            {!isReadOnly && (
+              <button 
+                onClick={handleLoadedVehicleSlipSelect}
+                className="w-full rounded-lg bg-indigo-100 px-3 py-2 text-xs font-bold text-indigo-700 border border-indigo-300 hover:bg-indigo-200 transition flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                {loadedVehicleSlipFiles.length > 0 ? `✓ ${loadedVehicleSlipFiles.length} new` : '+ Upload Loaded Vehicle Slip'}
+              </button>
+            )}
+            <div className="mt-2">
+              {existingFiles.loadedVehicleSlips?.map((file, idx) => (
+                <FileUploadItem 
+                  key={`existing-loadedSlip-${idx}`}
+                  file={file}
+                  index={idx}
+                  onRemove={() => removeLoadedVehicleSlip(idx, true)}
+                  label="Loaded Vehicle Slip"
+                  isExisting={true}
+                  readOnly={isReadOnly}
+                />
+              ))}
+              {loadedVehicleSlipFiles.map((file, idx) => (
+                <FileUploadItem 
+                  key={`new-loadedSlip-${idx}`}
+                  file={file}
+                  index={idx}
+                  onRemove={() => removeLoadedVehicleSlip(idx)}
+                  label="Loaded Vehicle Slip"
+                  readOnly={isReadOnly}
+                />
+              ))}
             </div>
-          </Card>
+          </div>
         </div>
       </div>
     </div>
-	
   );
 }

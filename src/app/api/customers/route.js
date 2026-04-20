@@ -3,10 +3,10 @@ import dbConnect from "@/lib/db.js";
 import Customer from "@/models/CustomerModel";
 import CompanyUser from "@/models/CompanyUser";
 import { getTokenFromHeader, verifyJWT } from "@/lib/auth";
-// If you actually need these later you can keep them; otherwise remove to avoid unused imports
-import BankHead from "@/models/BankHead";
-import Country from "@/app/api/countries/schema.js";
-import State from "../states/schema.js";
+
+// ✅ Import BankHead model if you need it for population
+// If you don't have BankHead model, comment out the population
+// import BankHead from "@/models/BankHead";
 
 export const runtime = "nodejs";
 
@@ -63,7 +63,6 @@ export async function GET(req) {
   if (error)
     return NextResponse.json({ success: false, message: error }, { status });
 
-  // Authorization: ensure user has access to customers
   if (!isAuthorized(user)) {
     return NextResponse.json(
       { success: false, message: "Forbidden: insufficient permissions" },
@@ -72,12 +71,15 @@ export async function GET(req) {
   }
 
   try {
-    // Restrict populated fields to avoid extra data
+    // ✅ OPTION 1: Remove population if BankHead model doesn't exist
     const customers = await Customer.find({
       companyId: user.companyId,
     })
     .populate("assignedAgents", "name email")
-    .populate("glAccount", "accountName accountCode");
+    // .populate("glAccount", "accountName accountCode"); // ❌ Comment this out if BankHead missing
+
+    // ✅ OPTION 2: Or populate without selecting specific fields
+    // .populate("glAccount");
 
     return NextResponse.json({ success: true, data: customers }, { status: 200 });
   } catch (err) {
@@ -89,10 +91,8 @@ export async function GET(req) {
   }
 }
 
-
 /* ========================================
    ✏️ POST /api/customers
-   Access: Admin, Sales Manager, Company
 ======================================== */
 export async function POST(req) {
   await dbConnect();
@@ -112,27 +112,63 @@ export async function POST(req) {
 
     const body = await req.json();
 
+    // Auto-generate customer code
+    const lastCustomer = await Customer.findOne({ 
+      companyId: user.companyId 
+    }).sort({ customerCode: -1 }).limit(1);
+    
+    let nextCode = "CUST-0001";
+    if (lastCustomer && lastCustomer.customerCode) {
+      const match = lastCustomer.customerCode.match(/\d+$/);
+      if (match) {
+        const lastNum = parseInt(match[0], 10);
+        nextCode = `CUST-${String(lastNum + 1).padStart(4, "0")}`;
+      }
+    }
+
+    // Remove customerCode from body if sent
+    const { customerCode, ...customerData } = body;
+
     const customer = new Customer({
-      ...body,
+      ...customerData,
+      customerCode: nextCode,
       companyId: user.companyId,
       createdBy: user.id,
     });
 
     await customer.save();
 
-    const populated = await Customer.findById(customer._id).populate("glAccount");
+    // ✅ Remove population or fix it
+    const populated = await Customer.findById(customer._id)
+      .populate("assignedAgents", "name email");
+      // .populate("glAccount"); // ❌ Comment out if BankHead missing
 
     return NextResponse.json({ success: true, data: populated }, { status: 201 });
 
   } catch (error) {
     console.error("POST /customers error:", error);
+    
+    if (error.code === 11000) {
+      if (error.message.includes("customer code")) {
+        return NextResponse.json({ 
+          success: false, 
+          message: "Customer code already exists. Please try again." 
+        }, { status: 409 });
+      } else if (error.message.includes("email")) {
+        return NextResponse.json({ 
+          success: false, 
+          message: "Email already registered for this company" 
+        }, { status: 409 });
+      }
+      return NextResponse.json({ 
+        success: false, 
+        message: "Duplicate entry. Please check customer data." 
+      }, { status: 409 });
+    }
+    
     return NextResponse.json({ success: false, message: "Failed to create customer" }, { status: 500 });
   }
 }
-
-
-
-
 // import { NextResponse } from "next/server";
 // import dbConnect from "@/lib/db.js";
 // import Customer from "@/models/CustomerModel";

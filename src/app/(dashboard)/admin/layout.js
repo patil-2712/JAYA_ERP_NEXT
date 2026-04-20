@@ -439,7 +439,7 @@ export default function Layout({ children }) {
 				<Item href="/admin/owners"               icon={<HiTruck />}             label="Vehicles-owner"                     onClick={closeSidebar} isActive={isActive("/admin/owners")} />
                 <Item href="/admin/rate-master/create"   icon={<HiCurrencyRupee />}     label="Rate-Location-Master-create"         onClick={closeSidebar} isActive={isActive("admin/rate-master/create")} />
 				     <Item href="/admin/rate-master/list"   icon={<HiCurrencyRupee />}     label="Rate-Location-Master-list"         onClick={closeSidebar} isActive={isActive("/admin/rate-master/list")} />
- <Item href="/admin/rate-master/list"   icon={<HiCurrencyRupee />}     label="Rate-Location-Master-list"         onClick={closeSidebar} isActive={isActive("/admin/rate-master/list")} />
+
  <Item href="/admin/UOM"   icon={<HiCurrencyRupee />}     label="UOM"         onClick={closeSidebar} isActive={isActive("/admin/UOM")} />
  <Item href="/admin/sku-sizes"   icon={<HiCurrencyRupee />}     label="sku-sizes"         onClick={closeSidebar} isActive={isActive("/admin/sku-sizes")} />
 

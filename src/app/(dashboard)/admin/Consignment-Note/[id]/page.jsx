@@ -24,7 +24,7 @@ const PRODUCT_NAME_OPTIONS = [
 ];
 const SKU_SIZE_OPTIONS = ["20 Kgs", "10 Kgs", "1 Kgs", "100 Ltr", "200 Kgs", "1 Ltr", "20"];
 const BOE_INVOICE_OPTIONS = ["As Per Invoice", "As Per Bill Of Entry", "NA"];
-const STATUS_OPTIONS = ["Draft", "Approved", "Rejected", "Completed", "Pending"];
+const STATUS_OPTIONS = ["Pending", "Approved", "Rejected", "Completed", "Draft"];
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);
@@ -35,226 +35,68 @@ function num(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
-/* =======================
-  Data Fetching Hooks
-========================= */
-function useOrders() {
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  const fetchOrders = async () => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/order-panel', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        setOrders(data.data);
-      }
-    } catch (error) {
-      console.error('Error fetching orders:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return { orders, loading, fetchOrders };
-}
-
-function useVendors() {
-  const [vendors, setVendors] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  const fetchVendors = async () => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/vendors', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        setVendors(data.data);
-      }
-    } catch (error) {
-      console.error('Error fetching vendors:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return { vendors, loading, fetchVendors };
-}
-
-function usePlants() {
-  const [plants, setPlants] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  const fetchPlants = async () => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/plants', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        setPlants(data.data);
-      }
-    } catch (error) {
-      console.error('Error fetching plants:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return { plants, loading, fetchPlants };
-}
-
-function useVehicleNegotiation() {
-  const [loading, setLoading] = useState(false);
-
-  const getNegotiationByVNN = async (vnnNo) => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      console.log(`🔍 Fetching Vehicle Negotiation with VNN: ${vnnNo}`);
-      
-      const res = await fetch(`/api/vehicle-negotiation?vnnNo=${encodeURIComponent(vnnNo)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      if (!res.ok) {
-        console.error(`API returned ${res.status}`);
-        return null;
-      }
-      
-      const data = await res.json();
-      return data.success ? data.data : null;
-    } catch (error) {
-      console.error('Error fetching negotiation:', error);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return { loading, getNegotiationByVNN };
-}
-
-function useLoadingInfo() {
-  const [loadingInfos, setLoadingInfos] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  const fetchLoadingInfos = async (currentNoteId = null) => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      
-      const res = await fetch('/api/loading-panel?format=table', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      if (!res.ok) {
-        console.warn('Loading Info API returned', res.status);
-        setLoadingInfos([]);
-        return;
-      }
-      
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        // Check which loading infos are already used in consignment notes
-        const consignmentRes = await fetch('/api/consignment-note?format=table', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        
-        const consignmentData = await consignmentRes.json();
-        
-        // Create a Set of used loading info numbers (excluding current note)
-        const usedLoadingInfos = new Set();
-        if (consignmentData.success && Array.isArray(consignmentData.data)) {
-          consignmentData.data.forEach(item => {
-            // Don't count the current note's loading info as used
-            if (item.loadingInfoNo && item.loadingInfoNo !== '' && item._id !== currentNoteId) {
-              usedLoadingInfos.add(item.loadingInfoNo);
-            }
-          });
-        }
-        
-        // Filter out loading infos that are already used
-        const availableLoadingInfos = data.data.filter(info => 
-          !usedLoadingInfos.has(info.vehicleArrivalNo)
-        );
-        
-        console.log(`📊 Found ${availableLoadingInfos.length} available loading infos out of ${data.data.length} total`);
-        
-        const enhancedData = availableLoadingInfos.map(item => ({
-          ...item,
-          driverNo: item.driverNo || item.driverMobileNo || '',
-          vehicleInfo: item.vehicleInfo || {},
-          orderRows: item.orderRows || []
-        }));
-        
-        setLoadingInfos(enhancedData);
-      }
-    } catch (error) {
-      console.error('Error fetching loading info:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getLoadingInfoById = async (id) => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/loading-panel?id=${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
-      
-      const data = await res.json();
-      return data.success ? data.data : null;
-    } catch (error) {
-      console.error('Error fetching loading info by ID:', error);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return { 
-    loadingInfos, 
-    loading, 
-    fetchLoadingInfos, 
-    getLoadingInfoById
-  };
-}
-
 /** =========================
- * DEFAULT EMPTY ROWS
+ * DEFAULT EMPTY ROWS FOR EACH PACK TYPE
  ========================= */
-function defaultProductRow() {
+function defaultPalletizationRow() {
   return {
     _id: uid(),
+    packType: "PALLETIZATION",
+    noOfPallets: "",
+    unitPerPallets: "",
     totalPkgs: "",
     pkgsType: "",
-    uom: "",
-    packSize: "",
+    uom: "MT",
     skuSize: "",
+    packWeight: "",
     productName: "",
     wtLtr: "",
     actualWt: "",
     chargedWt: "",
     wtUom: "MT",
+  };
+}
+
+function defaultUniformRow() {
+  return {
+    _id: uid(),
+    packType: "UNIFORM - BAGS/BOXES",
+    totalPkgs: "",
+    pkgsType: "",
+    uom: "",
+    skuSize: "",
+    packWeight: "",
+    productName: "",
+    wtLtr: "",
+    actualWt: "",
+    chargedWt: "",
+    wtUom: "MT",
+  };
+}
+
+function defaultLooseCargoRow() {
+  return {
+    _id: uid(),
+    packType: "LOOSE - CARGO",
+    uom: "MT",
+    productName: "",
+    actualWt: "",
+    chargedWt: "",
+  };
+}
+
+function defaultNonUniformRow() {
+  return {
+    _id: uid(),
+    packType: "NON-UNIFORM - GENERAL CARGO",
+    nos: "",
+    productName: "",
+    uom: "MT",
+    length: "",
+    width: "",
+    height: "",
+    actualWt: "",
+    chargedWt: "",
   };
 }
 
@@ -264,41 +106,75 @@ export default function EditConsignmentNote() {
   const noteId = params.id;
 
   /** =========================
-   * CUSTOM HOOKS
+   * STATE
    ========================= */
-  const orderHook = useOrders();
-  const vendorHook = useVendors();
-  const plantHook = usePlants();
-  const vehicleNegotiationHook = useVehicleNegotiation();
-  const loadingInfoHook = useLoadingInfo();
-
-  /** =========================
-   * STATE FOR API DATA
-   ========================= */
-  const [orders, setOrders] = useState([]);
-  const [vendors, setVendors] = useState([]);
-  const [plants, setPlants] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [fetchLoading, setFetchLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [apiError, setApiError] = useState(null);
+  const [fetchLoading, setFetchLoading] = useState(true);
   const [fetchingData, setFetchingData] = useState(false);
+  const [isReadOnly, setIsReadOnly] = useState(false);
 
   /** =========================
-   * LOADING INFO STATE
+   * ORDER SEARCH STATE
    ========================= */
-  const [loadingInfoNo, setLoadingInfoNo] = useState("");
-  const [showLoadingInfoDropdown, setShowLoadingInfoDropdown] = useState(false);
-  const [filteredLoadingInfos, setFilteredLoadingInfos] = useState([]);
-  const loadingInfoDropdownRef = useRef(null);
-  const [vnnData, setVnnData] = useState(null);
+  const [showOrderDropdown, setShowOrderDropdown] = useState(false);
+  const [filteredOrders, setFilteredOrders] = useState([]);
+  const [allOrders, setAllOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const orderDropdownRef = useRef(null);
+
+  /** =========================
+   * CUSTOMER DROPDOWN STATES
+   ========================= */
+  const [showConsignorDropdown, setShowConsignorDropdown] = useState(false);
+  const [showConsigneeDropdown, setShowConsigneeDropdown] = useState(false);
+  const [customers, setCustomers] = useState([]);
+  const [customersLoading, setCustomersLoading] = useState(false);
+  const [filteredConsignors, setFilteredConsignors] = useState([]);
+  const [filteredConsignees, setFilteredConsignees] = useState([]);
+  const consignorDropdownRef = useRef(null);
+  const consigneeDropdownRef = useRef(null);
+
+  /** =========================
+   * ADDRESS TITLE DROPDOWN STATES
+   ========================= */
+  const [showConsignorAddressDropdown, setShowConsignorAddressDropdown] = useState(false);
+  const [showConsigneeAddressDropdown, setShowConsigneeAddressDropdown] = useState(false);
+  const [consignorAddresses, setConsignorAddresses] = useState([]);
+  const [consigneeAddresses, setConsigneeAddresses] = useState([]);
+  const consignorAddressRef = useRef(null);
+  const consigneeAddressRef = useRef(null);
+
+  /** =========================
+   * VEHICLE NEGOTIATION STATE
+   ========================= */
+  const [vehicleNegotiationData, setVehicleNegotiationData] = useState(null);
+  const [fetchingVehicleData, setFetchingVehicleData] = useState(false);
 
   /** =========================
    * HEADER STATE
    ========================= */
+  const generateLRNo = () => {
+    const date = new Date();
+    const year = date.getFullYear().toString().slice(-2);
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    return `LR-${year}${month}${day}-${random}`;
+  };
+
+  const getCurrentDateFormatted = () => {
+    const date = new Date();
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}.${month}.${year}`;
+  };
+
   const [header, setHeader] = useState({
-    partyName: "",
     orderNo: "",
+    partyName: "",
     orderType: "Sales",
     plantCode: "",
     plantName: "",
@@ -307,12 +183,13 @@ export default function EditConsignmentNote() {
     vendorName: "",
     from: "",
     to: "",
+    taluka: "",
     district: "",
     state: "",
     vehicleNo: "",
     partyNo: "",
-    lrNo: "",
-    lrDate: "",
+    lrNo: generateLRNo(),
+    lrDate: getCurrentDateFormatted(),
     unit: "MT",
     status: "Pending"
   });
@@ -323,11 +200,15 @@ export default function EditConsignmentNote() {
   const [consignor, setConsignor] = useState({
     name: "",
     address: "",
+    customerId: "",
+    selectedAddressTitle: ""
   });
 
   const [consignee, setConsignee] = useState({
     name: "",
     address: "",
+    customerId: "",
+    selectedAddressTitle: ""
   });
 
   /** =========================
@@ -350,29 +231,199 @@ export default function EditConsignmentNote() {
   });
 
   /** =========================
-   * PRODUCT ROWS STATE
+   * PRODUCT ROWS FOR EACH PACK TYPE
    ========================= */
-  const [productRows, setProductRows] = useState([]);
-  const [vnnNo, setVnnNo] = useState("");
-  const [vehicleNegotiationId, setVehicleNegotiationId] = useState("");
+  const [palletizationRows, setPalletizationRows] = useState([defaultPalletizationRow()]);
+  const [uniformRows, setUniformRows] = useState([defaultUniformRow()]);
+  const [looseCargoRows, setLooseCargoRows] = useState([defaultLooseCargoRow()]);
+  const [nonUniformRows, setNonUniformRows] = useState([defaultNonUniformRow()]);
 
   /** =========================
-   * FETCH DATA ON MOUNT
+   * FETCH ORDERS FROM API
    ========================= */
-  useEffect(() => {
-    if (noteId) {
-      fetchConsignmentNote();
+  const fetchOrders = async () => {
+    setOrdersLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.warn('No token found');
+        setAllOrders([]);
+        return;
+      }
+      
+      const res = await fetch('/api/order-panel?format=table', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (!res.ok) {
+        throw new Error(`API returned ${res.status}`);
+      }
+      
+      const data = await res.json();
+      
+      if (data.success && Array.isArray(data.data)) {
+        setAllOrders(data.data);
+        setFilteredOrders(data.data);
+      } else {
+        setAllOrders([]);
+        setFilteredOrders([]);
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      setAllOrders([]);
+      setFilteredOrders([]);
+    } finally {
+      setOrdersLoading(false);
     }
-    fetchData();
-    loadingInfoHook.fetchLoadingInfos(noteId);
-  }, [noteId]);
+  };
 
-  useEffect(() => {
-    if (loadingInfoHook.loadingInfos.length > 0) {
-      setFilteredLoadingInfos(loadingInfoHook.loadingInfos);
+  /** =========================
+   * FETCH CUSTOMERS FROM API
+   ========================= */
+  const fetchCustomers = async () => {
+    setCustomersLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.warn('No token found');
+        setCustomers([]);
+        return;
+      }
+      
+      const res = await fetch('/api/customers', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (!res.ok) {
+        throw new Error(`API returned ${res.status}`);
+      }
+      
+      const data = await res.json();
+      
+      if (data.success && Array.isArray(data.data)) {
+        const customersWithAddress = data.data.map(customer => ({
+          ...customer,
+          address: customer.address || customer.billingAddress || customer.shippingAddress || customer.customerAddress || ''
+        }));
+        setCustomers(customersWithAddress);
+        setFilteredConsignors(customersWithAddress);
+        setFilteredConsignees(customersWithAddress);
+      } else {
+        setCustomers([]);
+        setFilteredConsignors([]);
+        setFilteredConsignees([]);
+      }
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+      setCustomers([]);
+      setFilteredConsignors([]);
+      setFilteredConsignees([]);
+    } finally {
+      setCustomersLoading(false);
     }
-  }, [loadingInfoHook.loadingInfos]);
+  };
 
+  /** =========================
+   * HELPER FUNCTION TO EXTRACT ADDRESSES FROM CUSTOMER
+   ========================= */
+  const extractAddressesFromCustomer = (customer) => {
+    const addresses = [];
+    
+    if (customer.billingAddresses && Array.isArray(customer.billingAddresses)) {
+      customer.billingAddresses.forEach((addr, idx) => {
+        if (addr.address1 || addr.address2 || addr.city) {
+          const addressText = `${addr.address1 || ''} ${addr.address2 || ''} ${addr.city || ''} ${addr.state || ''} ${addr.pin || ''}`.trim();
+          if (addressText) {
+            addresses.push({
+              title: addr.title || `Billing Address ${idx + 1}`,
+              address: addressText,
+              type: 'billing',
+              gstNumber: addr.gstNumber || ''
+            });
+          }
+        }
+      });
+    }
+    
+    if (customer.shippingAddresses && Array.isArray(customer.shippingAddresses)) {
+      customer.shippingAddresses.forEach((addr, idx) => {
+        if (addr.address1 || addr.address2 || addr.city) {
+          const addressText = `${addr.address1 || ''} ${addr.address2 || ''} ${addr.city || ''} ${addr.state || ''} ${addr.pin || ''}`.trim();
+          if (addressText) {
+            addresses.push({
+              title: addr.title || `Shipping Address ${idx + 1}`,
+              address: addressText,
+              type: 'shipping',
+              gstNumber: addr.gstNumber || ''
+            });
+          }
+        }
+      });
+    }
+    
+    if (addresses.length === 0) {
+      const oldAddress = customer.address || customer.billingAddress || customer.shippingAddress || customer.customerAddress || '';
+      if (oldAddress) {
+        addresses.push({
+          title: 'Default Address',
+          address: oldAddress,
+          type: 'default',
+          gstNumber: ''
+        });
+      }
+    }
+    
+    return addresses;
+  };
+
+  /** =========================
+   * FETCH VEHICLE NEGOTIATION BY ORDER NUMBER
+   ========================= */
+  const fetchVehicleNegotiationByOrder = async (orderNo) => {
+    setFetchingVehicleData(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return null;
+      
+      const res = await fetch('/api/vehicle-negotiation?format=table', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (!res.ok) return null;
+      
+      const data = await res.json();
+      
+      if (data.success && Array.isArray(data.data)) {
+        const matchingRecord = data.data.find(record => record.order === orderNo);
+        
+        if (matchingRecord && matchingRecord.vnId) {
+          const detailRes = await fetch(`/api/vehicle-negotiation?id=${matchingRecord.vnId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          
+          const detailData = await detailRes.json();
+          
+          if (detailData.success && detailData.data) {
+            setVehicleNegotiationData(detailData.data);
+            return detailData.data;
+          }
+        }
+      }
+      
+      setVehicleNegotiationData(null);
+      return null;
+    } catch (error) {
+      console.error('Error fetching vehicle negotiation:', error);
+      setVehicleNegotiationData(null);
+      return null;
+    } finally {
+      setFetchingVehicleData(false);
+    }
+  };
+
+  /** =========================
+   * FETCH CONSIGNMENT NOTE
+   ========================= */
   const fetchConsignmentNote = async () => {
     setFetchLoading(true);
     try {
@@ -395,15 +446,10 @@ export default function EditConsignmentNote() {
       const note = data.data;
       console.log("📦 Consignment Note Data:", note);
       
-      // Set reference fields
-      if (note.vnnNo) setVnnNo(note.vnnNo);
-      if (note.vehicleNegotiationId) setVehicleNegotiationId(note.vehicleNegotiationId);
-      if (note.loadingInfoNo) setLoadingInfoNo(note.loadingInfoNo);
-      
       // Set header data
       setHeader({
-        partyName: note.header?.partyName || "",
         orderNo: note.header?.orderNo || "",
+        partyName: note.header?.partyName || "",
         orderType: note.header?.orderType || "Sales",
         plantCode: note.header?.plantCode || "",
         plantName: note.header?.plantName || "",
@@ -412,12 +458,13 @@ export default function EditConsignmentNote() {
         vendorName: note.header?.vendorName || "",
         from: note.header?.from || "",
         to: note.header?.to || "",
+        taluka: note.header?.taluka || "",
         district: note.header?.district || "",
         state: note.header?.state || "",
         vehicleNo: note.header?.vehicleNo || "",
         partyNo: note.header?.partyNo || "",
-        lrNo: note.lrNo || "",
-        lrDate: note.header?.lrDate || "",
+        lrNo: note.lrNo || generateLRNo(),
+        lrDate: note.header?.lrDate || getCurrentDateFormatted(),
         unit: note.header?.unit || "MT",
         status: note.header?.status || "Pending"
       });
@@ -425,13 +472,17 @@ export default function EditConsignmentNote() {
       // Set consignor
       setConsignor({
         name: note.consignor?.name || "",
-        address: note.consignor?.address || ""
+        address: note.consignor?.address || "",
+        customerId: note.consignor?.customerId || "",
+        selectedAddressTitle: note.consignor?.selectedAddressTitle || ""
       });
 
       // Set consignee
       setConsignee({
         name: note.consignee?.name || "",
-        address: note.consignee?.address || ""
+        address: note.consignee?.address || "",
+        customerId: note.consignee?.customerId || "",
+        selectedAddressTitle: note.consignee?.selectedAddressTitle || ""
       });
 
       // Set invoice
@@ -449,20 +500,52 @@ export default function EditConsignmentNote() {
         containerNo: note.ewaybill?.containerNo || ""
       });
 
-      // Set product rows
-      if (note.productRows && note.productRows.length > 0) {
-        const processedRows = note.productRows.map(row => ({
-          ...row,
-          _id: row._id || uid(),
-          totalPkgs: row.totalPkgs?.toString() || "",
-          packSize: row.packSize?.toString() || "",
-          wtLtr: row.wtLtr?.toString() || "",
-          actualWt: row.actualWt?.toString() || "",
-          chargedWt: row.chargedWt?.toString() || "",
-        }));
-        setProductRows(processedRows);
-      } else {
-        setProductRows([defaultProductRow()]);
+      // Set pack data from note
+      if (note.packData) {
+        // Palletization
+        if (note.packData.PALLETIZATION && note.packData.PALLETIZATION.length > 0) {
+          setPalletizationRows(note.packData.PALLETIZATION.map(row => ({
+            ...row,
+            _id: row._id || uid()
+          })));
+        } else {
+          setPalletizationRows([defaultPalletizationRow()]);
+        }
+
+        // Uniform
+        if (note.packData['UNIFORM - BAGS/BOXES'] && note.packData['UNIFORM - BAGS/BOXES'].length > 0) {
+          setUniformRows(note.packData['UNIFORM - BAGS/BOXES'].map(row => ({
+            ...row,
+            _id: row._id || uid()
+          })));
+        } else {
+          setUniformRows([defaultUniformRow()]);
+        }
+
+        // Loose Cargo
+        if (note.packData['LOOSE - CARGO'] && note.packData['LOOSE - CARGO'].length > 0) {
+          setLooseCargoRows(note.packData['LOOSE - CARGO'].map(row => ({
+            ...row,
+            _id: row._id || uid()
+          })));
+        } else {
+          setLooseCargoRows([defaultLooseCargoRow()]);
+        }
+
+        // Non-Uniform
+        if (note.packData['NON-UNIFORM - GENERAL CARGO'] && note.packData['NON-UNIFORM - GENERAL CARGO'].length > 0) {
+          setNonUniformRows(note.packData['NON-UNIFORM - GENERAL CARGO'].map(row => ({
+            ...row,
+            _id: row._id || uid()
+          })));
+        } else {
+          setNonUniformRows([defaultNonUniformRow()]);
+        }
+      }
+
+      // Check if note has a linked order to make it read-only
+      if (note.header?.orderNo) {
+        setIsReadOnly(true);
       }
 
     } catch (error) {
@@ -474,291 +557,414 @@ export default function EditConsignmentNote() {
     }
   };
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      await Promise.all([
-        orderHook.fetchOrders(),
-        vendorHook.fetchVendors(),
-        plantHook.fetchPlants()
-      ]);
-      
-      setOrders(orderHook.orders);
-      setVendors(vendorHook.vendors);
-      setPlants(plantHook.plants);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      setApiError('Failed to load data');
-    } finally {
-      setLoading(false);
+  /** =========================
+   * LOAD DATA ON MOUNT
+   ========================= */
+  useEffect(() => {
+    fetchOrders();
+    fetchCustomers();
+    if (noteId) {
+      fetchConsignmentNote();
     }
-  };
+  }, [noteId]);
 
   /** =========================
-   * LOADING INFO HANDLERS
+   * ORDER SEARCH HANDLERS
    ========================= */
-  const handleLoadingInfoSearch = (query) => {
-    setLoadingInfoNo(query);
+  const handleOrderSearch = (query) => {
+    setHeader(prev => ({ ...prev, orderNo: query }));
+    
+    if (!allOrders || allOrders.length === 0) {
+      setFilteredOrders([]);
+      return;
+    }
     
     if (query.trim() === "") {
-      setFilteredLoadingInfos(loadingInfoHook.loadingInfos);
+      setFilteredOrders(allOrders);
     } else {
-      const filtered = loadingInfoHook.loadingInfos.filter(info =>
-        info.vehicleArrivalNo?.toLowerCase().includes(query.toLowerCase()) ||
-        info.vehicleNo?.toLowerCase().includes(query.toLowerCase()) ||
-        info.branch?.toLowerCase().includes(query.toLowerCase())
-      );
-      setFilteredLoadingInfos(filtered);
+      const filtered = allOrders.filter(order => {
+        const orderNo = order.orderNo || order.orderPanelNo;
+        return orderNo?.toLowerCase().includes(query.toLowerCase());
+      });
+      setFilteredOrders(filtered);
     }
   };
 
-  const handleSelectLoadingInfo = async (loadingInfo) => {
-    setLoadingInfoNo(loadingInfo.vehicleArrivalNo);
-    setShowLoadingInfoDropdown(false);
+  const handleSelectOrder = async (order) => {
     setFetchingData(true);
     
     try {
-      const fullInfo = await loadingInfoHook.getLoadingInfoById(loadingInfo._id);
+      const token = localStorage.getItem('token');
+      const orderId = order._id || order.originalOrderId;
       
-      if (fullInfo) {
-        console.log("📦 Full Loading Info:", fullInfo);
+      let fullOrder = order;
+      
+      if (orderId) {
+        const res = await fetch(`/api/order-panel?id=${orderId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         
-        // Get VNN from loading info
-        const vnnFromLoading = fullInfo.vehicleNegotiationNo;
-        
-        if (vnnFromLoading) {
-          // Fetch Vehicle Negotiation data
-          const vnnData = await vehicleNegotiationHook.getNegotiationByVNN(vnnFromLoading);
-          
-          if (vnnData) {
-            setVnnData(vnnData);
-            setVnnNo(vnnFromLoading);
-            setVehicleNegotiationId(vnnData._id);
-            console.log("✅ Vehicle Negotiation Data:", vnnData);
-            
-            // ===== EXTRACT VENDOR CODE FROM VNN APPROVAL =====
-            const approval = vnnData.approval || {};
-            const vendorCode = approval.vendorCode || "";  // Get vendor code from approval
-            const vendorName = approval.vendorName || vnnData.vendorName || "";
-            
-            console.log("✅ Vendor from VNN:", { vendorName, vendorCode });
-            
-            // Auto-fill from VNN data including vendor code
-            setHeader(prev => ({
-              ...prev,
-              vendorName: vendorName || prev.vendorName,
-              vendorCode: vendorCode || prev.vendorCode,  // ✅ Set vendor code from VNN
-              vehicleNo: approval.vehicleNo || vnnData.vehicleInfo?.vehicleNo || prev.vehicleNo,
-            }));
-
-            // Auto-fill from VNN orders
-            if (vnnData.orders && vnnData.orders.length > 0) {
-              const firstOrder = vnnData.orders[0];
-              setHeader(prev => ({
-                ...prev,
-                partyName: firstOrder.partyName || vnnData.customerName || "",
-                orderNo: firstOrder.orderNo || "",
-                plantCode: firstOrder.plantCodeValue || firstOrder.plantCode || "",
-                plantName: firstOrder.plantName || "",
-                from: firstOrder.fromName || firstOrder.from || "",
-                to: firstOrder.toName || firstOrder.to || "",
-                district: firstOrder.districtName || firstOrder.district || "",
-                state: firstOrder.stateName || firstOrder.state || "",
-              }));
-              
-              setConsignor(prev => ({
-                ...prev,
-                name: firstOrder.partyName || vnnData.customerName || "",
-              }));
-            }
-            
-            // Show success message with vendor info
-            if (vendorCode) {
-              alert(`✅ Data loaded from Vehicle Negotiation!\nVendor: ${vendorName} (Code: ${vendorCode})`);
-            } else {
-              alert(`✅ Data loaded from Vehicle Negotiation: ${vnnFromLoading}`);
-            }
-          }
+        const data = await res.json();
+        if (data.success && data.data) {
+          fullOrder = data.data;
         }
-
-        // Auto-fill vehicle information from loading info (fallback)
-        if (fullInfo.vehicleInfo && !vnnData) {
-          setHeader(prev => ({
-            ...prev,
-            vehicleNo: fullInfo.vehicleInfo.vehicleNo || prev.vehicleNo,
-            partyNo: fullInfo.vehicleInfo.driverMobileNo || "",
-          }));
-        }
-
-        // Auto-fill from/to locations from order rows (fallback)
-        if (fullInfo.orderRows && fullInfo.orderRows.length > 0 && !vnnData) {
-          const firstOrder = fullInfo.orderRows[0];
-          setHeader(prev => ({
-            ...prev,
-            from: firstOrder.from || "",
-            to: firstOrder.to || "",
-            district: firstOrder.district || "",
-            state: firstOrder.state || "",
-          }));
-        }
-
-        // Auto-fill product rows from pack data
-        if (fullInfo.packData) {
-          const products = [];
-          
-          // Get products from PALLETIZATION
-          if (fullInfo.packData.PALLETIZATION && fullInfo.packData.PALLETIZATION.length > 0) {
-            fullInfo.packData.PALLETIZATION.forEach(item => {
-              products.push({
-                _id: uid(),
-                totalPkgs: item.totalPkgs?.toString() || "",
-                pkgsType: item.pkgsType || "",
-                uom: item.uom || "",
-                packSize: item.skuSize || "",
-                skuSize: item.skuSize || "",
-                productName: item.productName || "",
-                wtLtr: item.wtLtr?.toString() || "",
-                actualWt: item.actualWt?.toString() || "",
-                chargedWt: item.chargedWt?.toString() || "",
-                wtUom: item.wtUom || "MT",
-              });
-            });
-          }
-          
-          // Get products from UNIFORM
-          if (fullInfo.packData['UNIFORM - BAGS/BOXES'] && fullInfo.packData['UNIFORM - BAGS/BOXES'].length > 0) {
-            fullInfo.packData['UNIFORM - BAGS/BOXES'].forEach(item => {
-              products.push({
-                _id: uid(),
-                totalPkgs: item.totalPkgs?.toString() || "",
-                pkgsType: item.pkgsType || "",
-                uom: item.uom || "",
-                packSize: item.skuSize || "",
-                skuSize: item.skuSize || "",
-                productName: item.productName || "",
-                wtLtr: item.wtLtr?.toString() || "",
-                actualWt: item.actualWt?.toString() || "",
-                chargedWt: item.chargedWt?.toString() || "",
-                wtUom: item.wtUom || "MT",
-              });
-            });
-          }
-          
-          // Get products from LOOSE CARGO
-          if (fullInfo.packData['LOOSE - CARGO'] && fullInfo.packData['LOOSE - CARGO'].length > 0) {
-            fullInfo.packData['LOOSE - CARGO'].forEach(item => {
-              products.push({
-                _id: uid(),
-                totalPkgs: "1",
-                pkgsType: "Loose",
-                uom: item.uom || "",
-                packSize: "",
-                skuSize: "",
-                productName: item.productName || "",
-                wtLtr: "",
-                actualWt: item.actualWt?.toString() || "",
-                chargedWt: item.chargedWt?.toString() || "",
-                wtUom: item.uom || "MT",
-              });
-            });
-          }
-          
-          if (products.length > 0) {
-            setProductRows(products);
-          }
-        }
-        
-        alert(`✅ Data loaded from Loading Info: ${loadingInfo.vehicleArrivalNo}`);
       }
+      
+      const orderNo = fullOrder.orderPanelNo || fullOrder.orderNo || order.orderNo || '';
+      const partyName = fullOrder.partyName || fullOrder.customerName || order.partyName || '';
+      
+      let plantCode = '';
+      let plantName = '';
+      
+      if (fullOrder.plantRows && fullOrder.plantRows.length > 0) {
+        const firstRow = fullOrder.plantRows[0];
+        plantCode = firstRow.plantCodeValue || firstRow.plantCode || '';
+        plantName = firstRow.plantName || '';
+      }
+      
+      let fromLocation = fullOrder.from || order.from || '';
+      let toLocation = fullOrder.to || order.to || '';
+      let taluka = fullOrder.taluka || order.taluka || '';
+      let district = fullOrder.district || order.district || '';
+      let state = fullOrder.state || order.state || '';
+      
+      if (fullOrder.plantRows && fullOrder.plantRows.length > 0) {
+        const firstRow = fullOrder.plantRows[0];
+        fromLocation = firstRow.fromName || firstRow.from || fromLocation;
+        toLocation = firstRow.toName || firstRow.to || toLocation;
+        taluka = firstRow.talukaName || firstRow.taluka || taluka;
+        district = firstRow.districtName || firstRow.district || district;
+        state = firstRow.stateName || firstRow.state || state;
+      }
+      
+      // Fetch vehicle negotiation data for this order
+      const vehicleData = await fetchVehicleNegotiationByOrder(orderNo);
+      
+      if (vehicleData && vehicleData.approval) {
+        setHeader(prev => ({
+          ...prev,
+          orderNo: orderNo,
+          partyName: partyName,
+          plantCode: plantCode,
+          plantName: plantName,
+          from: fromLocation,
+          to: toLocation,
+          taluka: taluka,
+          district: district,
+          state: state,
+          vendorCode: vehicleData.approval.vendorCode || prev.vendorCode,
+          vendorName: vehicleData.approval.vendorName || prev.vendorName,
+          vehicleNo: vehicleData.approval.vehicleNo || prev.vehicleNo,
+          partyNo: vehicleData.approval.mobile || prev.partyNo,
+        }));
+      } else {
+        setHeader(prev => ({
+          ...prev,
+          orderNo: orderNo,
+          partyName: partyName,
+          plantCode: plantCode,
+          plantName: plantName,
+          from: fromLocation,
+          to: toLocation,
+          taluka: taluka,
+          district: district,
+          state: state,
+        }));
+      }
+      
+      setConsignor(prev => ({
+        ...prev,
+        name: partyName
+      }));
+      
+      setIsReadOnly(true);
+      
+      if (fullOrder.packData) {
+        if (fullOrder.packData.PALLETIZATION && fullOrder.packData.PALLETIZATION.length > 0) {
+          const palletRows = fullOrder.packData.PALLETIZATION.map(item => ({
+            _id: uid(),
+            packType: "PALLETIZATION",
+            noOfPallets: item.noOfPallets?.toString() || "",
+            unitPerPallets: item.unitPerPallets?.toString() || "",
+            totalPkgs: item.totalPkgs?.toString() || "",
+            pkgsType: item.pkgsType || "",
+            uom: item.uom || "MT",
+            skuSize: item.skuSize || "",
+            packWeight: item.packWeight?.toString() || "",
+            productName: item.productName || "",
+            wtLtr: item.wtLtr?.toString() || "",
+            actualWt: item.actualWt?.toString() || "",
+            chargedWt: item.chargedWt?.toString() || "",
+            wtUom: item.wtUom || "MT",
+          }));
+          setPalletizationRows(palletRows);
+        }
+        
+        if (fullOrder.packData['UNIFORM - BAGS/BOXES'] && fullOrder.packData['UNIFORM - BAGS/BOXES'].length > 0) {
+          const uniformRowsData = fullOrder.packData['UNIFORM - BAGS/BOXES'].map(item => ({
+            _id: uid(),
+            packType: "UNIFORM - BAGS/BOXES",
+            totalPkgs: item.totalPkgs?.toString() || "",
+            pkgsType: item.pkgsType || "",
+            uom: item.uom || "",
+            skuSize: item.skuSize || "",
+            packWeight: item.packWeight?.toString() || "",
+            productName: item.productName || "",
+            wtLtr: item.wtLtr?.toString() || "",
+            actualWt: item.actualWt?.toString() || "",
+            chargedWt: item.chargedWt?.toString() || "",
+            wtUom: item.wtUom || "MT",
+          }));
+          setUniformRows(uniformRowsData);
+        }
+        
+        if (fullOrder.packData['LOOSE - CARGO'] && fullOrder.packData['LOOSE - CARGO'].length > 0) {
+          const looseRowsData = fullOrder.packData['LOOSE - CARGO'].map(item => ({
+            _id: uid(),
+            packType: "LOOSE - CARGO",
+            uom: item.uom || "MT",
+            productName: item.productName || "",
+            actualWt: item.actualWt?.toString() || "",
+            chargedWt: item.chargedWt?.toString() || "",
+          }));
+          setLooseCargoRows(looseRowsData);
+        }
+        
+        if (fullOrder.packData['NON-UNIFORM - GENERAL CARGO'] && fullOrder.packData['NON-UNIFORM - GENERAL CARGO'].length > 0) {
+          const nonUniformRowsData = fullOrder.packData['NON-UNIFORM - GENERAL CARGO'].map(item => ({
+            _id: uid(),
+            packType: "NON-UNIFORM - GENERAL CARGO",
+            nos: item.nos?.toString() || "",
+            productName: item.productName || "",
+            uom: item.uom || "MT",
+            length: item.length?.toString() || "",
+            width: item.width?.toString() || "",
+            height: item.height?.toString() || "",
+            actualWt: item.actualWt?.toString() || "",
+            chargedWt: item.chargedWt?.toString() || "",
+          }));
+          setNonUniformRows(nonUniformRowsData);
+        }
+      }
+      
+      alert(`✅ Order ${orderNo} loaded successfully! Data is now read-only.`);
+      
     } catch (error) {
-      console.error("Error loading loading info:", error);
-      alert(`❌ Failed to load data: ${error.message}`);
+      console.error('Error fetching order details:', error);
+      alert(`❌ Failed to load order details: ${error.message}`);
     } finally {
       setFetchingData(false);
+      setShowOrderDropdown(false);
     }
   };
 
-  const handleLoadingInfoInputFocus = () => {
-    if (!showLoadingInfoDropdown) {
-      setFilteredLoadingInfos(loadingInfoHook.loadingInfos);
-      setShowLoadingInfoDropdown(true);
+  const handleOrderInputFocus = () => {
+    if (!showOrderDropdown && allOrders && allOrders.length > 0) {
+      setFilteredOrders(allOrders);
+      setShowOrderDropdown(true);
+    } else if (!allOrders || allOrders.length === 0) {
+      fetchOrders();
     }
   };
 
-  const handleLoadingInfoInputBlur = () => {
+  const handleOrderInputBlur = () => {
     setTimeout(() => {
-      if (loadingInfoDropdownRef.current && !loadingInfoDropdownRef.current.contains(document.activeElement)) {
-        setShowLoadingInfoDropdown(false);
+      if (orderDropdownRef.current && !orderDropdownRef.current.contains(document.activeElement)) {
+        setShowOrderDropdown(false);
       }
     }, 200);
   };
 
   /** =========================
-   * PRODUCT ROW FUNCTIONS
+   * CUSTOMER DROPDOWN HANDLERS
    ========================= */
-  const addProductRow = () => setProductRows([...productRows, defaultProductRow()]);
-
-  const updateProductRow = (rowId, key, value) => {
-    setProductRows((prev) =>
-      prev.map((r) => {
-        if (r._id === rowId) {
-          const updatedRow = { ...r, [key]: value };
-          
-          // Auto-calculate WT (LTR) = TOTAL PKGS * PACK SIZE
-          if (key === "totalPkgs" || key === "packSize") {
-            const totalPkgs = num(updatedRow.totalPkgs);
-            const packSize = parseFloat(updatedRow.packSize) || 0;
-            updatedRow.wtLtr = (totalPkgs * packSize).toString();
-            
-            // Auto-calculate ACTUAL WT (convert to MT if needed)
-            if (updatedRow.wtUom === "MT") {
-              updatedRow.actualWt = ((totalPkgs * packSize) / 1000).toString();
-            } else {
-              updatedRow.actualWt = (totalPkgs * packSize).toString();
-            }
-          }
-          
-          // Auto-calculate ACTUAL WT from WT LTR
-          if (key === "wtLtr") {
-            const wtLtr = num(updatedRow.wtLtr);
-            if (updatedRow.wtUom === "MT") {
-              updatedRow.actualWt = (wtLtr / 1000).toString();
-            } else {
-              updatedRow.actualWt = wtLtr.toString();
-            }
-          }
-          
-          // Update CHARGED WT when ACTUAL WT changes (optional auto-fill)
-          if (key === "actualWt" && !updatedRow.chargedWt) {
-            updatedRow.chargedWt = updatedRow.actualWt;
-          }
-          
-          return updatedRow;
-        }
-        return r;
-      })
-    );
-  };
-
-  const removeProductRow = (rowId) => {
-    if (productRows.length > 1) {
-      setProductRows((prev) => prev.filter((r) => r._id !== rowId));
+  const handleConsignorSearch = (query) => {
+    setConsignor(prev => ({ ...prev, name: query }));
+    
+    if (!customers || customers.length === 0) {
+      setFilteredConsignors([]);
+      return;
+    }
+    
+    if (query.trim() === "") {
+      setFilteredConsignors(customers);
     } else {
-      alert("At least one product row is required");
+      const filtered = customers.filter(customer =>
+        customer.customerName?.toLowerCase().includes(query.toLowerCase()) ||
+        customer.customerCode?.toLowerCase().includes(query.toLowerCase())
+      );
+      setFilteredConsignors(filtered);
     }
   };
 
-  const duplicateProductRow = (rowId) => {
-    const row = productRows.find((r) => r._id === rowId);
-    if (!row) return;
-    setProductRows([...productRows, { ...row, _id: uid() }]);
+  const handleSelectConsignor = (customer) => {
+    const addresses = extractAddressesFromCustomer(customer);
+    
+    setConsignor({
+      name: customer.customerName,
+      address: addresses.length > 0 ? addresses[0].address : '',
+      customerId: customer._id,
+      selectedAddressTitle: addresses.length > 0 ? addresses[0].title : ''
+    });
+    
+    setConsignorAddresses(addresses);
+    setShowConsignorDropdown(false);
+  };
+
+  const handleConsignorInputFocus = () => {
+    if (!showConsignorDropdown) {
+      if (customers.length === 0) {
+        fetchCustomers();
+      } else {
+        setFilteredConsignors(customers);
+        setShowConsignorDropdown(true);
+      }
+    }
+  };
+
+  const handleConsignorInputBlur = () => {
+    setTimeout(() => {
+      if (consignorDropdownRef.current && !consignorDropdownRef.current.contains(document.activeElement)) {
+        setShowConsignorDropdown(false);
+      }
+    }, 200);
+  };
+
+  const handleSelectConsignorAddress = (addressObj) => {
+    setConsignor(prev => ({
+      ...prev,
+      address: addressObj.address,
+      selectedAddressTitle: addressObj.title
+    }));
+    setShowConsignorAddressDropdown(false);
+  };
+
+  const handleConsigneeSearch = (query) => {
+    setConsignee(prev => ({ ...prev, name: query }));
+    
+    if (!customers || customers.length === 0) {
+      setFilteredConsignees([]);
+      return;
+    }
+    
+    if (query.trim() === "") {
+      setFilteredConsignees(customers);
+    } else {
+      const filtered = customers.filter(customer =>
+        customer.customerName?.toLowerCase().includes(query.toLowerCase()) ||
+        customer.customerCode?.toLowerCase().includes(query.toLowerCase())
+      );
+      setFilteredConsignees(filtered);
+    }
+  };
+
+  const handleSelectConsignee = (customer) => {
+    const addresses = extractAddressesFromCustomer(customer);
+    
+    setConsignee({
+      name: customer.customerName,
+      address: addresses.length > 0 ? addresses[0].address : '',
+      customerId: customer._id,
+      selectedAddressTitle: addresses.length > 0 ? addresses[0].title : ''
+    });
+    
+    setConsigneeAddresses(addresses);
+    setShowConsigneeDropdown(false);
+  };
+
+  const handleConsigneeInputFocus = () => {
+    if (!showConsigneeDropdown) {
+      if (customers.length === 0) {
+        fetchCustomers();
+      } else {
+        setFilteredConsignees(customers);
+        setShowConsigneeDropdown(true);
+      }
+    }
+  };
+
+  const handleConsigneeInputBlur = () => {
+    setTimeout(() => {
+      if (consigneeDropdownRef.current && !consigneeDropdownRef.current.contains(document.activeElement)) {
+        setShowConsigneeDropdown(false);
+      }
+    }, 200);
+  };
+
+  const handleSelectConsigneeAddress = (addressObj) => {
+    setConsignee(prev => ({
+      ...prev,
+      address: addressObj.address,
+      selectedAddressTitle: addressObj.title
+    }));
+    setShowConsigneeAddressDropdown(false);
+  };
+
+  /** =========================
+   * PRODUCT ROW HANDLERS FOR EACH PACK TYPE
+   ========================= */
+  // Palletization
+  const addPalletizationRow = () => setPalletizationRows([...palletizationRows, defaultPalletizationRow()]);
+  const updatePalletizationRow = (id, field, value) => {
+    setPalletizationRows(prev => prev.map(row => 
+      row._id === id ? { ...row, [field]: value } : row
+    ));
+  };
+  const removePalletizationRow = (id) => {
+    if (palletizationRows.length > 1) {
+      setPalletizationRows(prev => prev.filter(row => row._id !== id));
+    }
+  };
+
+  // Uniform
+  const addUniformRow = () => setUniformRows([...uniformRows, defaultUniformRow()]);
+  const updateUniformRow = (id, field, value) => {
+    setUniformRows(prev => prev.map(row => 
+      row._id === id ? { ...row, [field]: value } : row
+    ));
+  };
+  const removeUniformRow = (id) => {
+    if (uniformRows.length > 1) {
+      setUniformRows(prev => prev.filter(row => row._id !== id));
+    }
+  };
+
+  // Loose Cargo
+  const addLooseCargoRow = () => setLooseCargoRows([...looseCargoRows, defaultLooseCargoRow()]);
+  const updateLooseCargoRow = (id, field, value) => {
+    setLooseCargoRows(prev => prev.map(row => 
+      row._id === id ? { ...row, [field]: value } : row
+    ));
+  };
+  const removeLooseCargoRow = (id) => {
+    if (looseCargoRows.length > 1) {
+      setLooseCargoRows(prev => prev.filter(row => row._id !== id));
+    }
+  };
+
+  // Non-Uniform
+  const addNonUniformRow = () => setNonUniformRows([...nonUniformRows, defaultNonUniformRow()]);
+  const updateNonUniformRow = (id, field, value) => {
+    setNonUniformRows(prev => prev.map(row => 
+      row._id === id ? { ...row, [field]: value } : row
+    ));
+  };
+  const removeNonUniformRow = (id) => {
+    if (nonUniformRows.length > 1) {
+      setNonUniformRows(prev => prev.filter(row => row._id !== id));
+    }
   };
 
   /** =========================
    * CALCULATED VALUES
    ========================= */
   const calculateTotalActualWt = () => {
-    return productRows.reduce((sum, row) => sum + num(row.actualWt), 0);
+    let total = 0;
+    palletizationRows.forEach(row => total += num(row.actualWt));
+    uniformRows.forEach(row => total += num(row.actualWt));
+    looseCargoRows.forEach(row => total += num(row.actualWt));
+    nonUniformRows.forEach(row => total += num(row.actualWt));
+    return total;
   };
 
   /** =========================
@@ -766,17 +972,12 @@ export default function EditConsignmentNote() {
    ========================= */
   const handleUpdate = async () => {
     if (!header.partyName) {
-      alert("Please select a party");
-      return;
-    }
-
-    if (!header.orderNo) {
-      alert("Please enter order number");
+      alert("Please enter party name");
       return;
     }
 
     if (!header.vendorName) {
-      alert("Please select a vendor");
+      alert("Please enter vendor name");
       return;
     }
 
@@ -790,27 +991,17 @@ export default function EditConsignmentNote() {
       
       const payload = {
         id: noteId,
-        vnnNo,
-        vehicleNegotiationId,
-        loadingInfoNo,
         header,
         consignor,
         consignee,
         invoice,
         ewaybill,
-        productRows: productRows.map(row => ({
-          ...row,
-          totalPkgs: row.totalPkgs || '',
-          pkgsType: row.pkgsType || '',
-          uom: row.uom || '',
-          packSize: row.packSize || '',
-          skuSize: row.skuSize || '',
-          productName: row.productName || '',
-          wtLtr: parseFloat(row.wtLtr) || 0,
-          actualWt: parseFloat(row.actualWt) || 0,
-          chargedWt: parseFloat(row.chargedWt) || 0,
-          wtUom: row.wtUom || 'MT'
-        })),
+        packData: {
+          PALLETIZATION: palletizationRows,
+          'UNIFORM - BAGS/BOXES': uniformRows,
+          'LOOSE - CARGO': looseCargoRows,
+          'NON-UNIFORM - GENERAL CARGO': nonUniformRows
+        },
         totalWeight: calculateTotalActualWt(),
       };
 
@@ -843,6 +1034,24 @@ export default function EditConsignmentNote() {
       setSaving(false);
     }
   };
+
+  // Get vehicle negotiation summary for display
+  const getVehicleSummary = () => {
+    if (!vehicleNegotiationData?.approval) return null;
+    
+    const approval = vehicleNegotiationData.approval;
+    return {
+      vehicleNo: approval.vehicleNo || 'N/A',
+      vendorName: approval.vendorName || 'N/A',
+      vendorCode: approval.vendorCode || 'N/A',
+      mobile: approval.mobile || 'N/A',
+      rateType: approval.rateType || 'N/A',
+      finalRate: approval.rateType === 'Per MT' ? approval.finalPerMT : approval.finalFix,
+      approvalStatus: approval.approvalStatus || 'Pending'
+    };
+  };
+
+  const vehicleSummary = getVehicleSummary();
 
   if (fetchLoading) {
     return (
@@ -878,26 +1087,19 @@ export default function EditConsignmentNote() {
               </div>
             </div>
             <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
-              {loadingInfoNo && (
-                <>
-                  <span>Loading Info: {loadingInfoNo}</span>
-                  <span>|</span>
-                </>
-              )}
-              {vnnNo && (
-                <>
-                  <span>VNN: {vnnNo}</span>
-                  <span>|</span>
-                </>
-              )}
               <span>Status: {header.status}</span>
-              {fetchingData && (
-                <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full text-xs flex items-center">
+              {isReadOnly && (
+                <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full text-xs">
+                  🔒 Read Only Mode - Data loaded from Order
+                </span>
+              )}
+              {fetchingVehicleData && (
+                <span className="text-green-600 bg-green-50 px-2 py-0.5 rounded-full text-xs flex items-center">
                   <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Loading...
+                  Fetching vehicle data...
                 </span>
               )}
               {apiError && (
@@ -911,9 +1113,9 @@ export default function EditConsignmentNote() {
           <div className="flex items-center gap-3">
             <button
               onClick={handleUpdate}
-              disabled={saving || fetchingData}
+              disabled={saving || fetchingData || isReadOnly}
               className={`rounded-xl px-5 py-2 text-sm font-bold text-white transition ${
-                saving || fetchingData
+                saving || fetchingData || isReadOnly
                   ? 'bg-gray-400 cursor-not-allowed' 
                   : 'bg-emerald-600 hover:bg-emerald-700'
               }`}
@@ -934,74 +1136,109 @@ export default function EditConsignmentNote() {
 
       {/* ===== Main Content ===== */}
       <div className="mx-auto max-w-full p-4">
-        {/* ===== Loading Info Search ===== */}
-        <div className="mb-4">
-          <Card title="Load from Loading Info">
-            <div className="grid grid-cols-12 gap-4">
-              <div className="col-span-12 md:col-span-4 relative" ref={loadingInfoDropdownRef}>
-                <label className="text-xs font-bold text-slate-600">Loading Info (Vehicle Arrival No)</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={loadingInfoNo}
-                    onChange={(e) => handleLoadingInfoSearch(e.target.value)}
-                    onFocus={handleLoadingInfoInputFocus}
-                    onBlur={handleLoadingInfoInputBlur}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 pr-8"
-                    placeholder="Search loading info..."
-                  />
-                  {loadingInfoHook.loading && (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      <svg className="animate-spin h-4 w-4 text-purple-500" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
+        {/* ===== Order Selection ===== */}
+        <Card title="Select Order">
+          <div className="grid grid-cols-12 gap-4">
+            <div className="col-span-12 md:col-span-4 relative" ref={orderDropdownRef}>
+              <label className="text-xs font-bold text-slate-600">Order No *</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={header.orderNo}
+                  onChange={(e) => handleOrderSearch(e.target.value)}
+                  onFocus={handleOrderInputFocus}
+                  onBlur={handleOrderInputBlur}
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 pr-8"
+                  placeholder="Search order no..."
+               
+                />
+                {ordersLoading && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <svg className="animate-spin h-4 w-4 text-purple-500" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  </div>
+                )}
+              </div>
+              {showOrderDropdown && !isReadOnly && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                  {ordersLoading ? (
+                    <div className="p-3 text-center text-sm text-slate-500">Loading orders...</div>
+                  ) : filteredOrders.length > 0 ? (
+                    filteredOrders.map((order, index) => (
+                      <div
+                        key={order._id || index}
+                        onMouseDown={() => handleSelectOrder(order)}
+                        className="p-3 hover:bg-purple-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors"
+                      >
+                        <div className="font-medium text-slate-800">
+                          {order.orderNo || order.orderPanelNo}
+                        </div>
+                        <div className="text-xs text-slate-500 mt-1">
+                          Party: {order.partyName || order.customerName || 'N/A'}
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          From: {order.from || 'N/A'} → To: {order.to || 'N/A'}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-3 text-center text-sm text-slate-500">
+                      {header.orderNo.trim() ? 
+                        `No orders found for "${header.orderNo}"` : 
+                        "No orders available. Please create orders first."
+                      }
                     </div>
                   )}
                 </div>
-                
-                {showLoadingInfoDropdown && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-                    {loadingInfoHook.loading ? (
-                      <div className="p-3 text-center text-sm text-slate-500">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-500 mx-auto"></div>
-                        <p className="mt-1">Loading...</p>
-                      </div>
-                    ) : filteredLoadingInfos.length > 0 ? (
-                      filteredLoadingInfos.map((info) => (
-                        <div
-                          key={info._id}
-                          onMouseDown={() => handleSelectLoadingInfo(info)}
-                          className="p-3 hover:bg-purple-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors"
-                        >
-                          <div className="font-medium text-slate-800">
-                            {info.vehicleArrivalNo}
-                          </div>
-                          <div className="text-xs text-slate-500 mt-1">
-                            Vehicle: {info.vehicleNo || 'N/A'} • 
-                            From: {info.orderRows?.[0]?.from || 'N/A'} → 
-                            To: {info.orderRows?.[0]?.to || 'N/A'}
-                          </div>
-                          <div className="text-xs text-slate-400">
-                            Branch: {info.branch || 'N/A'}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="p-3 text-center text-sm text-slate-500">
-                        {loadingInfoNo.trim() ? 
-                          `No loading info found for "${loadingInfoNo}"` : 
-                          "No loading info available"
-                        }
-                      </div>
-                    )}
+              )}
+              <div className="text-xs text-slate-400 mt-1">Search and select order to auto-fill details (Read Only after selection)</div>
+            </div>
+          </div>
+        </Card>
+
+        {/* ===== Vehicle Negotiation Summary Card ===== */}
+        {vehicleSummary && (
+          <div className="mt-4">
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <h3 className="text-sm font-extrabold text-green-800">Vehicle Negotiation Data Found</h3>
+                <span className={`ml-auto text-xs px-2 py-0.5 rounded-full ${
+                  vehicleSummary.approvalStatus === 'Approved' ? 'bg-green-100 text-green-700' :
+                  vehicleSummary.approvalStatus === 'Reject' ? 'bg-red-100 text-red-700' :
+                  'bg-yellow-100 text-yellow-700'
+                }`}>
+                  {vehicleSummary.approvalStatus}
+                </span>
+              </div>
+              <div className="grid grid-cols-12 gap-4">
+                <div className="col-span-12 md:col-span-3">
+                  <div className="text-xs text-green-600 font-medium">Vehicle No</div>
+                  <div className="text-sm font-bold text-green-800">{vehicleSummary.vehicleNo}</div>
+                </div>
+                <div className="col-span-12 md:col-span-3">
+                  <div className="text-xs text-green-600 font-medium">Vendor Name</div>
+                  <div className="text-sm font-bold text-green-800">{vehicleSummary.vendorName}</div>
+                  <div className="text-xs text-green-500">Code: {vehicleSummary.vendorCode}</div>
+                </div>
+                <div className="col-span-12 md:col-span-3">
+                  <div className="text-xs text-green-600 font-medium">Mobile No</div>
+                  <div className="text-sm font-bold text-green-800">{vehicleSummary.mobile}</div>
+                </div>
+                <div className="col-span-12 md:col-span-3">
+                  <div className="text-xs text-green-600 font-medium">Rate Details</div>
+                  <div className="text-sm font-bold text-green-800">
+                    {vehicleSummary.rateType}: {vehicleSummary.finalRate}
                   </div>
-                )}
-                <div className="text-xs text-slate-400 mt-1">Select to auto-fill vehicle, vendor, and product data</div>
+                </div>
               </div>
             </div>
-          </Card>
-        </div>
+          </div>
+        )}
 
         {/* ===== Party Information ===== */}
         <Card title="Party Information">
@@ -1012,19 +1249,19 @@ export default function EditConsignmentNote() {
                 type="text"
                 value={header.partyName}
                 onChange={(e) => setHeader({ ...header, partyName: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                readOnly={isReadOnly}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
                 placeholder="Enter party name"
               />
             </div>
 
             <div className="col-span-12 md:col-span-2">
-              <label className="text-xs font-bold text-slate-600">Order No *</label>
+              <label className="text-xs font-bold text-slate-600">Order No</label>
               <input
                 type="text"
                 value={header.orderNo}
-                onChange={(e) => setHeader({ ...header, orderNo: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                placeholder="Enter order no"
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
               />
             </div>
 
@@ -1033,7 +1270,8 @@ export default function EditConsignmentNote() {
               <select
                 value={header.orderType}
                 onChange={(e) => setHeader({ ...header, orderType: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                disabled={isReadOnly}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
               >
                 {ORDER_TYPES.map((opt) => (
                   <option key={opt} value={opt}>{opt}</option>
@@ -1046,9 +1284,8 @@ export default function EditConsignmentNote() {
               <input
                 type="text"
                 value={header.plantCode}
-                onChange={(e) => setHeader({ ...header, plantCode: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                placeholder="Plant code"
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
               />
             </div>
 
@@ -1057,7 +1294,8 @@ export default function EditConsignmentNote() {
               <select
                 value={header.hiredOwned}
                 onChange={(e) => setHeader({ ...header, hiredOwned: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                disabled={isReadOnly}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
               >
                 {HIRED_OWNED_OPTIONS.map((opt) => (
                   <option key={opt} value={opt}>{opt}</option>
@@ -1071,8 +1309,9 @@ export default function EditConsignmentNote() {
                 type="text"
                 value={header.vendorCode}
                 onChange={(e) => setHeader({ ...header, vendorCode: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                placeholder="Vendor code"
+                readOnly={isReadOnly || !!vehicleNegotiationData}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 ${(isReadOnly || vehicleNegotiationData) ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
+                placeholder="Enter vendor code"
               />
             </div>
 
@@ -1082,8 +1321,9 @@ export default function EditConsignmentNote() {
                 type="text"
                 value={header.vendorName}
                 onChange={(e) => setHeader({ ...header, vendorName: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                placeholder="Vendor name"
+                readOnly={isReadOnly || !!vehicleNegotiationData}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 ${(isReadOnly || vehicleNegotiationData) ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
+                placeholder="Enter vendor name"
               />
             </div>
 
@@ -1092,9 +1332,8 @@ export default function EditConsignmentNote() {
               <input
                 type="text"
                 value={header.from}
-                onChange={(e) => setHeader({ ...header, from: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                placeholder="Kandla"
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
               />
             </div>
 
@@ -1103,9 +1342,18 @@ export default function EditConsignmentNote() {
               <input
                 type="text"
                 value={header.to}
-                onChange={(e) => setHeader({ ...header, to: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                placeholder="Darayoganj"
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
+              />
+            </div>
+
+            <div className="col-span-12 md:col-span-1">
+              <label className="text-xs font-bold text-slate-600">Taluka</label>
+              <input
+                type="text"
+                value={header.taluka}
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
               />
             </div>
 
@@ -1114,9 +1362,8 @@ export default function EditConsignmentNote() {
               <input
                 type="text"
                 value={header.district}
-                onChange={(e) => setHeader({ ...header, district: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                placeholder="Etah"
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
               />
             </div>
 
@@ -1125,9 +1372,8 @@ export default function EditConsignmentNote() {
               <input
                 type="text"
                 value={header.state}
-                onChange={(e) => setHeader({ ...header, state: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                placeholder="UP"
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
               />
             </div>
 
@@ -1137,7 +1383,8 @@ export default function EditConsignmentNote() {
                 type="text"
                 value={header.vehicleNo}
                 onChange={(e) => setHeader({ ...header, vehicleNo: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                readOnly={isReadOnly || !!vehicleNegotiationData}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 ${(isReadOnly || vehicleNegotiationData) ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
                 placeholder="HR38X8960"
               />
             </div>
@@ -1148,7 +1395,8 @@ export default function EditConsignmentNote() {
                 type="text"
                 value={header.partyNo}
                 onChange={(e) => setHeader({ ...header, partyNo: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                readOnly={isReadOnly || !!vehicleNegotiationData}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 ${(isReadOnly || vehicleNegotiationData) ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
                 placeholder="8182482111"
               />
             </div>
@@ -1169,7 +1417,8 @@ export default function EditConsignmentNote() {
                 type="text"
                 value={header.lrDate}
                 onChange={(e) => setHeader({ ...header, lrDate: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                readOnly={isReadOnly}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
                 placeholder="DD.MM.YYYY"
               />
             </div>
@@ -1179,7 +1428,8 @@ export default function EditConsignmentNote() {
               <select
                 value={header.unit}
                 onChange={(e) => setHeader({ ...header, unit: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                disabled={isReadOnly}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
               >
                 {UNIT_OPTIONS.map((opt) => (
                   <option key={opt} value={opt}>{opt}</option>
@@ -1192,7 +1442,8 @@ export default function EditConsignmentNote() {
               <select
                 value={header.status}
                 onChange={(e) => setHeader({ ...header, status: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                disabled={isReadOnly}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
               >
                 {STATUS_OPTIONS.map((opt) => (
                   <option key={opt} value={opt}>{opt}</option>
@@ -1208,16 +1459,98 @@ export default function EditConsignmentNote() {
             <div className="col-span-12 md:col-span-6">
               <Card title="Consignor (Sender)">
                 <div className="space-y-3">
-                  <div>
-                    <label className="text-xs font-bold text-slate-600">Consignor Name</label>
-                    <input
-                      type="text"
-                      value={consignor.name}
-                      onChange={(e) => setConsignor({ ...consignor, name: e.target.value })}
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                      placeholder="Enter consignor name"
-                    />
+                  <div className="relative" ref={consignorDropdownRef}>
+                    <label className="text-xs font-bold text-slate-600">Consignor Name *</label>
+                    <div className="flex gap-2">
+                      <div className="flex-1 relative">
+                        <input
+                          type="text"
+                          value={consignor.name}
+                          onChange={(e) => handleConsignorSearch(e.target.value)}
+                          onFocus={handleConsignorInputFocus}
+                          onBlur={handleConsignorInputBlur}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                          placeholder="Search customer by name..."
+                          autoComplete="off"
+                        />
+                        {showConsignorDropdown && (
+                          <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                            {customersLoading ? (
+                              <div className="p-3 text-center text-sm text-slate-500">
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-500 mx-auto"></div>
+                                <p className="mt-1">Loading customers...</p>
+                              </div>
+                            ) : filteredConsignors.length > 0 ? (
+                              filteredConsignors.map((customer) => {
+                                const addresses = extractAddressesFromCustomer(customer);
+                                const addressCount = addresses.length;
+                                
+                                return (
+                                  <div
+                                    key={customer._id}
+                                    onMouseDown={() => handleSelectConsignor(customer)}
+                                    className="p-3 hover:bg-purple-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors"
+                                  >
+                                    <div className="font-medium text-slate-800">{customer.customerName}</div>
+                                    <div className="text-xs text-slate-500 mt-1">
+                                      Code: {customer.customerCode}
+                                      {customer.contactPersonName && ` • Contact: ${customer.contactPersonName}`}
+                                      {addressCount > 0 && ` • ${addressCount} address(es)`}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div className="p-3 text-center text-sm text-slate-500">
+                                {consignor.name.trim() ? 
+                                  `No customers found for "${consignor.name}"` : 
+                                  "No customers available"
+                                }
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
+                  
+                  {/* Address Title Dropdown */}
+                  <div className="relative" ref={consignorAddressRef}>
+                    <label className="text-xs font-bold text-slate-600">Select Address Title</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={consignor.selectedAddressTitle}
+                        onFocus={() => {
+                          if (consignor.customerId && consignorAddresses.length > 0) {
+                            setShowConsignorAddressDropdown(true);
+                          }
+                        }}
+                        onBlur={handleConsignorInputBlur}
+                        readOnly
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-50 px-3 py-2 text-sm outline-none cursor-pointer"
+                        placeholder={consignorAddresses.length > 0 ? "Select an address..." : "No addresses available"}
+                      />
+                      {showConsignorAddressDropdown && consignorAddresses.length > 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                          {consignorAddresses.map((addr, idx) => (
+                            <div
+                              key={idx}
+                              onMouseDown={() => handleSelectConsignorAddress(addr)}
+                              className="p-3 hover:bg-purple-50 cursor-pointer border-b border-slate-100 last:border-b-0"
+                            >
+                              <div className="font-medium text-slate-800">{addr.title}</div>
+                              <div className="text-xs text-slate-500 mt-1">{addr.address.substring(0, 100)}...</div>
+                              {addr.gstNumber && (
+                                <div className="text-xs text-slate-400 mt-0.5">GST: {addr.gstNumber}</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
                   <div>
                     <label className="text-xs font-bold text-slate-600">Consignor Address</label>
                     <textarea
@@ -1227,6 +1560,14 @@ export default function EditConsignmentNote() {
                       className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
                       placeholder="Enter complete address"
                     />
+                    {consignor.address && consignor.customerId && (
+                      <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Address auto-filled from selected customer
+                      </div>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -1235,16 +1576,98 @@ export default function EditConsignmentNote() {
             <div className="col-span-12 md:col-span-6">
               <Card title="Consignee (Receiver)">
                 <div className="space-y-3">
-                  <div>
-                    <label className="text-xs font-bold text-slate-600">Consignee Name</label>
-                    <input
-                      type="text"
-                      value={consignee.name}
-                      onChange={(e) => setConsignee({ ...consignee, name: e.target.value })}
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                      placeholder="Enter consignee name"
-                    />
+                  <div className="relative" ref={consigneeDropdownRef}>
+                    <label className="text-xs font-bold text-slate-600">Consignee Name *</label>
+                    <div className="flex gap-2">
+                      <div className="flex-1 relative">
+                        <input
+                          type="text"
+                          value={consignee.name}
+                          onChange={(e) => handleConsigneeSearch(e.target.value)}
+                          onFocus={handleConsigneeInputFocus}
+                          onBlur={handleConsigneeInputBlur}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                          placeholder="Search customer by name..."
+                          autoComplete="off"
+                        />
+                        {showConsigneeDropdown && (
+                          <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                            {customersLoading ? (
+                              <div className="p-3 text-center text-sm text-slate-500">
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-500 mx-auto"></div>
+                                <p className="mt-1">Loading customers...</p>
+                              </div>
+                            ) : filteredConsignees.length > 0 ? (
+                              filteredConsignees.map((customer) => {
+                                const addresses = extractAddressesFromCustomer(customer);
+                                const addressCount = addresses.length;
+                                
+                                return (
+                                  <div
+                                    key={customer._id}
+                                    onMouseDown={() => handleSelectConsignee(customer)}
+                                    className="p-3 hover:bg-purple-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors"
+                                  >
+                                    <div className="font-medium text-slate-800">{customer.customerName}</div>
+                                    <div className="text-xs text-slate-500 mt-1">
+                                      Code: {customer.customerCode}
+                                      {customer.contactPersonName && ` • Contact: ${customer.contactPersonName}`}
+                                      {addressCount > 0 && ` • ${addressCount} address(es)`}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div className="p-3 text-center text-sm text-slate-500">
+                                {consignee.name.trim() ? 
+                                  `No customers found for "${consignee.name}"` : 
+                                  "No customers available"
+                                }
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
+                  
+                  {/* Address Title Dropdown for Consignee */}
+                  <div className="relative" ref={consigneeAddressRef}>
+                    <label className="text-xs font-bold text-slate-600">Select Address Title</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={consignee.selectedAddressTitle}
+                        onFocus={() => {
+                          if (consignee.customerId && consigneeAddresses.length > 0) {
+                            setShowConsigneeAddressDropdown(true);
+                          }
+                        }}
+                        onBlur={handleConsignorInputBlur}
+                        readOnly
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-50 px-3 py-2 text-sm outline-none cursor-pointer"
+                        placeholder={consigneeAddresses.length > 0 ? "Select an address..." : "No addresses available"}
+                      />
+                      {showConsigneeAddressDropdown && consigneeAddresses.length > 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                          {consigneeAddresses.map((addr, idx) => (
+                            <div
+                              key={idx}
+                              onMouseDown={() => handleSelectConsigneeAddress(addr)}
+                              className="p-3 hover:bg-purple-50 cursor-pointer border-b border-slate-100 last:border-b-0"
+                            >
+                              <div className="font-medium text-slate-800">{addr.title}</div>
+                              <div className="text-xs text-slate-500 mt-1">{addr.address.substring(0, 100)}...</div>
+                              {addr.gstNumber && (
+                                <div className="text-xs text-slate-400 mt-0.5">GST: {addr.gstNumber}</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
                   <div>
                     <label className="text-xs font-bold text-slate-600">Consignee Address</label>
                     <textarea
@@ -1254,6 +1677,14 @@ export default function EditConsignmentNote() {
                       className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
                       placeholder="Enter complete address"
                     />
+                    {consignee.address && consignee.customerId && (
+                      <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Address auto-filled from selected customer
+                      </div>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -1270,7 +1701,8 @@ export default function EditConsignmentNote() {
                 <select
                   value={invoice.boeInvoice}
                   onChange={(e) => setInvoice({ ...invoice, boeInvoice: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                  
+                  className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 `}
                 >
                   {BOE_INVOICE_OPTIONS.map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
@@ -1284,7 +1716,8 @@ export default function EditConsignmentNote() {
                   type="text"
                   value={invoice.boeInvoiceNo}
                   onChange={(e) => setInvoice({ ...invoice, boeInvoiceNo: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                  
+                  className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 `}
                   placeholder="DC20004623"
                 />
               </div>
@@ -1295,7 +1728,8 @@ export default function EditConsignmentNote() {
                   type="text"
                   value={invoice.boeInvoiceDate}
                   onChange={(e) => setInvoice({ ...invoice, boeInvoiceDate: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                
+                  className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 `}
                   placeholder="DD.MM.YYYY"
                 />
               </div>
@@ -1306,7 +1740,8 @@ export default function EditConsignmentNote() {
                   type="text"
                   value={invoice.invoiceValue}
                   onChange={(e) => setInvoice({ ...invoice, invoiceValue: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                  
+                  className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 `}
                   placeholder="1589233"
                 />
               </div>
@@ -1324,7 +1759,8 @@ export default function EditConsignmentNote() {
                   type="text"
                   value={ewaybill.ewaybillNo}
                   onChange={(e) => setEwaybill({ ...ewaybill, ewaybillNo: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                 
+                  className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 `}
                   placeholder="5641 3563 6264"
                 />
               </div>
@@ -1335,7 +1771,8 @@ export default function EditConsignmentNote() {
                   type="text"
                   value={ewaybill.expiryDate}
                   onChange={(e) => setEwaybill({ ...ewaybill, expiryDate: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                  
+                  className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 `}
                   placeholder="DD.MM.YYYY"
                 />
               </div>
@@ -1346,7 +1783,8 @@ export default function EditConsignmentNote() {
                   type="text"
                   value={ewaybill.containerNo}
                   onChange={(e) => setEwaybill({ ...ewaybill, containerNo: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                 
+                  className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 `}
                   placeholder="TEU8753185M"
                 />
               </div>
@@ -1354,19 +1792,194 @@ export default function EditConsignmentNote() {
           </Card>
         </div>
 
-        {/* ===== Products Table ===== */}
+        {/* ===== Product Details - All 4 Pack Types ===== */}
+        
+        {/* PALLETIZATION Section */}
         <div className="mt-4">
           <Card 
-            title="Product Details"
+            title="Palletization"
             right={
-              <div className="flex gap-2">
+              !isReadOnly && (
                 <button
-                  onClick={addProductRow}
+                  onClick={addPalletizationRow}
                   className="rounded-xl bg-yellow-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-yellow-700 transition"
                 >
-                  + Add Product
+                  + Add Row
                 </button>
-              </div>
+              )
+            }
+          >
+            <div className="overflow-auto rounded-xl border border-yellow-300">
+              <table className="min-w-full w-full text-sm">
+                <thead className="sticky top-0 bg-yellow-400">
+                  <tr>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">NO OF PALLETS</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">UNIT PER PALLETS</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">TOTAL PKGS</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PKG TYPE</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">UOM</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">SKU - SIZE</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PACK - WEIGHT</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PRODUCT NAME</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">WT (LTR)</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">ACTUAL - WT</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">CHARGED - WT</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">WT UOM</th>
+                    {!isReadOnly && <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">Actions</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {palletizationRows.map((row) => (
+                    <tr key={row._id} className="hover:bg-yellow-50 even:bg-slate-50">
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.noOfPallets}
+                          onChange={(e) => updatePalletizationRow(row._id, 'noOfPallets', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`}
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.unitPerPallets}
+                          onChange={(e) => updatePalletizationRow(row._id, 'unitPerPallets', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`}
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.totalPkgs}
+                          onChange={(e) => updatePalletizationRow(row._id, 'totalPkgs', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`}
+                        />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <select
+                          value={row.pkgsType}
+                          onChange={(e) => updatePalletizationRow(row._id, 'pkgsType', e.target.value)}
+                          disabled={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
+                        >
+                          <option value="">Select</option>
+                          {PKGS_TYPE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                       </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <select
+                          value={row.uom}
+                          onChange={(e) => updatePalletizationRow(row._id, 'uom', e.target.value)}
+                          disabled={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
+                        >
+                          {UOM_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                       </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <select
+                          value={row.skuSize}
+                          onChange={(e) => updatePalletizationRow(row._id, 'skuSize', e.target.value)}
+                          disabled={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
+                        >
+                          <option value="">Select</option>
+                          {SKU_SIZE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                       </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.packWeight}
+                          onChange={(e) => updatePalletizationRow(row._id, 'packWeight', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`}
+                        />
+                       </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <select
+                          value={row.productName}
+                          onChange={(e) => updatePalletizationRow(row._id, 'productName', e.target.value)}
+                          disabled={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
+                        >
+                          <option value="">Select</option>
+                          {PRODUCT_NAME_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                       </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.wtLtr}
+                          onChange={(e) => updatePalletizationRow(row._id, 'wtLtr', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`}
+                        />
+                       </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.actualWt}
+                          onChange={(e) => updatePalletizationRow(row._id, 'actualWt', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`}
+                        />
+                       </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.chargedWt}
+                          onChange={(e) => updatePalletizationRow(row._id, 'chargedWt', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`}
+                        />
+                       </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <select
+                          value={row.wtUom}
+                          onChange={(e) => updatePalletizationRow(row._id, 'wtUom', e.target.value)}
+                          disabled={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
+                        >
+                          {UOM_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                       </td>
+                      {!isReadOnly && (
+                        <td className="border border-yellow-300 px-2 py-2 text-center">
+                          {palletizationRows.length > 1 && (
+                            <button
+                              onClick={() => removePalletizationRow(row._id)}
+                              className="rounded-lg bg-red-500 px-2 py-1.5 text-xs font-bold text-white hover:bg-red-600"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+
+        {/* UNIFORM - BAGS/BOXES Section */}
+        <div className="mt-4">
+          <Card 
+            title="Uniform - Bags/Boxes"
+            right={
+              !isReadOnly && (
+                <button
+                  onClick={addUniformRow}
+                  className="rounded-xl bg-yellow-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-yellow-700 transition"
+                >
+                  + Add Row
+                </button>
+              )
             }
           >
             <div className="overflow-auto rounded-xl border border-yellow-300">
@@ -1374,157 +1987,350 @@ export default function EditConsignmentNote() {
                 <thead className="sticky top-0 bg-yellow-400">
                   <tr>
                     <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">TOTAL PKGS</th>
-                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PKGS TYPE</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PKG TYPE</th>
                     <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">UOM</th>
-                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">Pack Size</th>
                     <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">SKU - SIZE</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PACK - WEIGHT</th>
                     <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PRODUCT NAME</th>
                     <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">WT (LTR)</th>
                     <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">ACTUAL - WT</th>
                     <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">CHARGED - WT</th>
                     <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">WT UOM</th>
-                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">Actions</th>
+                    {!isReadOnly && <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {productRows.map((row) => (
+                  {uniformRows.map((row) => (
                     <tr key={row._id} className="hover:bg-yellow-50 even:bg-slate-50">
                       <td className="border border-yellow-300 px-2 py-2">
                         <input
-                          type="number"
-                          value={row.totalPkgs || ""}
-                          onChange={(e) => updateProductRow(row._id, 'totalPkgs', e.target.value)}
-                          className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                          placeholder="Qty"
+                          type="text"
+                          value={row.totalPkgs}
+                          onChange={(e) => updateUniformRow(row._id, 'totalPkgs', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`}
                         />
-                      </td>
+                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
                         <select
-                          value={row.pkgsType || ""}
-                          onChange={(e) => updateProductRow(row._id, 'pkgsType', e.target.value)}
-                          className="w-24 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm"
+                          value={row.pkgsType}
+                          onChange={(e) => updateUniformRow(row._id, 'pkgsType', e.target.value)}
+                          disabled={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
                         >
                           <option value="">Select</option>
-                          {PKGS_TYPE_OPTIONS.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
+                          {PKGS_TYPE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
-                      </td>
+                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
                         <select
-                          value={row.uom || ""}
-                          onChange={(e) => updateProductRow(row._id, 'uom', e.target.value)}
-                          className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm"
+                          value={row.uom}
+                          onChange={(e) => updateUniformRow(row._id, 'uom', e.target.value)}
+                          disabled={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
                         >
-                          <option value="">UOM</option>
-                          {UOM_OPTIONS.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
+                          {UOM_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
-                      </td>
+                       </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <select
+                          value={row.skuSize}
+                          onChange={(e) => updateUniformRow(row._id, 'skuSize', e.target.value)}
+                          disabled={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
+                        >
+                          <option value="">Select</option>
+                          {SKU_SIZE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
                         <input
                           type="text"
-                          value={row.packSize || ""}
-                          onChange={(e) => updateProductRow(row._id, 'packSize', e.target.value)}
-                          className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                          placeholder="20 Kgs"
+                          value={row.packWeight}
+                          onChange={(e) => updateUniformRow(row._id, 'packWeight', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`}
                         />
-                      </td>
+                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
                         <select
-                          value={row.skuSize || ""}
-                          onChange={(e) => updateProductRow(row._id, 'skuSize', e.target.value)}
-                          className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm"
+                          value={row.productName}
+                          onChange={(e) => updateUniformRow(row._id, 'productName', e.target.value)}
+                          disabled={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
                         >
-                          <option value="">Size</option>
-                          {SKU_SIZE_OPTIONS.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
+                          <option value="">Select</option>
+                          {PRODUCT_NAME_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
-                      </td>
+                       </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.wtLtr}
+                          onChange={(e) => updateUniformRow(row._id, 'wtLtr', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`}
+                        />
+                       </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.actualWt}
+                          onChange={(e) => updateUniformRow(row._id, 'actualWt', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`}
+                        />
+                       </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.chargedWt}
+                          onChange={(e) => updateUniformRow(row._id, 'chargedWt', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`}
+                        />
+                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
                         <select
-                          value={row.productName || ""}
-                          onChange={(e) => updateProductRow(row._id, 'productName', e.target.value)}
-                          className="w-40 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm"
+                          value={row.wtUom}
+                          onChange={(e) => updateUniformRow(row._id, 'wtUom', e.target.value)}
+                          disabled={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
                         >
-                          <option value="">Select Product</option>
-                          {PRODUCT_NAME_OPTIONS.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
+                          {UOM_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
-                      </td>
-                      <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="number"
-                          value={row.wtLtr || ""}
-                          readOnly
-                          className="w-20 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm"
-                          placeholder="Auto"
-                        />
-                      </td>
-                      <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="number"
-                          value={row.actualWt || ""}
-                          onChange={(e) => updateProductRow(row._id, 'actualWt', e.target.value)}
-                          className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                          placeholder="Weight"
-                        />
-                      </td>
-                      <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="number"
-                          value={row.chargedWt || ""}
-                          onChange={(e) => updateProductRow(row._id, 'chargedWt', e.target.value)}
-                          className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                          placeholder="Charged"
-                        />
-                      </td>
-                      <td className="border border-yellow-300 px-2 py-2">
-                        <select
-                          value={row.wtUom || "MT"}
-                          onChange={(e) => updateProductRow(row._id, 'wtUom', e.target.value)}
-                          className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm"
-                        >
-                          {UOM_OPTIONS.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="border border-yellow-300 px-2 py-2">
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => duplicateProductRow(row._id)}
-                            className="rounded-lg border border-yellow-500 bg-yellow-100 px-2 py-1.5 text-xs font-bold text-yellow-800 hover:bg-yellow-200"
-                            title="Duplicate Row"
-                          >
-                            Dup
-                          </button>
-                          <button
-                            onClick={() => removeProductRow(row._id)}
-                            className="rounded-lg bg-red-500 px-2 py-1.5 text-xs font-bold text-white hover:bg-red-600"
-                            title="Remove Row"
-                          >
-                            Del
-                          </button>
-                        </div>
-                      </td>
+                       </td>
+                      {!isReadOnly && (
+                        <td className="border border-yellow-300 px-2 py-2 text-center">
+                          {uniformRows.length > 1 && (
+                            <button
+                              onClick={() => removeUniformRow(row._id)}
+                              className="rounded-lg bg-red-500 px-2 py-1.5 text-xs font-bold text-white hover:bg-red-600"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
-                <tfoot className="bg-yellow-100">
+              </table>
+            </div>
+          </Card>
+        </div>
+
+        {/* LOOSE - CARGO Section */}
+        <div className="mt-4">
+          <Card 
+            title="Loose - Cargo"
+            right={
+              !isReadOnly && (
+                <button
+                  onClick={addLooseCargoRow}
+                  className="rounded-xl bg-yellow-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-yellow-700 transition"
+                >
+                  + Add Row
+                </button>
+              )
+            }
+          >
+            <div className="overflow-auto rounded-xl border border-yellow-300">
+              <table className="min-w-full w-full text-sm">
+                <thead className="sticky top-0 bg-yellow-400">
                   <tr>
-                    <td colSpan="7" className="border border-yellow-300 px-3 py-2 text-right font-bold">
-                      Total Actual Weight:
-                    </td>
-                    <td className="border border-yellow-300 px-3 py-2 font-bold text-emerald-700">
-                      {calculateTotalActualWt().toFixed(2)} {header.unit}
-                    </td>
-                    <td colSpan="3" className="border border-yellow-300 px-3 py-2"></td>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">UOM</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PRODUCT NAME</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">ACTUAL - WT</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">CHARGED - WT</th>
+                    {!isReadOnly && <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">Actions</th>}
                   </tr>
-                </tfoot>
+                </thead>
+                <tbody>
+                  {looseCargoRows.map((row) => (
+                    <tr key={row._id} className="hover:bg-yellow-50 even:bg-slate-50">
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <select
+                          value={row.uom}
+                          onChange={(e) => updateLooseCargoRow(row._id, 'uom', e.target.value)}
+                          disabled={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
+                        >
+                          {UOM_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                       </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <select
+                          value={row.productName}
+                          onChange={(e) => updateLooseCargoRow(row._id, 'productName', e.target.value)}
+                          disabled={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
+                        >
+                          <option value="">Select</option>
+                          {PRODUCT_NAME_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                       </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.actualWt}
+                          onChange={(e) => updateLooseCargoRow(row._id, 'actualWt', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`}
+                        />
+                       </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.chargedWt}
+                          onChange={(e) => updateLooseCargoRow(row._id, 'chargedWt', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`}
+                        />
+                       </td>
+                      {!isReadOnly && (
+                        <td className="border border-yellow-300 px-2 py-2 text-center">
+                          {looseCargoRows.length > 1 && (
+                            <button
+                              onClick={() => removeLooseCargoRow(row._id)}
+                              className="rounded-lg bg-red-500 px-2 py-1.5 text-xs font-bold text-white hover:bg-red-600"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+
+        {/* NON-UNIFORM - GENERAL CARGO Section */}
+        <div className="mt-4">
+          <Card 
+            title="Non-uniform - General Cargo"
+            right={
+              !isReadOnly && (
+                <button
+                  onClick={addNonUniformRow}
+                  className="rounded-xl bg-yellow-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-yellow-700 transition"
+                >
+                  + Add Row
+                </button>
+              )
+            }
+          >
+            <div className="overflow-auto rounded-xl border border-yellow-300">
+              <table className="min-w-full w-full text-sm">
+                <thead className="sticky top-0 bg-yellow-400">
+                  <tr>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">NOS</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PRODUCT NAME</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">UOM</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">LENGTH</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">WIDTH</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">HEIGHT</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">ACTUAL - WT</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">CHARGED - WT</th>
+                    {!isReadOnly && <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">Actions</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {nonUniformRows.map((row) => (
+                    <tr key={row._id} className="hover:bg-yellow-50 even:bg-slate-50">
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.nos}
+                          onChange={(e) => updateNonUniformRow(row._id, 'nos', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`}
+                        />
+                       </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <select
+                          value={row.productName}
+                          onChange={(e) => updateNonUniformRow(row._id, 'productName', e.target.value)}
+                          disabled={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
+                        >
+                          <option value="">Select</option>
+                          {PRODUCT_NAME_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                       </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <select
+                          value={row.uom}
+                          onChange={(e) => updateNonUniformRow(row._id, 'uom', e.target.value)}
+                          disabled={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
+                        >
+                          {UOM_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                       </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.length}
+                          onChange={(e) => updateNonUniformRow(row._id, 'length', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`}
+                        />
+                       </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.width}
+                          onChange={(e) => updateNonUniformRow(row._id, 'width', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`}
+                        />
+                       </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.height}
+                          onChange={(e) => updateNonUniformRow(row._id, 'height', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`}
+                        />
+                       </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.actualWt}
+                          onChange={(e) => updateNonUniformRow(row._id, 'actualWt', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`}
+                        />
+                       </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input
+                          type="text"
+                          value={row.chargedWt}
+                          onChange={(e) => updateNonUniformRow(row._id, 'chargedWt', e.target.value)}
+                          readOnly={isReadOnly}
+                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`}
+                        />
+                       </td>
+                      {!isReadOnly && (
+                        <td className="border border-yellow-300 px-2 py-2 text-center">
+                          {nonUniformRows.length > 1 && (
+                            <button
+                              onClick={() => removeNonUniformRow(row._id)}
+                              className="rounded-lg bg-red-500 px-2 py-1.5 text-xs font-bold text-white hover:bg-red-600"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             </div>
           </Card>
@@ -1560,15 +2366,21 @@ export default function EditConsignmentNote() {
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span className="text-sm text-slate-600">Vehicle No:</span>
-                      <span className="font-bold text-amber-800">{header.vehicleNo || 'N/A'}</span>
+                      <span className={`font-bold ${header.vehicleNo && header.vehicleNo !== 'N/A' ? 'text-green-700' : 'text-amber-800'}`}>
+                        {header.vehicleNo || 'N/A'}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-slate-600">Vendor:</span>
-                      <span className="font-bold text-amber-800">{header.vendorName || 'N/A'}</span>
+                      <span className={`font-bold ${header.vendorName && header.vendorName !== 'N/A' ? 'text-green-700' : 'text-amber-800'}`}>
+                        {header.vendorName || 'N/A'}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-slate-600">Mobile No:</span>
-                      <span className="font-bold text-amber-800">{header.partyNo || 'N/A'}</span>
+                      <span className={`font-bold ${header.partyNo && header.partyNo !== 'N/A' ? 'text-green-700' : 'text-amber-800'}`}>
+                        {header.partyNo || 'N/A'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1581,10 +2393,6 @@ export default function EditConsignmentNote() {
                     <div className="flex justify-between">
                       <span className="text-sm text-slate-600">Total Weight:</span>
                       <span className="text-xl font-bold text-purple-800">{calculateTotalActualWt().toFixed(2)} {header.unit}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-slate-600">Total Products:</span>
-                      <span className="font-bold text-purple-800">{productRows.length}</span>
                     </div>
                   </div>
                 </div>

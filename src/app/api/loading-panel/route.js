@@ -715,8 +715,14 @@ export async function GET(req) {
         arrivalDetails: {
           ...loadingPanel.arrivalDetails,
           date: loadingPanel.arrivalDetails?.date ? 
-            new Date(loadingPanel.arrivalDetails.date).toISOString().split('T')[0] : ''
-        }
+            new Date(loadingPanel.arrivalDetails.date).toISOString().split('T')[0] : '',
+          outDate: loadingPanel.arrivalDetails?.outDate ? 
+            new Date(loadingPanel.arrivalDetails.outDate).toISOString().split('T')[0] : ''
+        },
+        // Convert Map to object for frontend
+        vlPhotoDetails: loadingPanel.vlPhotoDetails instanceof Map 
+          ? Object.fromEntries(loadingPanel.vlPhotoDetails) 
+          : (loadingPanel.vlPhotoDetails || {})
       };
 
       return NextResponse.json({ 
@@ -765,7 +771,10 @@ export async function GET(req) {
         const vlPhotos = [
           panel.vlUploads?.vl1, panel.vlUploads?.vl2, panel.vlUploads?.vl3,
           panel.vlUploads?.vl4, panel.vlUploads?.vl5, panel.vlUploads?.vl6,
-          panel.vlUploads?.vl7, panel.vlUploads?.videoVl
+          panel.vlUploads?.vl7, panel.vlUploads?.vl8, panel.vlUploads?.vl9,
+          panel.vlUploads?.vl10, panel.vlUploads?.vl11, panel.vlUploads?.vl12,
+          panel.vlUploads?.vl13, panel.vlUploads?.vl14, panel.vlUploads?.vl15,
+          panel.vlUploads?.videoVl
         ].filter(v => v && v !== '' && v !== 'Not Set');
         
         return {
@@ -783,7 +792,10 @@ export async function GET(req) {
           detentionNumber: panel.detentionNumber || '',
           hasHelper: panel.hasHelper || false,
           outTime: panel.arrivalDetails?.outTime || '',
+          outDate: panel.arrivalDetails?.outDate ? new Date(panel.arrivalDetails.outDate).toISOString().split('T')[0] : '',
           vlPhotoCount: vlPhotos.length,
+          vehicleSlipCount: panel.vehicleSlips?.length || 0,
+          loadedVehicleSlipCount: panel.loadedVehicleSlips?.length || 0,
           
           // Approval statuses
           vbpStatus: panel.vbpUploads?.approval || 'Not Set',
@@ -872,7 +884,7 @@ export async function POST(req) {
       vehicleArrivalNo = `LD-${Date.now().toString().slice(-8)}`;
     }
 
-    // Process order rows with taluka fields
+    // Process order rows
     const processedOrderRows = (body.orderRows || []).map(row => ({
       _id: new mongoose.Types.ObjectId(),
       orderNo: row.orderNo || '',
@@ -906,7 +918,7 @@ export async function POST(req) {
       aadharPhoto: body.helperInfo?.aadharPhoto || []
     };
 
-    // Process pack data with all 4 pack types
+    // Process pack data
     const processPackData = (packData) => {
       const result = {
         PALLETIZATION: [],
@@ -917,7 +929,6 @@ export async function POST(req) {
 
       if (!packData) return result;
 
-      // Process PALLETIZATION
       if (packData.PALLETIZATION && Array.isArray(packData.PALLETIZATION)) {
         result.PALLETIZATION = packData.PALLETIZATION.map(item => ({
           _id: new mongoose.Types.ObjectId(),
@@ -937,7 +948,6 @@ export async function POST(req) {
         }));
       }
 
-      // Process UNIFORM - BAGS/BOXES
       if (packData['UNIFORM - BAGS/BOXES'] && Array.isArray(packData['UNIFORM - BAGS/BOXES'])) {
         result['UNIFORM - BAGS/BOXES'] = packData['UNIFORM - BAGS/BOXES'].map(item => ({
           _id: new mongoose.Types.ObjectId(),
@@ -954,7 +964,6 @@ export async function POST(req) {
         }));
       }
 
-      // Process LOOSE - CARGO
       if (packData['LOOSE - CARGO'] && Array.isArray(packData['LOOSE - CARGO'])) {
         result['LOOSE - CARGO'] = packData['LOOSE - CARGO'].map(item => ({
           _id: new mongoose.Types.ObjectId(),
@@ -965,7 +974,6 @@ export async function POST(req) {
         }));
       }
 
-      // Process NON-UNIFORM - GENERAL CARGO
       if (packData['NON-UNIFORM - GENERAL CARGO'] && Array.isArray(packData['NON-UNIFORM - GENERAL CARGO'])) {
         result['NON-UNIFORM - GENERAL CARGO'] = packData['NON-UNIFORM - GENERAL CARGO'].map(item => ({
           _id: new mongoose.Types.ObjectId(),
@@ -982,6 +990,62 @@ export async function POST(req) {
 
       return result;
     };
+
+    // Process VL Photo Details - FIXED: Convert from frontend format to Map
+    let processedVlPhotoDetails = new Map();
+
+    if (body.vlPhotoDetails && typeof body.vlPhotoDetails === 'object') {
+      for (const [key, value] of Object.entries(body.vlPhotoDetails)) {
+        // Check if value is an object with height, width, nose properties
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          // If it has the correct structure, use it directly
+          processedVlPhotoDetails.set(key, {
+            height: num(value.height),
+            width: num(value.width),
+            nose: num(value.nose)
+          });
+        } 
+        // If it's a primitive number (coming from frontend as direct value)
+        else if (typeof value === 'number') {
+          // For keys like "vl1_0_height", extract the base key and field
+          const match = key.match(/(vl\d+_\d+)_(height|width|nose)/);
+          if (match) {
+            const baseKey = match[1];
+            const field = match[2];
+            
+            let existing = processedVlPhotoDetails.get(baseKey);
+            if (!existing) {
+              existing = { height: 0, width: 0, nose: 0 };
+            }
+            existing[field] = value;
+            processedVlPhotoDetails.set(baseKey, existing);
+          } else {
+            // If no match, store as is
+            processedVlPhotoDetails.set(key, { height: value, width: 0, nose: 0 });
+          }
+        }
+        // If it's a string that can be parsed as number
+        else if (typeof value === 'string' && !isNaN(parseFloat(value))) {
+          const numValue = parseFloat(value);
+          const match = key.match(/(vl\d+_\d+)_(height|width|nose)/);
+          if (match) {
+            const baseKey = match[1];
+            const field = match[2];
+            
+            let existing = processedVlPhotoDetails.get(baseKey);
+            if (!existing) {
+              existing = { height: 0, width: 0, nose: 0 };
+            }
+            existing[field] = numValue;
+            processedVlPhotoDetails.set(baseKey, existing);
+          }
+        }
+        else {
+          // Default fallback
+          processedVlPhotoDetails.set(key, { height: 0, width: 0, nose: 0 });
+        }
+      }
+    }
 
     // Process deduction rows
     const processedDeductionRows = (body.deductionRows || []).map(row => ({
@@ -1002,6 +1066,30 @@ export async function POST(req) {
         branchId = new mongoose.Types.ObjectId(body.header.branch);
       }
     }
+
+    // Process vlUploads with dynamic fields (up to vl15)
+    const processedVlUploads = {
+      vl1: body.vlUploads?.vl1 || '',
+      vl2: body.vlUploads?.vl2 || '',
+      vl3: body.vlUploads?.vl3 || '',
+      vl4: body.vlUploads?.vl4 || '',
+      vl5: body.vlUploads?.vl5 || '',
+      vl6: body.vlUploads?.vl6 || '',
+      vl7: body.vlUploads?.vl7 || '',
+      vl8: body.vlUploads?.vl8 || '',
+      vl9: body.vlUploads?.vl9 || '',
+      vl10: body.vlUploads?.vl10 || '',
+      vl11: body.vlUploads?.vl11 || '',
+      vl12: body.vlUploads?.vl12 || '',
+      vl13: body.vlUploads?.vl13 || '',
+      vl14: body.vlUploads?.vl14 || '',
+      vl15: body.vlUploads?.vl15 || '',
+      videoVl: body.vlUploads?.videoVl || '',
+      approval: body.vlUploads?.approval || '',
+      loadingStatus: body.vlUploads?.loadingStatus && body.vlUploads.loadingStatus !== '' 
+        ? body.vlUploads.loadingStatus 
+        : 'Not Loaded'
+    };
 
     // Create loading panel document
     const loadingPanelData = {
@@ -1027,7 +1115,7 @@ export async function POST(req) {
       // Orders
       orderRows: processedOrderRows,
       
-      // Vehicle Info with Aadhar
+      // Vehicle Info
       vehicleInfo: {
         vehicleNo: body.vehicleInfo?.vehicleNo || '',
         driverMobileNo: body.vehicleInfo?.driverMobileNo || '',
@@ -1047,8 +1135,6 @@ export async function POST(req) {
         chasisNumber: body.vehicleInfo?.chasisNumber || '',
         fitnessNumber: body.vehicleInfo?.fitnessNumber || '',
         pucNumber: body.vehicleInfo?.pucNumber || '',
-        
-        // File paths
         rcDocument: body.vehicleInfo?.rcDocument || '',
         panDocument: body.vehicleInfo?.panDocument || '',
         licenseDocument: body.vehicleInfo?.licenseDocument || '',
@@ -1067,8 +1153,14 @@ export async function POST(req) {
       detentionDays: body.detentionDays || '',
       detentionNumber: body.detentionNumber || '',
       
+      // Vehicle Slips
+      vehicleSlips: body.vehicleSlips || [],
+      
       // Loaded Vehicle Slip
       loadedVehicleSlips: body.loadedVehicleSlips || [],
+      
+      // VL Photo Details - FIXED: Use processed Map
+      vlPhotoDetails: processedVlPhotoDetails,
       
       // Pack Data
       packData: processPackData(body.packData),
@@ -1118,21 +1210,8 @@ export async function POST(req) {
         approval: body.votUploads?.approval || ''
       },
       
-      // Upload sections - VL (with default loadingStatus)
-      vlUploads: {
-        vl1: body.vlUploads?.vl1 || '',
-        vl2: body.vlUploads?.vl2 || '',
-        vl3: body.vlUploads?.vl3 || '',
-        vl4: body.vlUploads?.vl4 || '',
-        vl5: body.vlUploads?.vl5 || '',
-        vl6: body.vlUploads?.vl6 || '',
-        vl7: body.vlUploads?.vl7 || '',
-        videoVl: body.vlUploads?.videoVl || '',
-        approval: body.vlUploads?.approval || '',
-        loadingStatus: body.vlUploads?.loadingStatus && body.vlUploads.loadingStatus !== '' 
-          ? body.vlUploads.loadingStatus 
-          : 'Not Loaded'
-      },
+      // Upload sections - VL
+      vlUploads: processedVlUploads,
       
       // Loaded weighment
       loadedWeighment: {
@@ -1151,10 +1230,11 @@ export async function POST(req) {
         isTrackingActive: body.gpsTracking?.isTrackingActive || false
       },
       
-      // Arrival details with Out Time
+      // Arrival details
       arrivalDetails: {
         date: body.arrivalDetails?.date ? new Date(body.arrivalDetails.date) : null,
         time: body.arrivalDetails?.time || '',
+        outDate: body.arrivalDetails?.outDate ? new Date(body.arrivalDetails.outDate) : null,
         outTime: body.arrivalDetails?.outTime || ''
       },
       
@@ -1239,7 +1319,7 @@ export async function PUT(req) {
       }, { status: 400 });
     }
 
-    // Check if loading panel exists and belongs to company
+    // Check if loading panel exists
     const existingPanel = await LoadingPanel.findOne({
       _id: id,
       companyId: user.companyId
@@ -1281,7 +1361,6 @@ export async function PUT(req) {
         otherCharges: num(row.otherCharges) || 0
       }));
 
-      // Recalculate total weight
       updateData.totalWeight = updateData.orderRows.reduce((sum, row) => sum + row.weight, 0);
     }
 
@@ -1292,6 +1371,43 @@ export async function PUT(req) {
         mobileNo: updateData.helperInfo.mobileNo || '',
         photo: updateData.helperInfo.photo || [],
         aadharPhoto: updateData.helperInfo.aadharPhoto || []
+      };
+    }
+
+    // Process VL Photo Details - FIXED for PUT request
+    if (updateData.vlPhotoDetails && typeof updateData.vlPhotoDetails === 'object') {
+      const processedDetails = new Map();
+      for (const [key, value] of Object.entries(updateData.vlPhotoDetails)) {
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          processedDetails.set(key, {
+            height: num(value.height),
+            width: num(value.width),
+            nose: num(value.nose)
+          });
+        } else if (typeof value === 'number') {
+          const match = key.match(/(vl\d+_\d+)_(height|width|nose)/);
+          if (match) {
+            const baseKey = match[1];
+            const field = match[2];
+            let existing = processedDetails.get(baseKey);
+            if (!existing) {
+              existing = { height: 0, width: 0, nose: 0 };
+            }
+            existing[field] = value;
+            processedDetails.set(baseKey, existing);
+          }
+        }
+      }
+      updateData.vlPhotoDetails = processedDetails;
+    }
+
+    // Process arrivalDetails with outDate
+    if (updateData.arrivalDetails) {
+      updateData.arrivalDetails = {
+        date: updateData.arrivalDetails.date ? new Date(updateData.arrivalDetails.date) : existingPanel.arrivalDetails?.date,
+        time: updateData.arrivalDetails.time || existingPanel.arrivalDetails?.time || '',
+        outDate: updateData.arrivalDetails.outDate ? new Date(updateData.arrivalDetails.outDate) : existingPanel.arrivalDetails?.outDate,
+        outTime: updateData.arrivalDetails.outTime || existingPanel.arrivalDetails?.outTime || ''
       };
     }
 
@@ -1356,7 +1472,7 @@ export async function PUT(req) {
       };
     }
 
-    // Remove _id from update data if present
+    // Remove _id from update data
     delete updateData._id;
     delete updateData.__v;
     delete updateData.createdAt;

@@ -129,10 +129,24 @@ const loadingPanelSchema = new mongoose.Schema({
   detentionDays: String,
   detentionNumber: String,
   
+  // Vehicle Slip files
+  vehicleSlips: [String],
+  
   // Loaded Vehicle Slip
   loadedVehicleSlips: [String],
   
-  // Pack Data (from Order Panel) - Updated with all 4 pack types
+  // VL Photo Details (Height, Width, Nose for each photo)
+  vlPhotoDetails: {
+    type: Map,
+    of: {
+      height: { type: Number, default: 0 },
+      width: { type: Number, default: 0 },
+      nose: { type: Number, default: 0 }
+    },
+    default: () => new Map()
+  },
+  
+  // Pack Data
   packData: {
     PALLETIZATION: [{
       _id: {
@@ -236,18 +250,19 @@ const loadingPanelSchema = new mongoose.Schema({
     approval: String
   },
   
-  // Upload sections - VL with min 5 / max 25 photos
-  // In the vlUploads section of your schema
-vlUploads: {
-  vl1: String, vl2: String, vl3: String, vl4: String,
-  vl5: String, vl6: String, vl7: String, videoVl: String,
-  approval: String,
-  loadingStatus: {
-    type: String,
-    enum: ['Loaded', 'Partially Loaded', 'Not Loaded', ''],
-    default: ''
-  }
-},
+  // Upload sections - VL with dynamic fields up to vl15
+  vlUploads: {
+    vl1: String, vl2: String, vl3: String, vl4: String,
+    vl5: String, vl6: String, vl7: String, vl8: String, vl9: String,
+    vl10: String, vl11: String, vl12: String, vl13: String, vl14: String, vl15: String,
+    videoVl: String,
+    approval: String,
+    loadingStatus: {
+      type: String,
+      enum: ['Loaded', 'Partially Loaded', 'Not Loaded', ''],
+      default: ''
+    }
+  },
   
   // Loaded weighment
   loadedWeighment: {
@@ -284,10 +299,11 @@ vlUploads: {
     }
   },
   
-  // Arrival details with Out Time
+  // Arrival details with Out Date and Out Time
   arrivalDetails: {
     date: Date,
     time: String,
+    outDate: Date,
     outTime: String
   },
   

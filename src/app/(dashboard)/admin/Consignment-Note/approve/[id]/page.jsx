@@ -12,7 +12,7 @@ const UNIT_OPTIONS = ["MT", "KG", "LTR", "TON", "M3", "PCS"];
 const PKGS_TYPE_OPTIONS = ["Drum", "Boxes", "Bags", "Cartons", "Crates", "Pallets", "Box"];
 const UOM_OPTIONS = ["KG", "LTR", "TON", "M3", "PCS", "Kgs", "Ltr", "MT"];
 const BOE_INVOICE_OPTIONS = ["As Per Invoice", "As Per Bill Of Entry", "NA"];
-const STATUS_OPTIONS = ["Draft", "Approved", "Rejected", "Completed", "Pending"];
+const STATUS_OPTIONS = ["Pending", "Approved", "Rejected", "Completed", "Draft"];
 
 function num(v) {
   const n = Number(v);
@@ -81,59 +81,158 @@ function InfoRow({ label, value }) {
 }
 
 /* =======================
-  PRODUCTS TABLE (READ-ONLY)
+  PACK DATA TABLES (READ-ONLY)
 ========================= */
-function ProductsTable({ rows }) {
-  const columns = [
-    { key: "totalPkgs", label: "TOTAL PKGS" },
-    { key: "pkgsType", label: "PKGS TYPE" },
-    { key: "uom", label: "UOM" },
-    { key: "packSize", label: "Pack Size" },
-    { key: "skuSize", label: "SKU SIZE" },
-    { key: "productName", label: "PRODUCT NAME" },
-    { key: "actualWt", label: "ACTUAL WT" },
-    { key: "chargedWt", label: "CHARGED WT" },
-    { key: "wtUom", label: "WT UOM" },
-  ];
+function PalletizationTable({ rows }) {
+  if (!rows || rows.length === 0 || (rows.length === 1 && !rows[0].noOfPallets && !rows[0].productName)) {
+    return <div className="text-center py-4 text-slate-400">No palletization data available</div>;
+  }
 
   return (
     <div className="overflow-auto rounded-xl border border-yellow-300">
       <table className="min-w-full w-full text-sm">
         <thead className="sticky top-0 bg-yellow-400">
           <tr>
-            {columns.map((col) => (
-              <th
-                key={col.key}
-                className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
-              >
-                {col.label}
-              </th>
-            ))}
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">NO OF PALLETS</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">UNIT PER PALLETS</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">TOTAL PKGS</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PKG TYPE</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">UOM</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">SKU - SIZE</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PACK - WEIGHT</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PRODUCT NAME</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">ACTUAL - WT</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">CHARGED - WT</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">WT UOM</th>
           </tr>
         </thead>
-
         <tbody>
-          {rows.length > 0 ? (
-            rows.map((row, index) => (
-              <tr key={row._id || index} className="hover:bg-yellow-50 even:bg-slate-50">
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.totalPkgs || '-'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.pkgsType || '-'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.uom || '-'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.packSize || '-'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.skuSize || '-'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.productName || '-'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-right">{row.actualWt || '0'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-right">{row.chargedWt || '0'}</td>
-                <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.wtUom || 'MT'}</td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={columns.length} className="border border-yellow-300 px-4 py-8 text-center text-slate-400">
-                No products added.
-              </td>
+          {rows.map((row, index) => (
+            <tr key={row._id || index} className="hover:bg-yellow-50 even:bg-slate-50">
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.noOfPallets || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.unitPerPallets || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.totalPkgs || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.pkgsType || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.uom || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.skuSize || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.packWeight || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.productName || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-right">{row.actualWt || '0'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-right">{row.chargedWt || '0'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.wtUom || 'MT'}</td>
             </tr>
-          )}
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function UniformTable({ rows }) {
+  if (!rows || rows.length === 0 || (rows.length === 1 && !rows[0].totalPkgs && !rows[0].productName)) {
+    return <div className="text-center py-4 text-slate-400">No uniform data available</div>;
+  }
+
+  return (
+    <div className="overflow-auto rounded-xl border border-yellow-300">
+      <table className="min-w-full w-full text-sm">
+        <thead className="sticky top-0 bg-yellow-400">
+          <tr>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">TOTAL PKGS</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PKG TYPE</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">UOM</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">SKU - SIZE</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PACK - WEIGHT</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PRODUCT NAME</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">ACTUAL - WT</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">CHARGED - WT</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">WT UOM</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={row._id || index} className="hover:bg-yellow-50 even:bg-slate-50">
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.totalPkgs || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.pkgsType || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.uom || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.skuSize || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.packWeight || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.productName || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-right">{row.actualWt || '0'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-right">{row.chargedWt || '0'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.wtUom || 'MT'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function LooseCargoTable({ rows }) {
+  if (!rows || rows.length === 0 || (rows.length === 1 && !rows[0].actualWt && !rows[0].productName)) {
+    return <div className="text-center py-4 text-slate-400">No loose cargo data available</div>;
+  }
+
+  return (
+    <div className="overflow-auto rounded-xl border border-yellow-300">
+      <table className="min-w-full w-full text-sm">
+        <thead className="sticky top-0 bg-yellow-400">
+          <tr>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">UOM</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PRODUCT NAME</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">ACTUAL - WT</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">CHARGED - WT</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={row._id || index} className="hover:bg-yellow-50 even:bg-slate-50">
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.uom || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.productName || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-right">{row.actualWt || '0'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-right">{row.chargedWt || '0'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function NonUniformTable({ rows }) {
+  if (!rows || rows.length === 0 || (rows.length === 1 && !rows[0].nos && !rows[0].productName)) {
+    return <div className="text-center py-4 text-slate-400">No non-uniform cargo data available</div>;
+  }
+
+  return (
+    <div className="overflow-auto rounded-xl border border-yellow-300">
+      <table className="min-w-full w-full text-sm">
+        <thead className="sticky top-0 bg-yellow-400">
+          <tr>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">NOS</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PRODUCT NAME</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">UOM</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">LENGTH</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">WIDTH</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">HEIGHT</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">ACTUAL - WT</th>
+            <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">CHARGED - WT</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={row._id || index} className="hover:bg-yellow-50 even:bg-slate-50">
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.nos || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.productName || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.uom || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.length || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.width || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-center">{row.height || '-'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-right">{row.actualWt || '0'}</td>
+              <td className="border border-yellow-300 px-2 py-2 text-slate-700 text-right">{row.chargedWt || '0'}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
@@ -164,6 +263,7 @@ export default function ApproveConsignmentNote() {
     vendorName: "",
     from: "",
     to: "",
+    taluka: "",
     district: "",
     state: "",
     vehicleNo: "",
@@ -177,11 +277,15 @@ export default function ApproveConsignmentNote() {
   const [consignor, setConsignor] = useState({
     name: "",
     address: "",
+    customerId: "",
+    selectedAddressTitle: ""
   });
 
   const [consignee, setConsignee] = useState({
     name: "",
     address: "",
+    customerId: "",
+    selectedAddressTitle: ""
   });
 
   const [invoice, setInvoice] = useState({
@@ -197,9 +301,15 @@ export default function ApproveConsignmentNote() {
     containerNo: "",
   });
 
-  const [productRows, setProductRows] = useState([]);
+  // Pack data states
+  const [palletizationRows, setPalletizationRows] = useState([]);
+  const [uniformRows, setUniformRows] = useState([]);
+  const [looseCargoRows, setLooseCargoRows] = useState([]);
+  const [nonUniformRows, setNonUniformRows] = useState([]);
+  
   const [loadingInfoNo, setLoadingInfoNo] = useState("");
   const [vnnNo, setVnnNo] = useState("");
+  const [vehicleNegotiationId, setVehicleNegotiationId] = useState("");
 
   // Fetch consignment note data
   useEffect(() => {
@@ -232,6 +342,7 @@ export default function ApproveConsignmentNote() {
       
       // Set reference fields
       if (note.vnnNo) setVnnNo(note.vnnNo);
+      if (note.vehicleNegotiationId) setVehicleNegotiationId(note.vehicleNegotiationId);
       if (note.loadingInfoNo) setLoadingInfoNo(note.loadingInfoNo);
       
       // Set header data (STATUS IS EDITABLE, others read-only)
@@ -246,6 +357,7 @@ export default function ApproveConsignmentNote() {
         vendorName: note.header?.vendorName || "",
         from: note.header?.from || "",
         to: note.header?.to || "",
+        taluka: note.header?.taluka || "",
         district: note.header?.district || "",
         state: note.header?.state || "",
         vehicleNo: note.header?.vehicleNo || "",
@@ -253,19 +365,23 @@ export default function ApproveConsignmentNote() {
         lrNo: note.lrNo || "",
         lrDate: note.header?.lrDate || "",
         unit: note.header?.unit || "MT",
-        status: note.header?.status || "Pending"  // This field is EDITABLE
+        status: note.header?.status || "Pending"
       });
 
       // Set consignor (READ-ONLY)
       setConsignor({
         name: note.consignor?.name || "",
-        address: note.consignor?.address || ""
+        address: note.consignor?.address || "",
+        customerId: note.consignor?.customerId || "",
+        selectedAddressTitle: note.consignor?.selectedAddressTitle || ""
       });
 
       // Set consignee (READ-ONLY)
       setConsignee({
         name: note.consignee?.name || "",
-        address: note.consignee?.address || ""
+        address: note.consignee?.address || "",
+        customerId: note.consignee?.customerId || "",
+        selectedAddressTitle: note.consignee?.selectedAddressTitle || ""
       });
 
       // Set invoice (READ-ONLY)
@@ -283,9 +399,27 @@ export default function ApproveConsignmentNote() {
         containerNo: note.ewaybill?.containerNo || ""
       });
 
-      // Set product rows (READ-ONLY)
-      if (note.productRows && note.productRows.length > 0) {
-        setProductRows(note.productRows);
+      // Set pack data from note
+      if (note.packData) {
+        // Palletization
+        if (note.packData.PALLETIZATION && note.packData.PALLETIZATION.length > 0) {
+          setPalletizationRows(note.packData.PALLETIZATION);
+        }
+
+        // Uniform
+        if (note.packData['UNIFORM - BAGS/BOXES'] && note.packData['UNIFORM - BAGS/BOXES'].length > 0) {
+          setUniformRows(note.packData['UNIFORM - BAGS/BOXES']);
+        }
+
+        // Loose Cargo
+        if (note.packData['LOOSE - CARGO'] && note.packData['LOOSE - CARGO'].length > 0) {
+          setLooseCargoRows(note.packData['LOOSE - CARGO']);
+        }
+
+        // Non-Uniform
+        if (note.packData['NON-UNIFORM - GENERAL CARGO'] && note.packData['NON-UNIFORM - GENERAL CARGO'].length > 0) {
+          setNonUniformRows(note.packData['NON-UNIFORM - GENERAL CARGO']);
+        }
       }
 
     } catch (error) {
@@ -307,24 +441,10 @@ export default function ApproveConsignmentNote() {
     try {
       const token = localStorage.getItem('token');
       
-      // Fetch current data first
-      const fetchRes = await fetch(`/api/consignment-note?id=${noteId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      const fetchData = await fetchRes.json();
-      
-      if (!fetchData.success) {
-        throw new Error('Failed to fetch consignment note data');
-      }
-      
-      const currentData = fetchData.data;
-      
-      // Update only the status in header
-      const updatedData = {
-        ...currentData,
+      // Prepare update payload - only update status
+      const payload = {
+        id: noteId,
         header: {
-          ...currentData.header,
           status: header.status
         }
       };
@@ -336,10 +456,7 @@ export default function ApproveConsignmentNote() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          id: noteId,
-          ...updatedData
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -358,8 +475,20 @@ export default function ApproveConsignmentNote() {
     }
   };
 
-  // Calculate total weight from product rows
-  const totalWeight = productRows.reduce((sum, row) => sum + num(row.actualWt), 0);
+  // Calculate total weight from all pack types
+  const calculateTotalActualWt = () => {
+    let total = 0;
+    palletizationRows.forEach(row => total += num(row.actualWt));
+    uniformRows.forEach(row => total += num(row.actualWt));
+    looseCargoRows.forEach(row => total += num(row.actualWt));
+    nonUniformRows.forEach(row => total += num(row.actualWt));
+    return total;
+  };
+
+  const totalWeight = calculateTotalActualWt();
+
+  // Check if any product data exists
+  const hasProductData = palletizationRows.length > 0 || uniformRows.length > 0 || looseCargoRows.length > 0 || nonUniformRows.length > 0;
 
   if (loading) {
     return (
@@ -440,7 +569,7 @@ export default function ApproveConsignmentNote() {
       <div className="mx-auto max-w-full p-4 space-y-4">
         
         {/* ===== PARTY INFORMATION ===== */}
-        <Card title="Party Information">
+        <Card title="Party Information - Read Only (Except Status)">
           <div className="grid grid-cols-12 gap-4">
             <Input col="col-span-12 md:col-span-3" label="Party Name" value={header.partyName} readOnly={true} />
             <Input col="col-span-12 md:col-span-2" label="Order No" value={header.orderNo} readOnly={true} />
@@ -461,6 +590,7 @@ export default function ApproveConsignmentNote() {
             <Input col="col-span-12 md:col-span-2" label="Vendor Name" value={header.vendorName} readOnly={true} />
             <Input col="col-span-12 md:col-span-2" label="From" value={header.from} readOnly={true} />
             <Input col="col-span-12 md:col-span-2" label="To" value={header.to} readOnly={true} />
+            <Input col="col-span-12 md:col-span-1" label="Taluka" value={header.taluka} readOnly={true} />
             <Input col="col-span-12 md:col-span-1" label="District" value={header.district} readOnly={true} />
             <Input col="col-span-12 md:col-span-1" label="State" value={header.state} readOnly={true} />
             <Input col="col-span-12 md:col-span-2" label="Vehicle No" value={header.vehicleNo} readOnly={true} />
@@ -491,9 +621,12 @@ export default function ApproveConsignmentNote() {
             <Card title="Consignor (Sender) - Read Only">
               <div className="space-y-3">
                 <InfoRow label="Consignor Name" value={consignor.name} />
+                {consignor.selectedAddressTitle && (
+                  <InfoRow label="Address Title" value={consignor.selectedAddressTitle} />
+                )}
                 <div>
                   <label className="text-xs font-bold text-slate-600">Consignor Address</label>
-                  <div className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <div className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 whitespace-pre-wrap">
                     {consignor.address || '-'}
                   </div>
                 </div>
@@ -505,9 +638,12 @@ export default function ApproveConsignmentNote() {
             <Card title="Consignee (Receiver) - Read Only">
               <div className="space-y-3">
                 <InfoRow label="Consignee Name" value={consignee.name} />
+                {consignee.selectedAddressTitle && (
+                  <InfoRow label="Address Title" value={consignee.selectedAddressTitle} />
+                )}
                 <div>
                   <label className="text-xs font-bold text-slate-600">Consignee Address</label>
-                  <div className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <div className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 whitespace-pre-wrap">
                     {consignee.address || '-'}
                   </div>
                 </div>
@@ -535,9 +671,44 @@ export default function ApproveConsignmentNote() {
           </div>
         </Card>
 
-        {/* ===== PRODUCTS TABLE (READ ONLY) ===== */}
+        {/* ===== PRODUCT DETAILS - ALL PACK TYPES (READ ONLY) ===== */}
         <Card title="Product Details - Read Only">
-          <ProductsTable rows={productRows} />
+          {/* Palletization Section */}
+          {(palletizationRows.length > 0 && palletizationRows[0]?.productName) && (
+            <div className="mb-6">
+              <h3 className="text-sm font-bold text-slate-800 mb-2 bg-yellow-100 inline-block px-3 py-1 rounded-full">Palletization</h3>
+              <PalletizationTable rows={palletizationRows} />
+            </div>
+          )}
+
+          {/* Uniform Section */}
+          {(uniformRows.length > 0 && uniformRows[0]?.productName) && (
+            <div className="mb-6">
+              <h3 className="text-sm font-bold text-slate-800 mb-2 bg-yellow-100 inline-block px-3 py-1 rounded-full">Uniform - Bags/Boxes</h3>
+              <UniformTable rows={uniformRows} />
+            </div>
+          )}
+
+          {/* Loose Cargo Section */}
+          {(looseCargoRows.length > 0 && looseCargoRows[0]?.productName) && (
+            <div className="mb-6">
+              <h3 className="text-sm font-bold text-slate-800 mb-2 bg-yellow-100 inline-block px-3 py-1 rounded-full">Loose - Cargo</h3>
+              <LooseCargoTable rows={looseCargoRows} />
+            </div>
+          )}
+
+          {/* Non-Uniform Section */}
+          {(nonUniformRows.length > 0 && nonUniformRows[0]?.productName) && (
+            <div className="mb-6">
+              <h3 className="text-sm font-bold text-slate-800 mb-2 bg-yellow-100 inline-block px-3 py-1 rounded-full">Non-uniform - General Cargo</h3>
+              <NonUniformTable rows={nonUniformRows} />
+            </div>
+          )}
+
+          {!hasProductData && (
+            <div className="text-center py-8 text-slate-400">No product data available</div>
+          )}
+
           <div className="flex justify-end mt-4">
             <div className="flex items-center gap-3 border border-yellow-300 px-6 py-3 bg-yellow-50 rounded-xl">
               <div className="text-sm font-extrabold text-slate-900">Total Actual Weight:</div>
@@ -581,7 +752,6 @@ export default function ApproveConsignmentNote() {
                     <span className="text-sm text-slate-600">Total Weight:</span>
                     <span className="text-xl font-bold text-purple-800">{totalWeight.toFixed(2)} {header.unit}</span>
                   </div>
-                  <InfoRow label="Total Products" value={productRows.length} />
                   <InfoRow label="Current Status" value={header.status} />
                 </div>
               </div>

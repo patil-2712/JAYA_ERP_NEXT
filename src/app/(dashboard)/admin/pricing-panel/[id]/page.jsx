@@ -2839,34 +2839,64 @@ function VehicleNegotiationHeaderDropdown({
 }
 
 /* =========================
-  LOCATION RATE DROPDOWN
+  LOCATION RATE DROPDOWN - With Price List Filtering
 ========================= */
 function LocationRateDropdown({ 
   locations, 
   selectedName, 
   onSelect, 
   placeholder = "Select Location...",
-  readOnly = false
+  readOnly = false,
+  selectedRateMaster = null  // Add this to receive selected Price List
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const dropdownRef = useRef(null);
   const inputRef = useRef(null);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+
+  // Get location names that exist in the selected Price List
+  const availableLocationNames = useMemo(() => {
+    if (selectedRateMaster && selectedRateMaster.locationRates) {
+      return selectedRateMaster.locationRates.map(lr => lr.locationName);
+    }
+    return [];
+  }, [selectedRateMaster]);
+
+  // Filter locations - ONLY show locations that are in the selected Price List
+  const filteredLocationsByRateMaster = useMemo(() => {
+    if (!selectedRateMaster) {
+      return [];
+    }
+    
+    if (availableLocationNames.length === 0) {
+      return [];
+    }
+    
+    return (locations || []).filter(loc => 
+      availableLocationNames.includes(loc.name)
+    );
+  }, [locations, selectedRateMaster, availableLocationNames]);
 
   useEffect(() => {
     if (selectedName && locations) {
-      const item = locations.find(l => l.name === selectedName);
-      setSelectedItem(item);
-      if (item) {
-        setSearchQuery(item.name);
+      const isValidLocation = availableLocationNames.includes(selectedName);
+      if (isValidLocation) {
+        const item = locations.find(l => l.name === selectedName);
+        setSelectedItem(item);
+        if (item) {
+          setSearchQuery(item.name);
+        }
+      } else {
+        setSelectedItem(null);
+        setSearchQuery("");
+        onSelect?.("");
       }
     } else if (!selectedName) {
       setSelectedItem(null);
       setSearchQuery("");
     }
-  }, [locations, selectedName]);
+  }, [locations, selectedName, availableLocationNames]);
 
   const handleSelectItem = (item) => {
     if (readOnly) return;
@@ -2877,13 +2907,7 @@ function LocationRateDropdown({
   };
 
   const handleInputFocus = () => {
-    if (!readOnly && inputRef.current) {
-      const rect = inputRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + window.scrollY,
-        left: rect.left + window.scrollX,
-        width: rect.width
-      });
+    if (!readOnly && inputRef.current && filteredLocationsByRateMaster.length > 0) {
       setShowDropdown(true);
     }
   };
@@ -2896,12 +2920,22 @@ function LocationRateDropdown({
     }, 200);
   };
 
-  const filteredLocations = useMemo(() => {
-    if (!searchQuery.trim()) return locations || [];
-    return (locations || []).filter(loc => 
+  const searchedLocations = useMemo(() => {
+    if (!searchQuery.trim()) return filteredLocationsByRateMaster;
+    return filteredLocationsByRateMaster.filter(loc => 
       loc.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [locations, searchQuery]);
+  }, [filteredLocationsByRateMaster, searchQuery]);
+
+  const getPlaceholder = () => {
+    if (!selectedRateMaster) {
+      return "Please select Price List first";
+    }
+    if (filteredLocationsByRateMaster.length === 0) {
+      return "No locations available for this Price List";
+    }
+    return placeholder;
+  };
 
   return (
     <div className="relative w-full" ref={dropdownRef}>
@@ -2913,10 +2947,10 @@ function LocationRateDropdown({
         onFocus={handleInputFocus}
         onBlur={handleInputBlur}
         className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
-          readOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white cursor-pointer'
+          (readOnly || !selectedRateMaster || filteredLocationsByRateMaster.length === 0) ? 'bg-slate-50 cursor-not-allowed' : 'bg-white cursor-pointer'
         }`}
-        placeholder={placeholder}
-        readOnly={readOnly}
+        placeholder={getPlaceholder()}
+        readOnly={readOnly || !selectedRateMaster || filteredLocationsByRateMaster.length === 0}
         autoComplete="off"
       />
       <div className="absolute right-2 top-2 text-gray-400 pointer-events-none">
@@ -2925,21 +2959,12 @@ function LocationRateDropdown({
         </svg>
       </div>
       
-      {showDropdown && !readOnly && filteredLocations.length > 0 && (
-        <div 
-          ref={dropdownRef}
-          className="fixed z-[9999] bg-white border border-slate-200 rounded-lg shadow-xl overflow-y-auto"
-          style={{
-            top: dropdownPosition.top,
-            left: dropdownPosition.left,
-            width: dropdownPosition.width,
-            maxHeight: '300px'
-          }}
-        >
+      {showDropdown && !readOnly && selectedRateMaster && filteredLocationsByRateMaster.length > 0 && (
+        <div className="absolute z-[9999] w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg overflow-y-auto max-h-60">
           <div className="sticky top-0 bg-gray-50 px-3 py-2 text-xs font-semibold text-slate-600 border-b">
-            Select Location
+            Select Location (from {selectedRateMaster.title})
           </div>
-          {filteredLocations.map((location) => (
+          {searchedLocations.map((location) => (
             <div
               key={location._id}
               onMouseDown={() => handleSelectItem(location)}
@@ -2976,7 +3001,6 @@ function PriceListDropdown({
   const [selectedItem, setSelectedItem] = useState(null);
   const dropdownRef = useRef(null);
   const inputRef = useRef(null);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
 
   const filteredRateMasters = useMemo(() => {
     let filtered = rateMasters || [];
@@ -2999,15 +3023,8 @@ function PriceListDropdown({
       return [];
     }
     
-    if (locationName) {
-      filtered = filtered.filter(rm => {
-        return rm.locationRates && Array.isArray(rm.locationRates) && 
-               rm.locationRates.some(lr => lr.locationName === locationName);
-      });
-    }
-    
     return filtered;
-  }, [rateMasters, locationName, branchId, customerId]);
+  }, [rateMasters, branchId, customerId]);
 
   useEffect(() => {
     if (selectedValue) {
@@ -3032,12 +3049,6 @@ function PriceListDropdown({
 
   const handleInputFocus = () => {
     if (!readOnly && inputRef.current && filteredRateMasters.length > 0) {
-      const rect = inputRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + window.scrollY,
-        left: rect.left + window.scrollX,
-        width: rect.width
-      });
       setShowDropdown(true);
     }
   };
@@ -3080,16 +3091,7 @@ function PriceListDropdown({
       </div>
       
       {showDropdown && !readOnly && filteredRateMasters.length > 0 && (
-        <div 
-          className="fixed z-[9999] bg-white border border-slate-200 rounded-lg shadow-xl overflow-y-auto"
-          style={{
-            position: 'fixed',
-            top: dropdownPosition.top,
-            left: dropdownPosition.left,
-            width: dropdownPosition.width,
-            maxHeight: '300px'
-          }}
-        >
+        <div className="absolute z-[9999] w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg overflow-y-auto max-h-60">
           <div className="sticky top-0 bg-gray-50 px-3 py-2 text-xs font-semibold text-slate-600 border-b">
             Select Price List
           </div>
@@ -3182,9 +3184,6 @@ function BillingTypeTable({ billing, billingColumns }) {
 /* =========================
   ORDERS TABLE COMPONENT - WITH ALL FIELDS IN ONE ROW
 ========================= */
-/* =========================
-  ORDERS TABLE COMPONENT - WITH ALL FIELDS IN ONE ROW
-========================= */
 function OrdersTable({ 
   rows, 
   onChange, 
@@ -3214,8 +3213,8 @@ function OrdersTable({
     { key: "state", label: "State", width: "100px" },
     { key: "district", label: "District", width: "100px" },
     { key: "taluka", label: "Taluka", width: "100px" },
-    { key: "locationRate", label: "Location Rate", width: "140px" },
     { key: "priceList", label: "Price List", width: "160px" },
+    { key: "locationRate", label: "Location Rate", width: "140px" },
     { key: "weight", label: "Weight", type: "number", width: "70px" },
     { key: "rate", label: "Rate (₹)", type: "number", width: "80px", readOnly: true },
     { key: "totalAmount", label: "Total Amount", type: "number", width: "90px", readOnly: true },
@@ -3256,21 +3255,21 @@ function OrdersTable({
     onChange(rowId, 'talukaName', talukaName);
   };
 
-  const handleLocationRateSelect = (rowId, locationName) => {
-    onChange(rowId, 'locationRate', locationName);
-    onChange(rowId, 'priceList', '');
-    onChange(rowId, 'rate', '');
-    onChange(rowId, 'selectedRateMaster', null);
-  };
-
   const handlePriceListSelect = (rowId, rateMaster) => {
     onChange(rowId, 'priceList', rateMaster.title);
     onChange(rowId, 'selectedRateMaster', rateMaster);
+    // Clear location and rate when Price List changes
+    onChange(rowId, 'locationRate', '');
+    onChange(rowId, 'rate', '');
+  };
+
+  const handleLocationRateSelect = (rowId, locationName) => {
+    onChange(rowId, 'locationRate', locationName);
     
     const currentRow = rows.find(r => r._id === rowId);
-    if (currentRow && currentRow.weight && currentRow.locationRate) {
-      const locationRate = rateMaster.locationRates?.find(lr => 
-        lr.locationName === currentRow.locationRate
+    if (currentRow && currentRow.selectedRateMaster && currentRow.weight) {
+      const locationRate = currentRow.selectedRateMaster.locationRates?.find(lr => 
+        lr.locationName === locationName
       );
       
       if (locationRate) {
@@ -3508,16 +3507,6 @@ function OrdersTable({
                 </td>
 
                 <td className="border border-yellow-300 px-1 py-1">
-                  <LocationRateDropdown
-                    locations={locations}
-                    selectedName={row.locationRate}
-                    onSelect={(locationName) => handleLocationRateSelect(row._id, locationName)}
-                    readOnly={false}
-                    placeholder="Select Location..."
-                  />
-                </td>
-
-                <td className="border border-yellow-300 px-1 py-1">
                   <PriceListDropdown
                     rateMasters={rateMasters}
                     selectedValue={row.priceList}
@@ -3527,6 +3516,17 @@ function OrdersTable({
                     customerId={currentCustomerId}
                     placeholder="Select Price List..."
                     readOnly={false}
+                  />
+                </td>
+
+                <td className="border border-yellow-300 px-1 py-1">
+                  <LocationRateDropdown
+                    locations={locations}
+                    selectedName={row.locationRate}
+                    onSelect={(locationName) => handleLocationRateSelect(row._id, locationName)}
+                    readOnly={false}
+                    placeholder="Select Location..."
+                    selectedRateMaster={row.selectedRateMaster}
                   />
                 </td>
 
@@ -3622,6 +3622,7 @@ function OrdersTable({
     </div>
   );
 }
+
 /* =========================
   MAIN EDIT PAGE
 ========================= */

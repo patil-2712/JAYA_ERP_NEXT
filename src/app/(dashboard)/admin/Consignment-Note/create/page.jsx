@@ -34,223 +34,20 @@ function num(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
-/* =======================
-  Data Fetching Hooks
-========================= */
-function useVehicleNegotiation() {
-  const [loading, setLoading] = useState(false);
-
-  const getNegotiationByVNN = async (vnnNo) => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      console.log(`🔍 Fetching Vehicle Negotiation with VNN: ${vnnNo}`);
-      
-      const res = await fetch(`/api/vehicle-negotiation?vnnNo=${encodeURIComponent(vnnNo)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      if (!res.ok) {
-        console.error(`API returned ${res.status}`);
-        return null;
-      }
-      
-      const data = await res.json();
-      return data.success ? data.data : null;
-    } catch (error) {
-      console.error('Error fetching negotiation:', error);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return { loading, getNegotiationByVNN };
-}
-
-function useOrders() {
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  const fetchOrders = async () => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/order-panel', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        setOrders(data.data);
-      }
-    } catch (error) {
-      console.error('Error fetching orders:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return { orders, loading, fetchOrders };
-}
-
-function useVendors() {
-  const [vendors, setVendors] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  const fetchVendors = async () => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/vendors', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        setVendors(data.data);
-      }
-    } catch (error) {
-      console.error('Error fetching vendors:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return { vendors, loading, fetchVendors };
-}
-
-function usePlants() {
-  const [plants, setPlants] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  const fetchPlants = async () => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/plants', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        setPlants(data.data);
-      }
-    } catch (error) {
-      console.error('Error fetching plants:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return { plants, loading, fetchPlants };
-}
-
-function useLoadingInfo() {
-  const [loadingInfos, setLoadingInfos] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  const fetchLoadingInfos = async () => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      
-      // Fetch all loading panels
-      const loadingRes = await fetch('/api/loading-panel?format=table', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      if (!loadingRes.ok) {
-        console.warn('Loading Info API returned', loadingRes.status);
-        setLoadingInfos([]);
-        return;
-      }
-      
-      const loadingData = await loadingRes.json();
-      
-      // Fetch all consignment notes to see which loading infos are already used
-      const consignmentRes = await fetch('/api/consignment-note?format=table', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      const consignmentData = await consignmentRes.json();
-      
-      // Create a Set of used loading info numbers
-      const usedLoadingInfos = new Set();
-      if (consignmentData.success && Array.isArray(consignmentData.data)) {
-        consignmentData.data.forEach(item => {
-          if (item.loadingInfoNo && item.loadingInfoNo !== '') {
-            usedLoadingInfos.add(item.loadingInfoNo);
-          }
-        });
-      }
-      
-      // Filter out loading infos that are already used
-      if (loadingData.success && Array.isArray(loadingData.data)) {
-        const availableLoadingInfos = loadingData.data.filter(info => 
-          !usedLoadingInfos.has(info.vehicleArrivalNo)
-        );
-        
-        console.log(`📊 Found ${availableLoadingInfos.length} available loading infos out of ${loadingData.data.length} total`);
-        
-        const enhancedData = availableLoadingInfos.map(item => ({
-          ...item,
-          driverNo: item.driverNo || item.driverMobileNo || '',
-          vehicleInfo: item.vehicleInfo || {},
-          orderRows: item.orderRows || []
-        }));
-        
-        setLoadingInfos(enhancedData);
-      }
-    } catch (error) {
-      console.error('Error fetching loading info:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ✅ Add this function to get loading info by ID
-  const getLoadingInfoById = async (id) => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/loading-panel?id=${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
-      
-      const data = await res.json();
-      return data.success ? data.data : null;
-    } catch (error) {
-      console.error('Error fetching loading info by ID:', error);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return { 
-    loadingInfos, 
-    loading, 
-    fetchLoadingInfos, 
-    getLoadingInfoById  // ✅ Make sure to return it
-  };
-}
-
 /** =========================
- * DEFAULT EMPTY ROWS
+ * DEFAULT EMPTY ROWS FOR EACH PACK TYPE
  ========================= */
-function defaultProductRow() {
+function defaultPalletizationRow() {
   return {
     _id: uid(),
+    packType: "PALLETIZATION",
+    noOfPallets: "",
+    unitPerPallets: "",
     totalPkgs: "",
     pkgsType: "",
-    uom: "",
-    packSize: "",
+    uom: "MT",
     skuSize: "",
+    packWeight: "",
     productName: "",
     wtLtr: "",
     actualWt: "",
@@ -259,41 +56,95 @@ function defaultProductRow() {
   };
 }
 
+function defaultUniformRow() {
+  return {
+    _id: uid(),
+    packType: "UNIFORM - BAGS/BOXES",
+    totalPkgs: "",
+    pkgsType: "",
+    uom: "",
+    skuSize: "",
+    packWeight: "",
+    productName: "",
+    wtLtr: "",
+    actualWt: "",
+    chargedWt: "",
+    wtUom: "MT",
+  };
+}
+
+function defaultLooseCargoRow() {
+  return {
+    _id: uid(),
+    packType: "LOOSE - CARGO",
+    uom: "MT",
+    productName: "",
+    actualWt: "",
+    chargedWt: "",
+  };
+}
+
+function defaultNonUniformRow() {
+  return {
+    _id: uid(),
+    packType: "NON-UNIFORM - GENERAL CARGO",
+    nos: "",
+    productName: "",
+    uom: "MT",
+    length: "",
+    width: "",
+    height: "",
+    actualWt: "",
+    chargedWt: "",
+  };
+}
+
 export default function CreateConsignmentNote() {
-  const router = useRouter();
-
-  /** =========================
-   * CUSTOM HOOKS
-   ========================= */
-  const vehicleNegotiationHook = useVehicleNegotiation();
-  const orderHook = useOrders();
-  const vendorHook = useVendors();
-  const plantHook = usePlants();
-  const loadingInfoHook = useLoadingInfo();
-
-  const [orders, setOrders] = useState([]);
-  const [vendors, setVendors] = useState([]);
-  const [plants, setPlants] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [apiError, setApiError] = useState(null);
-  const [fetchingData, setFetchingData] = useState(false);
+  const [fetchingOrder, setFetchingOrder] = useState(false);
+  const [isReadOnly, setIsReadOnly] = useState(false);
 
   /** =========================
-   * LOADING INFO SEARCH STATE
+   * ORDER SEARCH STATE
    ========================= */
-  const [loadingInfoNo, setLoadingInfoNo] = useState("");
-  const [showLoadingInfoDropdown, setShowLoadingInfoDropdown] = useState(false);
-  const [filteredLoadingInfos, setFilteredLoadingInfos] = useState([]);
-  const loadingInfoDropdownRef = useRef(null);
+  const [showOrderDropdown, setShowOrderDropdown] = useState(false);
+  const [filteredOrders, setFilteredOrders] = useState([]);
+  const [allOrders, setAllOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const orderDropdownRef = useRef(null);
 
   /** =========================
-   * VNN REFERENCE STATE
+   * VEHICLE NEGOTIATION STATE
    ========================= */
-  const [vnnData, setVnnData] = useState(null);
+  const [vehicleNegotiationData, setVehicleNegotiationData] = useState(null);
+  const [fetchingVehicleData, setFetchingVehicleData] = useState(false);
 
   /** =========================
-   * HEADER STATE - Auto-generate LR No on mount
+   * CUSTOMER DROPDOWN STATES
+   ========================= */
+  const [showConsignorDropdown, setShowConsignorDropdown] = useState(false);
+  const [showConsigneeDropdown, setShowConsigneeDropdown] = useState(false);
+  const [customers, setCustomers] = useState([]);
+  const [customersLoading, setCustomersLoading] = useState(false);
+  const [filteredConsignors, setFilteredConsignors] = useState([]);
+  const [filteredConsignees, setFilteredConsignees] = useState([]);
+  const consignorDropdownRef = useRef(null);
+  const consigneeDropdownRef = useRef(null);
+
+  /** =========================
+   * ADDRESS TITLE DROPDOWN STATES
+   ========================= */
+  const [showConsignorAddressDropdown, setShowConsignorAddressDropdown] = useState(false);
+  const [showConsigneeAddressDropdown, setShowConsigneeAddressDropdown] = useState(false);
+  const [consignorAddresses, setConsignorAddresses] = useState([]);
+  const [consigneeAddresses, setConsigneeAddresses] = useState([]);
+  const consignorAddressRef = useRef(null);
+  const consigneeAddressRef = useRef(null);
+
+  /** =========================
+   * HEADER STATE
    ========================= */
   const generateLRNo = () => {
     const date = new Date();
@@ -313,8 +164,8 @@ export default function CreateConsignmentNote() {
   };
 
   const [header, setHeader] = useState({
-    partyName: "",
     orderNo: "",
+    partyName: "",
     orderType: "Sales",
     plantCode: "",
     plantName: "",
@@ -323,6 +174,7 @@ export default function CreateConsignmentNote() {
     vendorName: "",
     from: "",
     to: "",
+    taluka: "",
     district: "",
     state: "",
     vehicleNo: "",
@@ -330,7 +182,7 @@ export default function CreateConsignmentNote() {
     lrNo: generateLRNo(),
     lrDate: getCurrentDateFormatted(),
     unit: "MT",
-    status: "Pending" // Default to Pending
+    status: "Pending"
   });
 
   /** =========================
@@ -339,11 +191,15 @@ export default function CreateConsignmentNote() {
   const [consignor, setConsignor] = useState({
     name: "",
     address: "",
+    customerId: "",
+    selectedAddressTitle: ""
   });
 
   const [consignee, setConsignee] = useState({
     name: "",
     address: "",
+    customerId: "",
+    selectedAddressTitle: ""
   });
 
   /** =========================
@@ -366,307 +222,572 @@ export default function CreateConsignmentNote() {
   });
 
   /** =========================
-   * PRODUCT ROWS STATE
+   * PRODUCT ROWS FOR EACH PACK TYPE
    ========================= */
-  const [productRows, setProductRows] = useState([defaultProductRow()]);
+  const [palletizationRows, setPalletizationRows] = useState([defaultPalletizationRow()]);
+  const [uniformRows, setUniformRows] = useState([defaultUniformRow()]);
+  const [looseCargoRows, setLooseCargoRows] = useState([defaultLooseCargoRow()]);
+  const [nonUniformRows, setNonUniformRows] = useState([defaultNonUniformRow()]);
 
   /** =========================
-   * FETCH DATA FROM APIs
+   * FETCH ORDERS FROM API
+   ========================= */
+  const fetchOrders = async () => {
+    setOrdersLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.warn('No token found');
+        setAllOrders([]);
+        return;
+      }
+      
+      const res = await fetch('/api/order-panel?format=table', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (!res.ok) {
+        throw new Error(`API returned ${res.status}`);
+      }
+      
+      const data = await res.json();
+      console.log('Orders API response:', data);
+      
+      if (data.success && Array.isArray(data.data)) {
+        setAllOrders(data.data);
+        setFilteredOrders(data.data);
+        console.log(`✅ Loaded ${data.data.length} orders`);
+      } else {
+        setAllOrders([]);
+        setFilteredOrders([]);
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      setAllOrders([]);
+      setFilteredOrders([]);
+      setApiError('Failed to load orders: ' + error.message);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  /** =========================
+   * FETCH VEHICLE NEGOTIATION BY ORDER NUMBER
+   ========================= */
+  const fetchVehicleNegotiationByOrder = async (orderNo) => {
+    setFetchingVehicleData(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.warn('No token found');
+        return null;
+      }
+      
+      // First, get all vehicle negotiations
+      const res = await fetch('/api/vehicle-negotiation?format=table', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (!res.ok) {
+        throw new Error(`API returned ${res.status}`);
+      }
+      
+      const data = await res.json();
+      console.log('Vehicle Negotiation API response:', data);
+      
+      if (data.success && Array.isArray(data.data)) {
+        // Find the record matching the order number
+        const matchingRecord = data.data.find(record => record.order === orderNo);
+        
+        if (matchingRecord && matchingRecord.vnId) {
+          // Fetch full details using the VN ID
+          const detailRes = await fetch(`/api/vehicle-negotiation?id=${matchingRecord.vnId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          
+          const detailData = await detailRes.json();
+          
+          if (detailData.success && detailData.data) {
+            console.log('✅ Found vehicle negotiation data:', detailData.data);
+            setVehicleNegotiationData(detailData.data);
+            return detailData.data;
+          }
+        }
+      }
+      
+      setVehicleNegotiationData(null);
+      return null;
+    } catch (error) {
+      console.error('Error fetching vehicle negotiation:', error);
+      setVehicleNegotiationData(null);
+      return null;
+    } finally {
+      setFetchingVehicleData(false);
+    }
+  };
+
+  /** =========================
+   * FETCH CUSTOMERS FROM API
+   ========================= */
+  const fetchCustomers = async () => {
+    setCustomersLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.warn('No token found');
+        setCustomers([]);
+        return;
+      }
+      
+      const res = await fetch('/api/customers', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (!res.ok) {
+        throw new Error(`API returned ${res.status}`);
+      }
+      
+      const data = await res.json();
+      console.log('Customers API response:', data);
+      
+      if (data.success && Array.isArray(data.data)) {
+        const customersWithAddress = data.data.map(customer => ({
+          ...customer,
+          address: customer.address || customer.billingAddress || customer.shippingAddress || customer.customerAddress || ''
+        }));
+        setCustomers(customersWithAddress);
+        setFilteredConsignors(customersWithAddress);
+        setFilteredConsignees(customersWithAddress);
+        console.log(`✅ Loaded ${customersWithAddress.length} customers`);
+      } else {
+        setCustomers([]);
+        setFilteredConsignors([]);
+        setFilteredConsignees([]);
+      }
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+      setCustomers([]);
+      setFilteredConsignors([]);
+      setFilteredConsignees([]);
+    } finally {
+      setCustomersLoading(false);
+    }
+  };
+
+  /** =========================
+   * HELPER FUNCTION TO EXTRACT ADDRESSES FROM CUSTOMER
+   ========================= */
+  const extractAddressesFromCustomer = (customer) => {
+    const addresses = [];
+    
+    if (customer.billingAddresses && Array.isArray(customer.billingAddresses)) {
+      customer.billingAddresses.forEach((addr, idx) => {
+        if (addr.address1 || addr.address2 || addr.city) {
+          const addressText = `${addr.address1 || ''} ${addr.address2 || ''} ${addr.city || ''} ${addr.state || ''} ${addr.pin || ''}`.trim();
+          if (addressText) {
+            addresses.push({
+              title: addr.title || `Billing Address ${idx + 1}`,
+              address: addressText,
+              type: 'billing',
+              gstNumber: addr.gstNumber || ''
+            });
+          }
+        }
+      });
+    }
+    
+    if (customer.shippingAddresses && Array.isArray(customer.shippingAddresses)) {
+      customer.shippingAddresses.forEach((addr, idx) => {
+        if (addr.address1 || addr.address2 || addr.city) {
+          const addressText = `${addr.address1 || ''} ${addr.address2 || ''} ${addr.city || ''} ${addr.state || ''} ${addr.pin || ''}`.trim();
+          if (addressText) {
+            addresses.push({
+              title: addr.title || `Shipping Address ${idx + 1}`,
+              address: addressText,
+              type: 'shipping',
+              gstNumber: addr.gstNumber || ''
+            });
+          }
+        }
+      });
+    }
+    
+    if (addresses.length === 0) {
+      const oldAddress = customer.address || customer.billingAddress || customer.shippingAddress || customer.customerAddress || '';
+      if (oldAddress) {
+        addresses.push({
+          title: 'Default Address',
+          address: oldAddress,
+          type: 'default',
+          gstNumber: ''
+        });
+      }
+    }
+    
+    return addresses;
+  };
+
+  /** =========================
+   * LOAD DATA ON MOUNT
    ========================= */
   useEffect(() => {
-    fetchData();
+    fetchOrders();
+    fetchCustomers();
   }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      await Promise.all([
-        orderHook.fetchOrders(),
-        vendorHook.fetchVendors(),
-        plantHook.fetchPlants(),
-        loadingInfoHook.fetchLoadingInfos()
-      ]);
-      
-      setOrders(orderHook.orders);
-      setVendors(vendorHook.vendors);
-      setPlants(plantHook.plants);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      setApiError('Failed to load data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (loadingInfoHook.loadingInfos.length > 0) {
-      setFilteredLoadingInfos(loadingInfoHook.loadingInfos);
-    }
-  }, [loadingInfoHook.loadingInfos]);
-
   /** =========================
-   * LOADING INFO HANDLERS
+   * ORDER SEARCH HANDLERS
    ========================= */
-  const handleLoadingInfoSearch = (query) => {
-    setLoadingInfoNo(query);
+  const handleOrderSearch = (query) => {
+    setHeader(prev => ({ ...prev, orderNo: query }));
+    
+    if (!allOrders || allOrders.length === 0) {
+      setFilteredOrders([]);
+      return;
+    }
     
     if (query.trim() === "") {
-      setFilteredLoadingInfos(loadingInfoHook.loadingInfos);
+      setFilteredOrders(allOrders);
     } else {
-      const filtered = loadingInfoHook.loadingInfos.filter(info =>
-        info.vehicleArrivalNo?.toLowerCase().includes(query.toLowerCase()) ||
-        info.vehicleNo?.toLowerCase().includes(query.toLowerCase()) ||
-        info.branch?.toLowerCase().includes(query.toLowerCase())
-      );
-      setFilteredLoadingInfos(filtered);
+      const filtered = allOrders.filter(order => {
+        const orderNo = order.orderNo || order.orderPanelNo;
+        return orderNo?.toLowerCase().includes(query.toLowerCase());
+      });
+      setFilteredOrders(filtered);
     }
   };
 
- const handleSelectLoadingInfo = async (loadingInfo) => {
-  setLoadingInfoNo(loadingInfo.vehicleArrivalNo);
-  setShowLoadingInfoDropdown(false);
-  setFetchingData(true);
-  
-  try {
-    const fullInfo = await loadingInfoHook.getLoadingInfoById(loadingInfo._id);
+  const handleSelectOrder = async (order) => {
+    setFetchingOrder(true);
     
-    if (fullInfo) {
-      console.log("📦 Full Loading Info:", fullInfo);
+    try {
+      const token = localStorage.getItem('token');
+      const orderId = order._id || order.originalOrderId;
       
-      // Get VNN from loading info
-      const vnnFromLoading = fullInfo.vehicleNegotiationNo;
+      let fullOrder = order;
       
-      if (vnnFromLoading) {
-        // Fetch Vehicle Negotiation data
-        const vnnData = await vehicleNegotiationHook.getNegotiationByVNN(vnnFromLoading);
+      if (orderId) {
+        const res = await fetch(`/api/order-panel?id=${orderId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         
-        if (vnnData) {
-          setVnnData(vnnData);
-          console.log("✅ Vehicle Negotiation Data:", vnnData);
-          
-          // ===== EXTRACT VENDOR CODE FROM VNN APPROVAL =====
-          const approval = vnnData.approval || {};
-          const vendorCode = approval.vendorCode || "";  // Get vendor code from approval
-          const vendorName = approval.vendorName || vnnData.vendorName || "";
-          
-          console.log("✅ Vendor from VNN:", { vendorName, vendorCode });
-          
-          // Auto-fill from VNN data including vendor code
-          setHeader(prev => ({
-            ...prev,
-            vendorName: vendorName || prev.vendorName,
-            vendorCode: vendorCode || prev.vendorCode,  // ✅ Set vendor code from VNN
-            vehicleNo: approval.vehicleNo || vnnData.vehicleInfo?.vehicleNo || prev.vehicleNo,
-          }));
-
-          // Auto-fill from VNN orders
-          if (vnnData.orders && vnnData.orders.length > 0) {
-            const firstOrder = vnnData.orders[0];
-            setHeader(prev => ({
-              ...prev,
-              partyName: firstOrder.partyName || vnnData.customerName || "",
-              orderNo: firstOrder.orderNo || "",
-              plantCode: firstOrder.plantCodeValue || firstOrder.plantCode || "",
-              plantName: firstOrder.plantName || "",
-              from: firstOrder.fromName || firstOrder.from || "",
-              to: firstOrder.toName || firstOrder.to || "",
-              district: firstOrder.districtName || firstOrder.district || "",
-              state: firstOrder.stateName || firstOrder.state || "",
-            }));
-            
-            setConsignor(prev => ({
-              ...prev,
-              name: firstOrder.partyName || vnnData.customerName || "",
-            }));
-          }
-          
-          // Show success message with vendor info
-          if (vendorCode) {
-            alert(`✅ Data loaded from Vehicle Negotiation!\nVendor: ${vendorName} (Code: ${vendorCode})`);
-          } else {
-            alert(`✅ Data loaded from Vehicle Negotiation: ${vnnFromLoading}`);
-          }
+        const data = await res.json();
+        if (data.success && data.data) {
+          fullOrder = data.data;
         }
+      }
+      
+      console.log('Selected Order Details:', fullOrder);
+      
+      const orderNo = fullOrder.orderPanelNo || fullOrder.orderNo || order.orderNo || '';
+      const partyName = fullOrder.partyName || fullOrder.customerName || order.partyName || '';
+      
+      let plantCode = '';
+      let plantName = '';
+      
+      if (fullOrder.plantRows && fullOrder.plantRows.length > 0) {
+        const firstRow = fullOrder.plantRows[0];
+        plantCode = firstRow.plantCodeValue || firstRow.plantCode || '';
+        plantName = firstRow.plantName || '';
+      }
+      
+      let fromLocation = fullOrder.from || order.from || '';
+      let toLocation = fullOrder.to || order.to || '';
+      let taluka = fullOrder.taluka || order.taluka || '';
+      let district = fullOrder.district || order.district || '';
+      let state = fullOrder.state || order.state || '';
+      
+      if (fullOrder.plantRows && fullOrder.plantRows.length > 0) {
+        const firstRow = fullOrder.plantRows[0];
+        fromLocation = firstRow.fromName || firstRow.from || fromLocation;
+        toLocation = firstRow.toName || firstRow.to || toLocation;
+        taluka = firstRow.talukaName || firstRow.taluka || taluka;
+        district = firstRow.districtName || firstRow.district || district;
+        state = firstRow.stateName || firstRow.state || state;
+      }
+      
+      // Fetch vehicle negotiation data for this order
+      const vehicleData = await fetchVehicleNegotiationByOrder(orderNo);
+      
+      // Update header with vehicle negotiation data if available
+      if (vehicleData && vehicleData.approval) {
+        console.log('🚛 Applying vehicle negotiation data:', vehicleData.approval);
+        
+        setHeader(prev => ({
+          ...prev,
+          orderNo: orderNo,
+          partyName: partyName,
+          plantCode: plantCode,
+          plantName: plantName,
+          from: fromLocation,
+          to: toLocation,
+          taluka: taluka,
+          district: district,
+          state: state,
+          // ✅ Auto-fill from Vehicle Negotiation
+          vendorCode: vehicleData.approval.vendorCode || prev.vendorCode,
+          vendorName: vehicleData.approval.vendorName || prev.vendorName,
+          vehicleNo: vehicleData.approval.vehicleNo || prev.vehicleNo,
+          partyNo: vehicleData.approval.mobile || prev.partyNo,
+        }));
       } else {
-        alert("⚠️ No Vehicle Negotiation reference found in this Loading Info");
-      }
-
-      // Auto-fill vehicle information from loading info (fallback)
-      if (fullInfo.vehicleInfo && !vnnData) {
         setHeader(prev => ({
           ...prev,
-          vehicleNo: fullInfo.vehicleInfo.vehicleNo || prev.vehicleNo,
-          partyNo: fullInfo.vehicleInfo.driverMobileNo || "",
+          orderNo: orderNo,
+          partyName: partyName,
+          plantCode: plantCode,
+          plantName: plantName,
+          from: fromLocation,
+          to: toLocation,
+          taluka: taluka,
+          district: district,
+          state: state,
         }));
       }
-
-      // Auto-fill from/to locations from order rows (fallback)
-      if (fullInfo.orderRows && fullInfo.orderRows.length > 0 && !vnnData) {
-        const firstOrder = fullInfo.orderRows[0];
-        setHeader(prev => ({
-          ...prev,
-          from: firstOrder.from || "",
-          to: firstOrder.to || "",
-          district: firstOrder.district || "",
-          state: firstOrder.state || "",
-        }));
-      }
-
-      // Auto-fill product rows from pack data
-      if (fullInfo.packData) {
-        const products = [];
-        
-        // Get products from PALLETIZATION
-        if (fullInfo.packData.PALLETIZATION && fullInfo.packData.PALLETIZATION.length > 0) {
-          fullInfo.packData.PALLETIZATION.forEach(item => {
-            products.push({
-              _id: uid(),
-              totalPkgs: item.totalPkgs?.toString() || "",
-              pkgsType: item.pkgsType || "",
-              uom: item.uom || "",
-              packSize: item.skuSize || "",
-              skuSize: item.skuSize || "",
-              productName: item.productName || "",
-              wtLtr: item.wtLtr?.toString() || "",
-              actualWt: item.actualWt?.toString() || "",
-              chargedWt: item.chargedWt?.toString() || "",
-              wtUom: item.wtUom || "MT",
-            });
-          });
+      
+      setConsignor(prev => ({
+        ...prev,
+        name: partyName
+      }));
+      
+      setIsReadOnly(true);
+      
+      if (fullOrder.packData) {
+        if (fullOrder.packData.PALLETIZATION && fullOrder.packData.PALLETIZATION.length > 0) {
+          const palletRows = fullOrder.packData.PALLETIZATION.map(item => ({
+            _id: uid(),
+            packType: "PALLETIZATION",
+            noOfPallets: item.noOfPallets?.toString() || "",
+            unitPerPallets: item.unitPerPallets?.toString() || "",
+            totalPkgs: item.totalPkgs?.toString() || "",
+            pkgsType: item.pkgsType || "",
+            uom: item.uom || "MT",
+            skuSize: item.skuSize || "",
+            packWeight: item.packWeight?.toString() || "",
+            productName: item.productName || "",
+            wtLtr: item.wtLtr?.toString() || "",
+            actualWt: item.actualWt?.toString() || "",
+            chargedWt: item.chargedWt?.toString() || "",
+            wtUom: item.wtUom || "MT",
+          }));
+          setPalletizationRows(palletRows);
         }
         
-        // Get products from UNIFORM
-        if (fullInfo.packData['UNIFORM - BAGS/BOXES'] && fullInfo.packData['UNIFORM - BAGS/BOXES'].length > 0) {
-          fullInfo.packData['UNIFORM - BAGS/BOXES'].forEach(item => {
-            products.push({
-              _id: uid(),
-              totalPkgs: item.totalPkgs?.toString() || "",
-              pkgsType: item.pkgsType || "",
-              uom: item.uom || "",
-              packSize: item.skuSize || "",
-              skuSize: item.skuSize || "",
-              productName: item.productName || "",
-              wtLtr: item.wtLtr?.toString() || "",
-              actualWt: item.actualWt?.toString() || "",
-              chargedWt: item.chargedWt?.toString() || "",
-              wtUom: item.wtUom || "MT",
-            });
-          });
+        if (fullOrder.packData['UNIFORM - BAGS/BOXES'] && fullOrder.packData['UNIFORM - BAGS/BOXES'].length > 0) {
+          const uniformRowsData = fullOrder.packData['UNIFORM - BAGS/BOXES'].map(item => ({
+            _id: uid(),
+            packType: "UNIFORM - BAGS/BOXES",
+            totalPkgs: item.totalPkgs?.toString() || "",
+            pkgsType: item.pkgsType || "",
+            uom: item.uom || "",
+            skuSize: item.skuSize || "",
+            packWeight: item.packWeight?.toString() || "",
+            productName: item.productName || "",
+            wtLtr: item.wtLtr?.toString() || "",
+            actualWt: item.actualWt?.toString() || "",
+            chargedWt: item.chargedWt?.toString() || "",
+            wtUom: item.wtUom || "MT",
+          }));
+          setUniformRows(uniformRowsData);
         }
         
-        // Get products from LOOSE CARGO
-        if (fullInfo.packData['LOOSE - CARGO'] && fullInfo.packData['LOOSE - CARGO'].length > 0) {
-          fullInfo.packData['LOOSE - CARGO'].forEach(item => {
-            products.push({
-              _id: uid(),
-              totalPkgs: "1",
-              pkgsType: "Loose",
-              uom: item.uom || "",
-              packSize: "",
-              skuSize: "",
-              productName: item.productName || "",
-              wtLtr: "",
-              actualWt: item.actualWt?.toString() || "",
-              chargedWt: item.chargedWt?.toString() || "",
-              wtUom: item.uom || "MT",
-            });
-          });
+        if (fullOrder.packData['LOOSE - CARGO'] && fullOrder.packData['LOOSE - CARGO'].length > 0) {
+          const looseRowsData = fullOrder.packData['LOOSE - CARGO'].map(item => ({
+            _id: uid(),
+            packType: "LOOSE - CARGO",
+            uom: item.uom || "MT",
+            productName: item.productName || "",
+            actualWt: item.actualWt?.toString() || "",
+            chargedWt: item.chargedWt?.toString() || "",
+          }));
+          setLooseCargoRows(looseRowsData);
         }
         
-        if (products.length > 0) {
-          setProductRows(products);
+        if (fullOrder.packData['NON-UNIFORM - GENERAL CARGO'] && fullOrder.packData['NON-UNIFORM - GENERAL CARGO'].length > 0) {
+          const nonUniformRowsData = fullOrder.packData['NON-UNIFORM - GENERAL CARGO'].map(item => ({
+            _id: uid(),
+            packType: "NON-UNIFORM - GENERAL CARGO",
+            nos: item.nos?.toString() || "",
+            productName: item.productName || "",
+            uom: item.uom || "MT",
+            length: item.length?.toString() || "",
+            width: item.width?.toString() || "",
+            height: item.height?.toString() || "",
+            actualWt: item.actualWt?.toString() || "",
+            chargedWt: item.chargedWt?.toString() || "",
+          }));
+          setNonUniformRows(nonUniformRowsData);
         }
       }
-    }
-  } catch (error) {
-    console.error("Error loading loading info:", error);
-    alert(`❌ Failed to load data: ${error.message}`);
-  } finally {
-    setFetchingData(false);
-  }
-};
-
-  const handleLoadingInfoInputFocus = () => {
-    if (!showLoadingInfoDropdown) {
-      setFilteredLoadingInfos(loadingInfoHook.loadingInfos);
-      setShowLoadingInfoDropdown(true);
+      
+      const vehicleInfo = vehicleData?.approval?.vehicleNo ? 
+        `\n🚛 Vehicle: ${vehicleData.approval.vehicleNo}\n👤 Vendor: ${vehicleData.approval.vendorName || 'N/A'}\n📱 Mobile: ${vehicleData.approval.mobile || 'N/A'}` : '';
+      
+      alert(`✅ Order ${orderNo} loaded successfully!${vehicleInfo}\nData is now read-only.`);
+      
+    } catch (error) {
+      console.error('Error fetching order details:', error);
+      alert(`❌ Failed to load order details: ${error.message}`);
+    } finally {
+      setFetchingOrder(false);
+      setShowOrderDropdown(false);
     }
   };
 
-  const handleLoadingInfoInputBlur = () => {
+  const handleOrderInputFocus = () => {
+    if (!showOrderDropdown && allOrders && allOrders.length > 0) {
+      setFilteredOrders(allOrders);
+      setShowOrderDropdown(true);
+    } else if (!allOrders || allOrders.length === 0) {
+      fetchOrders();
+    }
+  };
+
+  const handleOrderInputBlur = () => {
     setTimeout(() => {
-      if (loadingInfoDropdownRef.current && !loadingInfoDropdownRef.current.contains(document.activeElement)) {
-        setShowLoadingInfoDropdown(false);
+      if (orderDropdownRef.current && !orderDropdownRef.current.contains(document.activeElement)) {
+        setShowOrderDropdown(false);
+      }
+    }, 200);
+  };
+  
+  const router = useRouter();
+  
+  /** =========================
+   * CUSTOMER DROPDOWN HANDLERS
+   ========================= */
+  const handleConsignorSearch = (query) => {
+    setConsignor(prev => ({ ...prev, name: query }));
+    
+    if (!customers || customers.length === 0) {
+      setFilteredConsignors([]);
+      return;
+    }
+    
+    if (query.trim() === "") {
+      setFilteredConsignors(customers);
+    } else {
+      const filtered = customers.filter(customer =>
+        customer.customerName?.toLowerCase().includes(query.toLowerCase()) ||
+        customer.customerCode?.toLowerCase().includes(query.toLowerCase())
+      );
+      setFilteredConsignors(filtered);
+    }
+  };
+
+  const handleSelectConsignor = (customer) => {
+    const addresses = extractAddressesFromCustomer(customer);
+    
+    setConsignor({
+      name: customer.customerName,
+      address: addresses.length > 0 ? addresses[0].address : '',
+      customerId: customer._id,
+      selectedAddressTitle: addresses.length > 0 ? addresses[0].title : ''
+    });
+    
+    setConsignorAddresses(addresses);
+    setShowConsignorDropdown(false);
+  };
+
+  const handleConsignorInputFocus = () => {
+    if (!showConsignorDropdown) {
+      if (customers.length === 0) {
+        fetchCustomers();
+      } else {
+        setFilteredConsignors(customers);
+        setShowConsignorDropdown(true);
+      }
+    }
+  };
+
+  const handleConsignorInputBlur = () => {
+    setTimeout(() => {
+      if (consignorDropdownRef.current && !consignorDropdownRef.current.contains(document.activeElement)) {
+        setShowConsignorDropdown(false);
       }
     }, 200);
   };
 
-  /** =========================
-   * PRODUCT ROW FUNCTIONS
-   ========================= */
-  const addProductRow = () => setProductRows([...productRows, defaultProductRow()]);
-
-  const updateProductRow = (rowId, key, value) => {
-    setProductRows((prev) =>
-      prev.map((r) => {
-        if (r._id === rowId) {
-          const updatedRow = { ...r, [key]: value };
-          
-          // Auto-calculate WT (LTR) = TOTAL PKGS * PACK SIZE
-          if (key === "totalPkgs" || key === "packSize") {
-            const totalPkgs = num(updatedRow.totalPkgs);
-            const packSize = parseFloat(updatedRow.packSize) || 0;
-            updatedRow.wtLtr = (totalPkgs * packSize).toString();
-            
-            // Auto-calculate ACTUAL WT (convert to MT)
-            if (updatedRow.wtUom === "MT") {
-              updatedRow.actualWt = ((totalPkgs * packSize) / 1000).toString();
-            } else {
-              updatedRow.actualWt = (totalPkgs * packSize).toString();
-            }
-          }
-          
-          // Auto-calculate ACTUAL WT from WT LTR
-          if (key === "wtLtr") {
-            const wtLtr = num(updatedRow.wtLtr);
-            if (updatedRow.wtUom === "MT") {
-              updatedRow.actualWt = (wtLtr / 1000).toString();
-            } else {
-              updatedRow.actualWt = wtLtr.toString();
-            }
-          }
-          
-          // Update CHARGED WT when ACTUAL WT changes (optional auto-fill)
-          if (key === "actualWt" && !updatedRow.chargedWt) {
-            updatedRow.chargedWt = updatedRow.actualWt;
-          }
-          
-          return updatedRow;
-        }
-        return r;
-      })
-    );
+  const handleSelectConsignorAddress = (addressObj) => {
+    setConsignor(prev => ({
+      ...prev,
+      address: addressObj.address,
+      selectedAddressTitle: addressObj.title
+    }));
+    setShowConsignorAddressDropdown(false);
   };
 
-  const removeProductRow = (rowId) => {
-    if (productRows.length > 1) {
-      setProductRows((prev) => prev.filter((r) => r._id !== rowId));
+  const handleConsigneeSearch = (query) => {
+    setConsignee(prev => ({ ...prev, name: query }));
+    
+    if (!customers || customers.length === 0) {
+      setFilteredConsignees([]);
+      return;
+    }
+    
+    if (query.trim() === "") {
+      setFilteredConsignees(customers);
     } else {
-      alert("At least one product row is required");
+      const filtered = customers.filter(customer =>
+        customer.customerName?.toLowerCase().includes(query.toLowerCase()) ||
+        customer.customerCode?.toLowerCase().includes(query.toLowerCase())
+      );
+      setFilteredConsignees(filtered);
     }
   };
 
-  const duplicateProductRow = (rowId) => {
-    const row = productRows.find((r) => r._id === rowId);
-    if (!row) return;
-    setProductRows([...productRows, { ...row, _id: uid() }]);
+  const handleSelectConsignee = (customer) => {
+    const addresses = extractAddressesFromCustomer(customer);
+    
+    setConsignee({
+      name: customer.customerName,
+      address: addresses.length > 0 ? addresses[0].address : '',
+      customerId: customer._id,
+      selectedAddressTitle: addresses.length > 0 ? addresses[0].title : ''
+    });
+    
+    setConsigneeAddresses(addresses);
+    setShowConsigneeDropdown(false);
+  };
+
+  const handleConsigneeInputFocus = () => {
+    if (!showConsigneeDropdown) {
+      if (customers.length === 0) {
+        fetchCustomers();
+      } else {
+        setFilteredConsignees(customers);
+        setShowConsigneeDropdown(true);
+      }
+    }
+  };
+
+  const handleConsigneeInputBlur = () => {
+    setTimeout(() => {
+      if (consigneeDropdownRef.current && !consigneeDropdownRef.current.contains(document.activeElement)) {
+        setShowConsigneeDropdown(false);
+      }
+    }, 200);
+  };
+
+  const handleSelectConsigneeAddress = (addressObj) => {
+    setConsignee(prev => ({
+      ...prev,
+      address: addressObj.address,
+      selectedAddressTitle: addressObj.title
+    }));
+    setShowConsigneeAddressDropdown(false);
   };
 
   /** =========================
    * CALCULATED VALUES
    ========================= */
   const calculateTotalActualWt = () => {
-    return productRows.reduce((sum, row) => sum + num(row.actualWt), 0);
+    let total = 0;
+    palletizationRows.forEach(row => total += num(row.actualWt));
+    uniformRows.forEach(row => total += num(row.actualWt));
+    looseCargoRows.forEach(row => total += num(row.actualWt));
+    nonUniformRows.forEach(row => total += num(row.actualWt));
+    return total;
   };
 
   /** =========================
@@ -674,17 +795,12 @@ export default function CreateConsignmentNote() {
    ========================= */
   const handleSave = async () => {
     if (!header.partyName) {
-      alert("Please select a party");
-      return;
-    }
-
-    if (!header.orderNo) {
-      alert("Please enter order number");
+      alert("Please enter party name");
       return;
     }
 
     if (!header.vendorName) {
-      alert("Please select a vendor");
+      alert("Please enter vendor name");
       return;
     }
 
@@ -702,11 +818,14 @@ export default function CreateConsignmentNote() {
         consignee,
         invoice,
         ewaybill,
-        productRows,
+        packData: {
+          PALLETIZATION: palletizationRows,
+          'UNIFORM - BAGS/BOXES': uniformRows,
+          'LOOSE - CARGO': looseCargoRows,
+          'NON-UNIFORM - GENERAL CARGO': nonUniformRows
+        },
         totalWeight: calculateTotalActualWt(),
-        loadingInfoNo: loadingInfoNo,
-        vnnNo: vnnData?.vnnNo || "",
-        vehicleNegotiationId: vnnData?._id || "",
+        vehicleNegotiationRef: vehicleNegotiationData?._id || null
       };
 
       console.log("Saving consignment note:", payload);
@@ -720,12 +839,18 @@ export default function CreateConsignmentNote() {
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ message: `HTTP error! status: ${res.status}` }));
-        throw new Error(errorData.message || 'Failed to save consignment note');
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await res.text();
+        console.error('Non-JSON response:', text.substring(0, 500));
+        throw new Error('Server returned an error page. Please check your API endpoint.');
       }
 
       const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || `Failed to save consignment note: ${res.status}`);
+      }
       
       alert(`✅ Consignment Note saved successfully!\nLR No: ${data.data?.lrNo || header.lrNo}`);
       
@@ -739,21 +864,23 @@ export default function CreateConsignmentNote() {
     }
   };
 
-  /** =========================
-   * RENDER
-   ========================= */
-  if (loading && !fetchingData) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto"></div>
-            <p className="mt-4 text-slate-600">Loading data...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Get vehicle negotiation summary for display
+  const getVehicleSummary = () => {
+    if (!vehicleNegotiationData?.approval) return null;
+    
+    const approval = vehicleNegotiationData.approval;
+    return {
+      vehicleNo: approval.vehicleNo || 'N/A',
+      vendorName: approval.vendorName || 'N/A',
+      vendorCode: approval.vendorCode || 'N/A',
+      mobile: approval.mobile || 'N/A',
+      rateType: approval.rateType || 'N/A',
+      finalRate: approval.rateType === 'Per MT' ? approval.finalPerMT : approval.finalFix,
+      approvalStatus: approval.approvalStatus || 'Pending'
+    };
+  };
+
+  const vehicleSummary = getVehicleSummary();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white">
@@ -781,13 +908,27 @@ export default function CreateConsignmentNote() {
               <span>Date: {header.lrDate}</span>
               <span>|</span>
               <span>Status: {header.status}</span>
-              {fetchingData && (
+              {isReadOnly && (
+                <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full text-xs">
+                  🔒 Read Only Mode - Data loaded from Order
+                </span>
+              )}
+              {fetchingOrder && (
                 <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full text-xs flex items-center">
                   <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Loading...
+                  Loading order...
+                </span>
+              )}
+              {fetchingVehicleData && (
+                <span className="text-green-600 bg-green-50 px-2 py-0.5 rounded-full text-xs flex items-center">
+                  <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Fetching vehicle data...
                 </span>
               )}
               {apiError && (
@@ -801,9 +942,9 @@ export default function CreateConsignmentNote() {
           <div className="flex items-center gap-3">
             <button
               onClick={handleSave}
-              disabled={saving || fetchingData}
+              disabled={saving || fetchingOrder}
               className={`rounded-xl px-5 py-2 text-sm font-bold text-white transition ${
-                saving || fetchingData
+                saving || fetchingOrder
                   ? 'bg-gray-400 cursor-not-allowed' 
                   : 'bg-emerald-600 hover:bg-emerald-700'
               }`}
@@ -824,74 +965,109 @@ export default function CreateConsignmentNote() {
 
       {/* ===== Main Content ===== */}
       <div className="mx-auto max-w-full p-4">
-        {/* ===== Loading Info Search ===== */}
-        <div className="mb-4">
-          <Card title="Load from Loading Info">
-            <div className="grid grid-cols-12 gap-4">
-              <div className="col-span-12 md:col-span-4 relative" ref={loadingInfoDropdownRef}>
-                <label className="text-xs font-bold text-slate-600">Loading Info (Vehicle Arrival No)</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={loadingInfoNo}
-                    onChange={(e) => handleLoadingInfoSearch(e.target.value)}
-                    onFocus={handleLoadingInfoInputFocus}
-                    onBlur={handleLoadingInfoInputBlur}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 pr-8"
-                    placeholder="Search loading info..."
-                  />
-                  {loadingInfoHook.loading && (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      <svg className="animate-spin h-4 w-4 text-purple-500" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
+        {/* ===== Order Selection ===== */}
+        <Card title="Select Order">
+          <div className="grid grid-cols-12 gap-4">
+            <div className="col-span-12 md:col-span-4 relative" ref={orderDropdownRef}>
+              <label className="text-xs font-bold text-slate-600">Order No *</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={header.orderNo}
+                  onChange={(e) => handleOrderSearch(e.target.value)}
+                  onFocus={handleOrderInputFocus}
+                  onBlur={handleOrderInputBlur}
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 pr-8"
+                  placeholder="Search order no..."
+                  readOnly={isReadOnly}
+                />
+                {ordersLoading && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <svg className="animate-spin h-4 w-4 text-purple-500" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  </div>
+                )}
+              </div>
+              {showOrderDropdown && !isReadOnly && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                  {ordersLoading ? (
+                    <div className="p-3 text-center text-sm text-slate-500">Loading orders...</div>
+                  ) : filteredOrders.length > 0 ? (
+                    filteredOrders.map((order, index) => (
+                      <div
+                        key={order._id || index}
+                        onMouseDown={() => handleSelectOrder(order)}
+                        className="p-3 hover:bg-purple-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors"
+                      >
+                        <div className="font-medium text-slate-800">
+                          {order.orderNo || order.orderPanelNo}
+                        </div>
+                        <div className="text-xs text-slate-500 mt-1">
+                          Party: {order.partyName || order.customerName || 'N/A'}
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          From: {order.from || 'N/A'} → To: {order.to || 'N/A'}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-3 text-center text-sm text-slate-500">
+                      {header.orderNo.trim() ? 
+                        `No orders found for "${header.orderNo}"` : 
+                        "No orders available. Please create orders first."
+                      }
                     </div>
                   )}
                 </div>
-                
-                {showLoadingInfoDropdown && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-                    {loadingInfoHook.loading ? (
-                      <div className="p-3 text-center text-sm text-slate-500">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-500 mx-auto"></div>
-                        <p className="mt-1">Loading...</p>
-                      </div>
-                    ) : filteredLoadingInfos.length > 0 ? (
-                      filteredLoadingInfos.map((info) => (
-                        <div
-                          key={info._id}
-                          onMouseDown={() => handleSelectLoadingInfo(info)}
-                          className="p-3 hover:bg-purple-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors"
-                        >
-                          <div className="font-medium text-slate-800">
-                            {info.vehicleArrivalNo}
-                          </div>
-                          <div className="text-xs text-slate-500 mt-1">
-                            Vehicle: {info.vehicleNo || 'N/A'} • 
-                            From: {info.orderRows?.[0]?.from || 'N/A'} → 
-                            To: {info.orderRows?.[0]?.to || 'N/A'}
-                          </div>
-                          <div className="text-xs text-slate-400">
-                            Branch: {info.branch || 'N/A'}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="p-3 text-center text-sm text-slate-500">
-                        {loadingInfoNo.trim() ? 
-                          `No loading info found for "${loadingInfoNo}"` : 
-                          "No loading info available"
-                        }
-                      </div>
-                    )}
+              )}
+              <div className="text-xs text-slate-400 mt-1">Search and select order to auto-fill details (Read Only after selection)</div>
+            </div>
+          </div>
+        </Card>
+
+        {/*===== Vehicle Negotiation Summary Card =====
+        {vehicleSummary && (
+          <div className="mt-4">
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <h3 className="text-sm font-extrabold text-green-800">Vehicle Negotiation Data Found</h3>
+                <span className={`ml-auto text-xs px-2 py-0.5 rounded-full ${
+                  vehicleSummary.approvalStatus === 'Approved' ? 'bg-green-100 text-green-700' :
+                  vehicleSummary.approvalStatus === 'Reject' ? 'bg-red-100 text-red-700' :
+                  'bg-yellow-100 text-yellow-700'
+                }`}>
+                  {vehicleSummary.approvalStatus}
+                </span>
+              </div>
+              <div className="grid grid-cols-12 gap-4">
+                <div className="col-span-12 md:col-span-3">
+                  <div className="text-xs text-green-600 font-medium">Vehicle No</div>
+                  <div className="text-sm font-bold text-green-800">{vehicleSummary.vehicleNo}</div>
+                </div>
+                <div className="col-span-12 md:col-span-3">
+                  <div className="text-xs text-green-600 font-medium">Vendor Name</div>
+                  <div className="text-sm font-bold text-green-800">{vehicleSummary.vendorName}</div>
+                  <div className="text-xs text-green-500">Code: {vehicleSummary.vendorCode}</div>
+                </div>
+                <div className="col-span-12 md:col-span-3">
+                  <div className="text-xs text-green-600 font-medium">Mobile No</div>
+                  <div className="text-sm font-bold text-green-800">{vehicleSummary.mobile}</div>
+                </div>
+                <div className="col-span-12 md:col-span-3">
+                  <div className="text-xs text-green-600 font-medium">Rate Details</div>
+                  <div className="text-sm font-bold text-green-800">
+                    {vehicleSummary.rateType}: {vehicleSummary.finalRate}
                   </div>
-                )}
-                <div className="text-xs text-slate-400 mt-1">Select to auto-fill vehicle and product data</div>
+                </div>
               </div>
             </div>
-          </Card>
-        </div>
+          </div>
+        )}*/}
 
         {/* ===== Party Information ===== */}
         <Card title="Party Information">
@@ -902,19 +1078,19 @@ export default function CreateConsignmentNote() {
                 type="text"
                 value={header.partyName}
                 onChange={(e) => setHeader({ ...header, partyName: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                placeholder="Auto-filled from VNN"
+                readOnly={isReadOnly}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
+                placeholder="Enter party name"
               />
             </div>
 
             <div className="col-span-12 md:col-span-2">
-              <label className="text-xs font-bold text-slate-600">Order No *</label>
+              <label className="text-xs font-bold text-slate-600">Order No</label>
               <input
                 type="text"
                 value={header.orderNo}
-                onChange={(e) => setHeader({ ...header, orderNo: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                placeholder="Auto-filled from VNN"
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
               />
             </div>
 
@@ -923,7 +1099,8 @@ export default function CreateConsignmentNote() {
               <select
                 value={header.orderType}
                 onChange={(e) => setHeader({ ...header, orderType: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                disabled={isReadOnly}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
               >
                 {ORDER_TYPES.map((opt) => (
                   <option key={opt} value={opt}>{opt}</option>
@@ -936,9 +1113,8 @@ export default function CreateConsignmentNote() {
               <input
                 type="text"
                 value={header.plantCode}
-                onChange={(e) => setHeader({ ...header, plantCode: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                placeholder="Auto-filled from VNN"
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
               />
             </div>
 
@@ -947,7 +1123,8 @@ export default function CreateConsignmentNote() {
               <select
                 value={header.hiredOwned}
                 onChange={(e) => setHeader({ ...header, hiredOwned: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                disabled={isReadOnly}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
               >
                 {HIRED_OWNED_OPTIONS.map((opt) => (
                   <option key={opt} value={opt}>{opt}</option>
@@ -961,8 +1138,9 @@ export default function CreateConsignmentNote() {
                 type="text"
                 value={header.vendorCode}
                 onChange={(e) => setHeader({ ...header, vendorCode: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                placeholder="Auto-filled from VNN"
+                readOnly={isReadOnly || !!vehicleNegotiationData}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 ${(isReadOnly || vehicleNegotiationData) ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
+                placeholder="Enter vendor code"
               />
             </div>
 
@@ -972,8 +1150,9 @@ export default function CreateConsignmentNote() {
                 type="text"
                 value={header.vendorName}
                 onChange={(e) => setHeader({ ...header, vendorName: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                placeholder="Auto-filled from VNN"
+                readOnly={isReadOnly || !!vehicleNegotiationData}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 ${(isReadOnly || vehicleNegotiationData) ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
+                placeholder="Enter vendor name"
               />
             </div>
 
@@ -982,9 +1161,8 @@ export default function CreateConsignmentNote() {
               <input
                 type="text"
                 value={header.from}
-                onChange={(e) => setHeader({ ...header, from: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                placeholder="Kandla"
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
               />
             </div>
 
@@ -993,9 +1171,18 @@ export default function CreateConsignmentNote() {
               <input
                 type="text"
                 value={header.to}
-                onChange={(e) => setHeader({ ...header, to: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                placeholder="Darayoganj"
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
+              />
+            </div>
+
+            <div className="col-span-12 md:col-span-1">
+              <label className="text-xs font-bold text-slate-600">Taluka</label>
+              <input
+                type="text"
+                value={header.taluka}
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
               />
             </div>
 
@@ -1004,9 +1191,8 @@ export default function CreateConsignmentNote() {
               <input
                 type="text"
                 value={header.district}
-                onChange={(e) => setHeader({ ...header, district: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                placeholder="Etah"
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
               />
             </div>
 
@@ -1015,9 +1201,8 @@ export default function CreateConsignmentNote() {
               <input
                 type="text"
                 value={header.state}
-                onChange={(e) => setHeader({ ...header, state: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                placeholder="UP"
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
               />
             </div>
 
@@ -1027,7 +1212,8 @@ export default function CreateConsignmentNote() {
                 type="text"
                 value={header.vehicleNo}
                 onChange={(e) => setHeader({ ...header, vehicleNo: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                readOnly={isReadOnly || !!vehicleNegotiationData}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 ${(isReadOnly || vehicleNegotiationData) ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
                 placeholder="HR38X8960"
               />
             </div>
@@ -1038,7 +1224,8 @@ export default function CreateConsignmentNote() {
                 type="text"
                 value={header.partyNo}
                 onChange={(e) => setHeader({ ...header, partyNo: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                readOnly={isReadOnly || !!vehicleNegotiationData}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 ${(isReadOnly || vehicleNegotiationData) ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
                 placeholder="8182482111"
               />
             </div>
@@ -1068,7 +1255,8 @@ export default function CreateConsignmentNote() {
               <select
                 value={header.unit}
                 onChange={(e) => setHeader({ ...header, unit: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                disabled={isReadOnly}
+                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
               >
                 {UNIT_OPTIONS.map((opt) => (
                   <option key={opt} value={opt}>{opt}</option>
@@ -1087,65 +1275,6 @@ export default function CreateConsignmentNote() {
             </div>
           </div>
         </Card>
-
-        {/* ===== Consignor & Consignee ===== */}
-        <div className="mt-4">
-          <div className="grid grid-cols-12 gap-4">
-            <div className="col-span-12 md:col-span-6">
-              <Card title="Consignor (Sender)">
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs font-bold text-slate-600">Consignor Name</label>
-                    <input
-                      type="text"
-                      value={consignor.name}
-                      onChange={(e) => setConsignor({ ...consignor, name: e.target.value })}
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                      placeholder="Enter consignor name"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-600">Consignor Address</label>
-                    <textarea
-                      value={consignor.address}
-                      onChange={(e) => setConsignor({ ...consignor, address: e.target.value })}
-                      rows={4}
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                      placeholder="Enter complete address"
-                    />
-                  </div>
-                </div>
-              </Card>
-            </div>
-
-            <div className="col-span-12 md:col-span-6">
-              <Card title="Consignee (Receiver)">
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs font-bold text-slate-600">Consignee Name</label>
-                    <input
-                      type="text"
-                      value={consignee.name}
-                      onChange={(e) => setConsignee({ ...consignee, name: e.target.value })}
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                      placeholder="Enter consignee name"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-600">Consignee Address</label>
-                    <textarea
-                      value={consignee.address}
-                      onChange={(e) => setConsignee({ ...consignee, address: e.target.value })}
-                      rows={4}
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                      placeholder="Enter complete address"
-                    />
-                  </div>
-                </div>
-              </Card>
-            </div>
-          </div>
-        </div>
 
         {/* ===== BOE / Invoice Information ===== */}
         <div className="mt-4">
@@ -1240,177 +1369,390 @@ export default function CreateConsignmentNote() {
           </Card>
         </div>
 
-        {/* ===== Products Table ===== */}
+        {/* ===== Consignor & Consignee ===== */}
         <div className="mt-4">
-          <Card 
-            title="Product Details"
-            right={
-              <div className="flex gap-2">
-                <button
-                  onClick={addProductRow}
-                  className="rounded-xl bg-yellow-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-yellow-700 transition"
-                >
-                  + Add Product
-                </button>
-              </div>
-            }
-          >
+          <div className="grid grid-cols-12 gap-4">
+            <div className="col-span-12 md:col-span-6">
+              <Card title="Consignor (Sender)">
+                <div className="space-y-3">
+                  <div className="relative" ref={consignorDropdownRef}>
+                    <label className="text-xs font-bold text-slate-600">Consignor Name *</label>
+                    <div className="flex gap-2">
+                      <div className="flex-1 relative">
+                        <input
+                          type="text"
+                          value={consignor.name}
+                          onChange={(e) => handleConsignorSearch(e.target.value)}
+                          onFocus={handleConsignorInputFocus}
+                          onBlur={handleConsignorInputBlur}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                          placeholder="Search customer by name..."
+                          autoComplete="off"
+                        />
+                        {showConsignorDropdown && (
+                          <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                            {customersLoading ? (
+                              <div className="p-3 text-center text-sm text-slate-500">
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-500 mx-auto"></div>
+                                <p className="mt-1">Loading customers...</p>
+                              </div>
+                            ) : filteredConsignors.length > 0 ? (
+                              filteredConsignors.map((customer) => {
+                                const addresses = extractAddressesFromCustomer(customer);
+                                const addressCount = addresses.length;
+                                
+                                return (
+                                  <div
+                                    key={customer._id}
+                                    onMouseDown={() => handleSelectConsignor(customer)}
+                                    className="p-3 hover:bg-purple-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors"
+                                  >
+                                    <div className="font-medium text-slate-800">{customer.customerName}</div>
+                                    <div className="text-xs text-slate-500 mt-1">
+                                      Code: {customer.customerCode}
+                                      {customer.contactPersonName && ` • Contact: ${customer.contactPersonName}`}
+                                      {addressCount > 0 && ` • ${addressCount} address(es)`}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div className="p-3 text-center text-sm text-slate-500">
+                                {consignor.name.trim() ? 
+                                  `No customers found for "${consignor.name}"` : 
+                                  "No customers available"
+                                }
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Address Title Dropdown */}
+                  <div className="relative" ref={consignorAddressRef}>
+                    <label className="text-xs font-bold text-slate-600">Select Address Title</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={consignor.selectedAddressTitle}
+                        onFocus={() => {
+                          if (consignor.customerId && consignorAddresses.length > 0) {
+                            setShowConsignorAddressDropdown(true);
+                          }
+                        }}
+                        onBlur={handleConsignorInputBlur}
+                        readOnly
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-50 px-3 py-2 text-sm outline-none cursor-pointer"
+                        placeholder={consignorAddresses.length > 0 ? "Select an address..." : "No addresses available"}
+                      />
+                      {showConsignorAddressDropdown && consignorAddresses.length > 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                          {consignorAddresses.map((addr, idx) => (
+                            <div
+                              key={idx}
+                              onMouseDown={() => handleSelectConsignorAddress(addr)}
+                              className="p-3 hover:bg-purple-50 cursor-pointer border-b border-slate-100 last:border-b-0"
+                            >
+                              <div className="font-medium text-slate-800">{addr.title}</div>
+                              <div className="text-xs text-slate-500 mt-1">{addr.address.substring(0, 100)}...</div>
+                              {addr.gstNumber && (
+                                <div className="text-xs text-slate-400 mt-0.5">GST: {addr.gstNumber}</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-xs font-bold text-slate-600">Consignor Address</label>
+                    <textarea
+                      value={consignor.address}
+                      onChange={(e) => setConsignor({ ...consignor, address: e.target.value })}
+                      rows={4}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                      placeholder="Enter complete address"
+                    />
+                    {consignor.address && consignor.customerId && (
+                      <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Address auto-filled from selected customer
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            <div className="col-span-12 md:col-span-6">
+              <Card title="Consignee (Receiver)">
+                <div className="space-y-3">
+                  <div className="relative" ref={consigneeDropdownRef}>
+                    <label className="text-xs font-bold text-slate-600">Consignee Name *</label>
+                    <div className="flex gap-2">
+                      <div className="flex-1 relative">
+                        <input
+                          type="text"
+                          value={consignee.name}
+                          onChange={(e) => handleConsigneeSearch(e.target.value)}
+                          onFocus={handleConsigneeInputFocus}
+                          onBlur={handleConsigneeInputBlur}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                          placeholder="Search customer by name..."
+                          autoComplete="off"
+                        />
+                        {showConsigneeDropdown && (
+                          <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                            {customersLoading ? (
+                              <div className="p-3 text-center text-sm text-slate-500">
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-500 mx-auto"></div>
+                                <p className="mt-1">Loading customers...</p>
+                              </div>
+                            ) : filteredConsignees.length > 0 ? (
+                              filteredConsignees.map((customer) => {
+                                const addresses = extractAddressesFromCustomer(customer);
+                                const addressCount = addresses.length;
+                                
+                                return (
+                                  <div
+                                    key={customer._id}
+                                    onMouseDown={() => handleSelectConsignee(customer)}
+                                    className="p-3 hover:bg-purple-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors"
+                                  >
+                                    <div className="font-medium text-slate-800">{customer.customerName}</div>
+                                    <div className="text-xs text-slate-500 mt-1">
+                                      Code: {customer.customerCode}
+                                      {customer.contactPersonName && ` • Contact: ${customer.contactPersonName}`}
+                                      {addressCount > 0 && ` • ${addressCount} address(es)`}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div className="p-3 text-center text-sm text-slate-500">
+                                {consignee.name.trim() ? 
+                                  `No customers found for "${consignee.name}"` : 
+                                  "No customers available"
+                                }
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Address Title Dropdown for Consignee */}
+                  <div className="relative" ref={consigneeAddressRef}>
+                    <label className="text-xs font-bold text-slate-600">Select Address Title</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={consignee.selectedAddressTitle}
+                        onFocus={() => {
+                          if (consignee.customerId && consigneeAddresses.length > 0) {
+                            setShowConsigneeAddressDropdown(true);
+                          }
+                        }}
+                        onBlur={handleConsignorInputBlur}
+                        readOnly
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-50 px-3 py-2 text-sm outline-none cursor-pointer"
+                        placeholder={consigneeAddresses.length > 0 ? "Select an address..." : "No addresses available"}
+                      />
+                      {showConsigneeAddressDropdown && consigneeAddresses.length > 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                          {consigneeAddresses.map((addr, idx) => (
+                            <div
+                              key={idx}
+                              onMouseDown={() => handleSelectConsigneeAddress(addr)}
+                              className="p-3 hover:bg-purple-50 cursor-pointer border-b border-slate-100 last:border-b-0"
+                            >
+                              <div className="font-medium text-slate-800">{addr.title}</div>
+                              <div className="text-xs text-slate-500 mt-1">{addr.address.substring(0, 100)}...</div>
+                              {addr.gstNumber && (
+                                <div className="text-xs text-slate-400 mt-0.5">GST: {addr.gstNumber}</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-xs font-bold text-slate-600">Consignee Address</label>
+                    <textarea
+                      value={consignee.address}
+                      onChange={(e) => setConsignee({ ...consignee, address: e.target.value })}
+                      rows={4}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                      placeholder="Enter complete address"
+                    />
+                    {consignee.address && consignee.customerId && (
+                      <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Address auto-filled from selected customer
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            </div>
+          </div>
+        </div>
+        
+        {/* ===== Product Details - All 4 Pack Types ===== */}
+        
+        {/* PALLETIZATION Section */}
+        <div className="mt-4">
+          <Card title="Palletization">
             <div className="overflow-auto rounded-xl border border-yellow-300">
               <table className="min-w-full w-full text-sm">
                 <thead className="sticky top-0 bg-yellow-400">
                   <tr>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">NO OF PALLETS</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">UNIT PER PALLETS</th>
                     <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">TOTAL PKGS</th>
-                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PKGS TYPE</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PKG TYPE</th>
                     <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">UOM</th>
-                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">Pack Size</th>
                     <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">SKU - SIZE</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PACK - WEIGHT</th>
                     <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PRODUCT NAME</th>
                     <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">WT (LTR)</th>
                     <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">ACTUAL - WT</th>
                     <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">CHARGED - WT</th>
                     <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">WT UOM</th>
-                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {productRows.map((row) => (
+                  {palletizationRows.map((row) => (
                     <tr key={row._id} className="hover:bg-yellow-50 even:bg-slate-50">
-                      <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="number"
-                          value={row.totalPkgs || ""}
-                          onChange={(e) => updateProductRow(row._id, 'totalPkgs', e.target.value)}
-                          className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                          placeholder="Qty"
-                        />
-                      </td>
-                      <td className="border border-yellow-300 px-2 py-2">
-                        <select
-                          value={row.pkgsType || ""}
-                          onChange={(e) => updateProductRow(row._id, 'pkgsType', e.target.value)}
-                          className="w-24 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm"
-                        >
-                          <option value="">Select</option>
-                          {PKGS_TYPE_OPTIONS.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="border border-yellow-300 px-2 py-2">
-                        <select
-                          value={row.uom || ""}
-                          onChange={(e) => updateProductRow(row._id, 'uom', e.target.value)}
-                          className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm"
-                        >
-                          <option value="">UOM</option>
-                          {UOM_OPTIONS.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="text"
-                          value={row.packSize || ""}
-                          onChange={(e) => updateProductRow(row._id, 'packSize', e.target.value)}
-                          className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                          placeholder="20 Kgs"
-                        />
-                      </td>
-                      <td className="border border-yellow-300 px-2 py-2">
-                        <select
-                          value={row.skuSize || ""}
-                          onChange={(e) => updateProductRow(row._id, 'skuSize', e.target.value)}
-                          className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm"
-                        >
-                          <option value="">Size</option>
-                          {SKU_SIZE_OPTIONS.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="border border-yellow-300 px-2 py-2">
-                        <select
-                          value={row.productName || ""}
-                          onChange={(e) => updateProductRow(row._id, 'productName', e.target.value)}
-                          className="w-40 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm"
-                        >
-                          <option value="">Select Product</option>
-                          {PRODUCT_NAME_OPTIONS.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="number"
-                          value={row.wtLtr || ""}
-                          readOnly
-                          className="w-20 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm"
-                          placeholder="Auto"
-                        />
-                      </td>
-                      <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="number"
-                          value={row.actualWt || ""}
-                          onChange={(e) => updateProductRow(row._id, 'actualWt', e.target.value)}
-                          className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                          placeholder="Weight"
-                        />
-                      </td>
-                      <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="number"
-                          value={row.chargedWt || ""}
-                          onChange={(e) => updateProductRow(row._id, 'chargedWt', e.target.value)}
-                          className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                          placeholder="Charged"
-                        />
-                      </td>
-                      <td className="border border-yellow-300 px-2 py-2">
-                        <select
-                          value={row.wtUom || "MT"}
-                          onChange={(e) => updateProductRow(row._id, 'wtUom', e.target.value)}
-                          className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm"
-                        >
-                          {UOM_OPTIONS.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="border border-yellow-300 px-2 py-2">
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => duplicateProductRow(row._id)}
-                            className="rounded-lg border border-yellow-500 bg-yellow-100 px-2 py-1.5 text-xs font-bold text-yellow-800 hover:bg-yellow-200"
-                            title="Duplicate Row"
-                          >
-                            Dup
-                          </button>
-                          <button
-                            onClick={() => removeProductRow(row._id)}
-                            className="rounded-lg bg-red-500 px-2 py-1.5 text-xs font-bold text-white hover:bg-red-600"
-                            title="Remove Row"
-                          >
-                            Del
-                          </button>
-                        </div>
-                      </td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.noOfPallets} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.unitPerPallets} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.totalPkgs} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.pkgsType} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.uom} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.skuSize} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.packWeight} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.productName} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.wtLtr} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.actualWt} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.chargedWt} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.wtUom} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
                     </tr>
                   ))}
                 </tbody>
-                <tfoot className="bg-yellow-100">
+              </table>
+            </div>
+          </Card>
+        </div>
+
+        {/* UNIFORM - BAGS/BOXES Section */}
+        <div className="mt-4">
+          <Card title="Uniform - Bags/Boxes">
+            <div className="overflow-auto rounded-xl border border-yellow-300">
+              <table className="min-w-full w-full text-sm">
+                <thead className="sticky top-0 bg-yellow-400">
                   <tr>
-                    <td colSpan="7" className="border border-yellow-300 px-3 py-2 text-right font-bold">
-                      Total Actual Weight:
-                    </td>
-                    <td className="border border-yellow-300 px-3 py-2 font-bold text-emerald-700">
-                      {calculateTotalActualWt().toFixed(2)} {header.unit}
-                    </td>
-                    <td colSpan="3" className="border border-yellow-300 px-3 py-2"></td>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">TOTAL PKGS</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PKG TYPE</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">UOM</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">SKU - SIZE</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PACK - WEIGHT</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PRODUCT NAME</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">WT (LTR)</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">ACTUAL - WT</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">CHARGED - WT</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">WT UOM</th>
                   </tr>
-                </tfoot>
+                </thead>
+                <tbody>
+                  {uniformRows.map((row) => (
+                    <tr key={row._id} className="hover:bg-yellow-50 even:bg-slate-50">
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.totalPkgs} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.pkgsType} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.uom} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.skuSize} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.packWeight} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.productName} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.wtLtr} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.actualWt} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.chargedWt} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.wtUom} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+
+        {/* LOOSE - CARGO Section */}
+        <div className="mt-4">
+          <Card title="Loose - Cargo">
+            <div className="overflow-auto rounded-xl border border-yellow-300">
+              <table className="min-w-full w-full text-sm">
+                <thead className="sticky top-0 bg-yellow-400">
+                  <tr>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">UOM</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PRODUCT NAME</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">ACTUAL - WT</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">CHARGED - WT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {looseCargoRows.map((row) => (
+                    <tr key={row._id} className="hover:bg-yellow-50 even:bg-slate-50">
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.uom} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.productName} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.actualWt} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.chargedWt} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+
+        {/* NON-UNIFORM - GENERAL CARGO Section */}
+        <div className="mt-4">
+          <Card title="Non-uniform - General Cargo">
+            <div className="overflow-auto rounded-xl border border-yellow-300">
+              <table className="min-w-full w-full text-sm">
+                <thead className="sticky top-0 bg-yellow-400">
+                  <tr>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">NOS</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">PRODUCT NAME</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">UOM</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">LENGTH</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">WIDTH</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">HEIGHT</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">ACTUAL - WT</th>
+                    <th className="border border-yellow-500 px-2 py-3 text-xs font-extrabold">CHARGED - WT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {nonUniformRows.map((row) => (
+                    <tr key={row._id} className="hover:bg-yellow-50 even:bg-slate-50">
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.nos} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.productName} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.uom} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.length} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.width} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.height} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.actualWt} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                      <td className="border border-yellow-300 px-2 py-2"><input type="text" value={row.chargedWt} readOnly className="w-full bg-gray-100 px-2 py-1.5 text-sm rounded" /></td>
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             </div>
           </Card>
@@ -1446,15 +1788,24 @@ export default function CreateConsignmentNote() {
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span className="text-sm text-slate-600">Vehicle No:</span>
-                      <span className="font-bold text-amber-800">{header.vehicleNo || 'N/A'}</span>
+                      <span className={`font-bold ${header.vehicleNo && header.vehicleNo !== 'N/A' ? 'text-green-700' : 'text-amber-800'}`}>
+                        {header.vehicleNo || 'N/A'}
+                        {vehicleNegotiationData && header.vehicleNo && header.vehicleNo !== 'N/A' && (
+                          <span className="text-xs text-green-500 ml-1">(from Vehicle Negotiation)</span>
+                        )}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-slate-600">Vendor:</span>
-                      <span className="font-bold text-amber-800">{header.vendorName || 'N/A'}</span>
+                      <span className={`font-bold ${header.vendorName && header.vendorName !== 'N/A' ? 'text-green-700' : 'text-amber-800'}`}>
+                        {header.vendorName || 'N/A'}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-slate-600">Mobile No:</span>
-                      <span className="font-bold text-amber-800">{header.partyNo || 'N/A'}</span>
+                      <span className={`font-bold ${header.partyNo && header.partyNo !== 'N/A' ? 'text-green-700' : 'text-amber-800'}`}>
+                        {header.partyNo || 'N/A'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1467,10 +1818,6 @@ export default function CreateConsignmentNote() {
                     <div className="flex justify-between">
                       <span className="text-sm text-slate-600">Total Weight:</span>
                       <span className="text-xl font-bold text-purple-800">{calculateTotalActualWt().toFixed(2)} {header.unit}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-slate-600">Total Products:</span>
-                      <span className="font-bold text-purple-800">{productRows.length}</span>
                     </div>
                   </div>
                 </div>

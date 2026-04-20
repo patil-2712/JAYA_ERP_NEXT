@@ -30,13 +30,11 @@ export async function GET(req, { params }) {
     }
 
     const { id } = params;
-    // const customer = await Customer.findOne({ _id: id, companyId: user.companyId });
-        const customer = await Customer.findById(id);
-        if (!customer) {
-          return res.status(404).json({ success: false, message: 'Customer not found' });
-        }
+    // ✅ FIXED: Check both ID and companyId
+    const customer = await Customer.findOne({ _id: id, companyId: user.companyId });
+    
     if (!customer) {
-      return NextResponse.json({ success: false, message: "Customer not found" }, { status: 404 });
+      return NextResponse.json({ success: false, message: 'Customer not found' }, { status: 404 });
     }
 
     return NextResponse.json({ success: true, data: customer }, { status: 200 });

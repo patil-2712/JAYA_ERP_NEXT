@@ -256,19 +256,6 @@ function Input({ label, value, col = "", type = "text", readOnly = true }) {
   );
 }
 
-function Select({ label, value, options = [], col = "", readOnly = true }) {
-  return (
-    <div className={col}>
-      <label className="text-xs font-bold text-slate-600">{label}</label>
-      <div className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm ${
-        readOnly ? 'bg-slate-50 text-slate-700' : 'bg-white'
-      }`}>
-        {value || "-"}
-      </div>
-    </div>
-  );
-}
-
 function EditableSelect({ label, value, onChange, options = [], col = "" }) {
   return (
     <div className={col}>
@@ -297,20 +284,6 @@ function EditableInput({ label, value, onChange, col = "", type = "text" }) {
         type={type}
         value={value || ""}
         onChange={(e) => onChange?.(e.target.value)}
-        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
-      />
-    </div>
-  );
-}
-
-function TextArea({ label, value, onChange, rows = 3 }) {
-  return (
-    <div>
-      <label className="text-xs font-bold text-slate-600">{label}</label>
-      <textarea
-        value={value || ""}
-        onChange={(e) => onChange?.(e.target.value)}
-        rows={rows}
         className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
       />
     </div>
@@ -513,13 +486,21 @@ export default function ApproveLoadingPanel() {
   
   // File states
   const [existingFiles, setExistingFiles] = useState({
+    vehicle: {
+      rc: [],
+      pan: [],
+      license: [],
+      photo: [],
+      aadhar: []
+    },
     vbp: {},
     vft: {},
     vot: {},
     vl: {},
     weighment: { weighSlip: [] },
     loadedVehicleSlips: [],
-    vehiclePhotos: []
+    vehiclePhotos: [],
+    vehicleSlips: []  // Added for Vehicle Slip
   });
 
   // Approval states - EDITABLE
@@ -558,6 +539,7 @@ export default function ApproveLoadingPanel() {
   const [arrivalDetails, setArrivalDetails] = useState({
     date: "",
     time: "",
+    outDate: "",
     outTime: "",
   });
 
@@ -655,13 +637,17 @@ export default function ApproveLoadingPanel() {
         });
       }
 
-      // Set existing files
-      const vbpFiles = {};
-      const vftFiles = {};
-      const votFiles = {};
-      const vlFiles = {};
+      // Set existing files - Vehicle Documents
+      const vehicleDocs = {
+        rc: panel.vehicleInfo?.rcDocument ? [{ path: panel.vehicleInfo.rcDocument, name: 'RC Document', originalName: 'RC Document' }] : [],
+        pan: panel.vehicleInfo?.panDocument ? [{ path: panel.vehicleInfo.panDocument, name: 'PAN Document', originalName: 'PAN Document' }] : [],
+        license: panel.vehicleInfo?.licenseDocument ? [{ path: panel.vehicleInfo.licenseDocument, name: 'License Document', originalName: 'License Document' }] : [],
+        photo: panel.vehicleInfo?.driverPhoto ? [{ path: panel.vehicleInfo.driverPhoto, name: 'Driver Photo', originalName: 'Driver Photo' }] : [],
+        aadhar: panel.vehicleInfo?.aadharDocument ? [{ path: panel.vehicleInfo.aadharDocument, name: 'Aadhar Document', originalName: 'Aadhar Document' }] : []
+      };
 
       // VBP Files
+      const vbpFiles = {};
       if (panel.vbpUploads) {
         ['vbp1','vbp2','vbp3','vbp4','vbp5','vbp6','vbp7','videoVbp'].forEach(key => {
           if (panel.vbpUploads[key]) {
@@ -675,6 +661,7 @@ export default function ApproveLoadingPanel() {
       }
 
       // VFT Files
+      const vftFiles = {};
       if (panel.vftUploads) {
         ['vft1','vft2','vft3','vft4','vft5','vft6','vft7','videoVft'].forEach(key => {
           if (panel.vftUploads[key]) {
@@ -688,6 +675,7 @@ export default function ApproveLoadingPanel() {
       }
 
       // VOT Files
+      const votFiles = {};
       if (panel.votUploads) {
         ['vot1','vot2','vot3','vot4','vot5','vot6','vot7','videoVot'].forEach(key => {
           if (panel.votUploads[key]) {
@@ -701,8 +689,10 @@ export default function ApproveLoadingPanel() {
       }
 
       // VL Files
+      const vlFiles = {};
       if (panel.vlUploads) {
-        ['vl1','vl2','vl3','vl4','vl5','vl6','vl7','videoVl'].forEach(key => {
+        for (let i = 1; i <= 15; i++) {
+          const key = `vl${i}`;
           if (panel.vlUploads[key]) {
             vlFiles[key] = [{
               path: panel.vlUploads[key],
@@ -710,30 +700,54 @@ export default function ApproveLoadingPanel() {
               originalName: `${key} file`
             }];
           }
-        });
+        }
+        if (panel.vlUploads.videoVl) {
+          vlFiles.videoVl = [{
+            path: panel.vlUploads.videoVl,
+            name: 'Video VL',
+            originalName: 'Video VL'
+          }];
+        }
       }
 
       // Vehicle Photos
-      const vehiclePhotos = {};
+      const vehiclePhotos = [];
       if (panel.vehiclePhotos && panel.vehiclePhotos.length > 0) {
-        vehiclePhotos.photos = panel.vehiclePhotos.map(path => ({
-          path: path,
-          name: 'Vehicle Photo',
-          originalName: 'Vehicle Photo'
-        }));
+        panel.vehiclePhotos.forEach(path => {
+          vehiclePhotos.push({
+            path: path,
+            name: 'Vehicle Photo',
+            originalName: 'Vehicle Photo'
+          });
+        });
+      }
+
+      // Vehicle Slips
+      const vehicleSlips = [];
+      if (panel.vehicleSlips && panel.vehicleSlips.length > 0) {
+        panel.vehicleSlips.forEach(path => {
+          vehicleSlips.push({
+            path: path,
+            name: 'Vehicle Slip',
+            originalName: 'Vehicle Slip'
+          });
+        });
       }
 
       // Loaded Vehicle Slips
-      const loadedVehicleSlips = {};
+      const loadedVehicleSlips = [];
       if (panel.loadedVehicleSlips && panel.loadedVehicleSlips.length > 0) {
-        loadedVehicleSlips.slips = panel.loadedVehicleSlips.map(path => ({
-          path: path,
-          name: 'Loaded Vehicle Slip',
-          originalName: 'Loaded Vehicle Slip'
-        }));
+        panel.loadedVehicleSlips.forEach(path => {
+          loadedVehicleSlips.push({
+            path: path,
+            name: 'Loaded Vehicle Slip',
+            originalName: 'Loaded Vehicle Slip'
+          });
+        });
       }
 
       setExistingFiles({
+        vehicle: vehicleDocs,
         vbp: vbpFiles,
         vft: vftFiles,
         vot: votFiles,
@@ -745,25 +759,10 @@ export default function ApproveLoadingPanel() {
             originalName: 'Weigh Slip'
           }] : []
         },
-        vehiclePhotos: vehiclePhotos.photos || [],
-        loadedVehicleSlips: loadedVehicleSlips.slips || []
+        vehiclePhotos: vehiclePhotos,
+        vehicleSlips: vehicleSlips,
+        loadedVehicleSlips: loadedVehicleSlips
       });
-
-      // Helper files
-      if (panel.helperInfo) {
-        if (panel.helperInfo.photo && panel.helperInfo.photo.length > 0) {
-          setHelperInfo(prev => ({
-            ...prev,
-            photo: panel.helperInfo.photo.map(p => ({ path: p, name: 'Helper Photo', originalName: 'Helper Photo' }))
-          }));
-        }
-        if (panel.helperInfo.aadharPhoto && panel.helperInfo.aadharPhoto.length > 0) {
-          setHelperInfo(prev => ({
-            ...prev,
-            aadharPhoto: panel.helperInfo.aadharPhoto.map(p => ({ path: p, name: 'Helper Aadhar', originalName: 'Helper Aadhar' }))
-          }));
-        }
-      }
 
       // Set approval sections
       if (panel.vbpUploads) {
@@ -814,6 +813,7 @@ export default function ApproveLoadingPanel() {
         setArrivalDetails({
           date: panel.arrivalDetails.date ? new Date(panel.arrivalDetails.date).toISOString().split('T')[0] : "",
           time: panel.arrivalDetails.time || "",
+          outDate: panel.arrivalDetails.outDate ? new Date(panel.arrivalDetails.outDate).toISOString().split('T')[0] : "",
           outTime: panel.arrivalDetails.outTime || "",
         });
       }
@@ -883,6 +883,7 @@ export default function ApproveLoadingPanel() {
         arrivalDetails: {
           date: arrivalDetails.date ? new Date(arrivalDetails.date) : currentData.arrivalDetails?.date,
           time: arrivalDetails.time,
+          outDate: arrivalDetails.outDate ? new Date(arrivalDetails.outDate) : currentData.arrivalDetails?.outDate,
           outTime: arrivalDetails.outTime,
         },
         detentionDays,
@@ -1003,7 +1004,26 @@ export default function ApproveLoadingPanel() {
 
       {/* Main Content */}
       <div className="mx-auto max-w-full p-4">
-        {/* Vehicle Arrival Information - READ ONLY with Owner Aadhar Card */}
+        {/* Vehicle Slip Upload - Top section (Empty Vehicle Slip) */}
+        <div className="mb-4">
+          <div className="bg-white p-4 rounded-xl border-2 border-dashed border-slate-300">
+            <label className="text-xs font-bold text-slate-600">Vehicle Slip</label>
+            <p className="text-xs text-slate-400 mb-1">Vehicle slip document (Image/PDF)</p>
+            {existingFiles.vehicleSlips && existingFiles.vehicleSlips.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-2">
+                {existingFiles.vehicleSlips.map((file, idx) => (
+                  <FileDisplayItem key={idx} file={file} label="Vehicle Slip" />
+                ))}
+              </div>
+            ) : (
+              <div className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                No vehicle slip uploaded
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Vehicle Arrival Information - READ ONLY */}
         <Card title="Vehicle Arrival Information (Read Only)">
           <div className="grid grid-cols-12 gap-3">
             <Input
@@ -1043,13 +1063,70 @@ export default function ApproveLoadingPanel() {
             />
             <Input
               col="col-span-12 md:col-span-2"
+              label="Driving License"
+              value={vehicleInfo.drivingLicense}
+            />
+            <Input
+              col="col-span-12 md:col-span-2"
               label="Owner Aadhar Card"
               value={vehicleInfo.ownerAadharCard}
             />
           </div>
         </Card>
 
-        {/* Billing Type / Charges - READ ONLY with all charges */}
+        
+
+        {/* Owner Documents Section - READ ONLY */}
+        <div className="mt-4">
+          <Card title="Owner Documents (Read Only)">
+            <div className="grid grid-cols-12 gap-4">
+              <div className="col-span-12 md:col-span-4">
+                <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
+                  <label className="text-xs font-bold text-blue-700">Owner RC Document</label>
+                  {existingFiles.vehicle?.rc && existingFiles.vehicle.rc.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      {existingFiles.vehicle.rc.map((file, idx) => (
+                        <FileDisplayItem key={idx} file={file} label="RC Document" />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-sm text-slate-500">No RC document uploaded</div>
+                  )}
+                </div>
+              </div>
+              <div className="col-span-12 md:col-span-4">
+                <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
+                  <label className="text-xs font-bold text-blue-700">Owner PAN Document</label>
+                  {existingFiles.vehicle?.pan && existingFiles.vehicle.pan.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      {existingFiles.vehicle.pan.map((file, idx) => (
+                        <FileDisplayItem key={idx} file={file} label="PAN Document" />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-sm text-slate-500">No PAN document uploaded</div>
+                  )}
+                </div>
+              </div>
+              <div className="col-span-12 md:col-span-4">
+                <div className="bg-purple-50 p-4 rounded-xl border border-purple-200">
+                  <label className="text-xs font-bold text-purple-700">Owner Aadhar Document</label>
+                  {existingFiles.vehicle?.aadhar && existingFiles.vehicle.aadhar.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      {existingFiles.vehicle.aadhar.map((file, idx) => (
+                        <FileDisplayItem key={idx} file={file} label="Aadhar Document" />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-sm text-slate-500">No Aadhar document uploaded</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Billing Type / Charges - READ ONLY */}
         <div className="mt-4">
           <Card title="Billing Type / Charges (Read Only)">
             <div className="overflow-auto rounded-xl border border-yellow-300">
@@ -1059,7 +1136,6 @@ export default function ApproveLoadingPanel() {
                     <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Billing Type</th>
                     <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Loading Points</th>
                     <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Drop Points</th>
-      
                   </tr>
                 </thead>
                 <tbody>
@@ -1067,7 +1143,6 @@ export default function ApproveLoadingPanel() {
                     <td className="border border-yellow-300 px-2 py-2 text-slate-700">{header.billingType || '-'}</td>
                     <td className="border border-yellow-300 px-2 py-2 text-slate-700">{header.noOfLoadingPoints || '-'}</td>
                     <td className="border border-yellow-300 px-2 py-2 text-slate-700">{header.noOfDroppingPoint || '-'}</td>
-
                   </tr>
                 </tbody>
               </table>
@@ -1075,7 +1150,7 @@ export default function ApproveLoadingPanel() {
           </Card>
         </div>
 
-        {/* Orders Table - SCROLLABLE with all charges */}
+        {/* Orders Table - READ ONLY */}
         <div className="mt-4">
           <Card title="Order Details (Read Only)">
             <OrdersTable rows={orderRows} />
@@ -1088,7 +1163,7 @@ export default function ApproveLoadingPanel() {
           </Card>
         </div>
 
-        {/* Vehicle & Driver Details - READ ONLY with Message & Remarks */}
+        {/* Vehicle & Driver Details - READ ONLY */}
         <div className="mt-4">
           <Card title="Vehicle & Driver Details (Read Only)">
             <div className="overflow-auto rounded-xl border border-yellow-300">
@@ -1126,7 +1201,7 @@ export default function ApproveLoadingPanel() {
                     <td className="border border-yellow-300 px-4 py-3 align-top">
                       <Input label="Driver Name" value={vehicleInfo.driverName} />
                       <Input label="Driver Mobile No" value={vehicleInfo.driverMobileNo} />
-                      <Input label="Driving License" value={vehicleInfo.drivingLicense} />
+                      <Input label="Driving License No" value={vehicleInfo.drivingLicense} />
                       
                       {/* Helper Section */}
                       {hasHelper && (
@@ -1173,98 +1248,74 @@ export default function ApproveLoadingPanel() {
           </Card>
         </div>
 
-        {/* Detention Information Card */}
+        {/* Driver Photo - READ ONLY */}
         <div className="mt-4">
-          <Card title="Detention Information (Read Only)">
-            <div className="grid grid-cols-12 gap-4">
-              <div className="col-span-12 md:col-span-6">
-                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
-                  <label className="text-xs font-bold text-orange-700">Detention Days</label>
-                  <div className="mt-1 w-full rounded-lg border border-orange-200 bg-slate-50 px-3 py-2 text-sm">
-                    {detentionDays || '-'}
-                  </div>
-                  <p className="text-xs text-orange-600 mt-1">Number of days vehicle is detained</p>
+          <Card title="Driver Photo (Read Only)">
+            <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
+              {existingFiles.vehicle?.photo && existingFiles.vehicle.photo.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                  {existingFiles.vehicle.photo.map((file, idx) => (
+                    <FileDisplayItem key={idx} file={file} label="Driver Photo" />
+                  ))}
                 </div>
+              ) : (
+                <div className="text-center py-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                  <p className="text-sm text-gray-500">No driver photo uploaded</p>
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+
+       
+        {/* Pack Type - READ ONLY with ALL pack types displayed */}
+        <div className="mt-4">
+          <Card title="Pack Type (Read Only)">
+            <div className="space-y-6">
+              {/* PALLETIZATION Table */}
+              <div>
+                <div className="mb-3">
+                  <div className="text-sm font-bold text-slate-800 bg-yellow-100 inline-block px-4 py-1.5 rounded-lg">
+                    Palletization
+                  </div>
+                </div>
+                <PackTypeTable packType="PALLETIZATION" rows={packData.PALLETIZATION || []} />
               </div>
-              <div className="col-span-12 md:col-span-6">
-                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
-                  <label className="text-xs font-bold text-orange-700">Detention Number / Reference</label>
-                  <div className="mt-1 w-full rounded-lg border border-orange-200 bg-slate-50 px-3 py-2 text-sm">
-                    {detentionNumber || '-'}
+
+              {/* UNIFORM - BAGS/BOXES Table */}
+              <div>
+                <div className="mb-3">
+                  <div className="text-sm font-bold text-slate-800 bg-yellow-100 inline-block px-4 py-1.5 rounded-lg">
+                    Uniform - Bags/Boxes
                   </div>
-                  <p className="text-xs text-orange-600 mt-1">Reference number or ID for detention</p>
                 </div>
+                <PackTypeTable packType="UNIFORM - BAGS/BOXES" rows={packData["UNIFORM - BAGS/BOXES"] || []} />
+              </div>
+
+              {/* LOOSE - CARGO Table */}
+              <div>
+                <div className="mb-3">
+                  <div className="text-sm font-bold text-slate-800 bg-yellow-100 inline-block px-4 py-1.5 rounded-lg">
+                    Loose - Cargo
+                  </div>
+                </div>
+                <PackTypeTable packType="LOOSE - CARGO" rows={packData["LOOSE - CARGO"] || []} />
+              </div>
+
+              {/* NON-UNIFORM - GENERAL CARGO Table */}
+              <div>
+                <div className="mb-3">
+                  <div className="text-sm font-bold text-slate-800 bg-yellow-100 inline-block px-4 py-1.5 rounded-lg">
+                    Non-uniform - General Cargo
+                  </div>
+                </div>
+                <PackTypeTable packType="NON-UNIFORM - GENERAL CARGO" rows={packData["NON-UNIFORM - GENERAL CARGO"] || []} />
               </div>
             </div>
           </Card>
         </div>
 
-        {/* Loaded Vehicle Slip Upload - READ ONLY */}
-        <div className="mt-4">
-          <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
-            <label className="text-xs font-bold text-indigo-700">Loaded Vehicle Slip</label>
-            {existingFiles.loadedVehicleSlips && existingFiles.loadedVehicleSlips.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-2">
-                {existingFiles.loadedVehicleSlips.map((file, idx) => (
-                  <FileDisplayItem key={idx} file={file} label="Loaded Vehicle Slip" />
-                ))}
-              </div>
-            ) : (
-              <div className="mt-1 w-full rounded-lg border border-indigo-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
-                No loaded vehicle slip uploaded
-              </div>
-            )}
-          </div>
-        </div>
-
-       {/* Pack Type - READ ONLY with ALL pack types displayed */}
-<div className="mt-4">
-  <Card title="Pack Type (Read Only)">
-    <div className="space-y-6">
-      {/* PALLETIZATION Table */}
-      <div>
-        <div className="mb-3">
-          <div className="text-sm font-bold text-slate-800 bg-yellow-100 inline-block px-4 py-1.5 rounded-lg">
-            Palletization
-          </div>
-        </div>
-        <PackTypeTable packType="PALLETIZATION" rows={packData.PALLETIZATION || []} />
-      </div>
-
-      {/* UNIFORM - BAGS/BOXES Table */}
-      <div>
-        <div className="mb-3">
-          <div className="text-sm font-bold text-slate-800 bg-yellow-100 inline-block px-4 py-1.5 rounded-lg">
-            Uniform - Bags/Boxes
-          </div>
-        </div>
-        <PackTypeTable packType="UNIFORM - BAGS/BOXES" rows={packData["UNIFORM - BAGS/BOXES"] || []} />
-      </div>
-
-      {/* LOOSE - CARGO Table */}
-      <div>
-        <div className="mb-3">
-          <div className="text-sm font-bold text-slate-800 bg-yellow-100 inline-block px-4 py-1.5 rounded-lg">
-            Loose - Cargo
-          </div>
-        </div>
-        <PackTypeTable packType="LOOSE - CARGO" rows={packData["LOOSE - CARGO"] || []} />
-      </div>
-
-      {/* NON-UNIFORM - GENERAL CARGO Table */}
-      <div>
-        <div className="mb-3">
-          <div className="text-sm font-bold text-slate-800 bg-yellow-100 inline-block px-4 py-1.5 rounded-lg">
-            Non-uniform - General Cargo
-          </div>
-        </div>
-        <PackTypeTable packType="NON-UNIFORM - GENERAL CARGO" rows={packData["NON-UNIFORM - GENERAL CARGO"] || []} />
-      </div>
-    </div>
-  </Card>
-</div>
-
-        {/* VBP Panel - EDITABLE with direct image preview */}
+        {/* VBP Panel - EDITABLE */}
         <div className="mt-4">
           <Card title="VBP - PANEL (Vehicle Body Pictures) - Editable">
             <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200">
@@ -1405,7 +1456,55 @@ export default function ApproveLoadingPanel() {
                       </div>
                     </div>
                   )}
+				
                 </div>
+
+				    <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
+                  <label className="text-xs font-bold text-orange-700">Detention Days</label>
+                  <div className="mt-1 w-full rounded-lg border border-orange-200 bg-slate-50 px-3 py-2 text-sm">
+                    {detentionDays || '-'}
+                  </div>
+                  <p className="text-xs text-orange-600 mt-1">Number of days vehicle is detained</p>
+                </div>
+				  {/* Arrival Details - EDITABLE with Out Date and Out Time */}
+        <div className="mt-4">
+          <Card title="Arrival Details - Editable">
+            <div className="grid grid-cols-12 gap-4">
+              <div className="col-span-12 md:col-span-3">
+                <EditableInput
+                  label="Arrival Date"
+                  type="date"
+                  value={arrivalDetails.date}
+                  onChange={(v) => setArrivalDetails({ ...arrivalDetails, date: v })}
+                />
+              </div>
+              <div className="col-span-12 md:col-span-3">
+                <EditableInput
+                  label="Arrival Time"
+                  type="time"
+                  value={arrivalDetails.time}
+                  onChange={(v) => setArrivalDetails({ ...arrivalDetails, time: v })}
+                />
+              </div>
+              <div className="col-span-12 md:col-span-3">
+                <EditableInput
+                  label="Out Date"
+                  type="date"
+                  value={arrivalDetails.outDate}
+                  onChange={(v) => setArrivalDetails({ ...arrivalDetails, outDate: v })}
+                />
+              </div>
+              <div className="col-span-12 md:col-span-3">
+                <EditableInput
+                  label="Out Time"
+                  type="time"
+                  value={arrivalDetails.outTime}
+                  onChange={(v) => setArrivalDetails({ ...arrivalDetails, outTime: v })}
+                />
+              </div>
+            </div>
+          </Card>
+        </div>
               </div>
               <div className="col-span-12 md:col-span-6">
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
@@ -1441,12 +1540,20 @@ export default function ApproveLoadingPanel() {
                       onChange={(v) => setLoadedWeighment({ ...loadedWeighment, vehicleOuterTarpaulin: v })}
                       type="number"
                     />
+                    <div className="flex justify-between items-center pt-2 border-t border-slate-200 mt-2">
+                      <span className="text-sm font-bold text-slate-800">Total:</span>
+                      <span className="font-bold text-orange-700 text-lg">
+                        ₹{(num(loadedWeighment.loadingCharges) + num(loadedWeighment.loadingStaffMunshiyana) + num(loadedWeighment.otherExpenses) + num(loadedWeighment.vehicleFloorTarpaulin) + num(loadedWeighment.vehicleOuterTarpaulin)).toLocaleString()}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </Card>
         </div>
+
+        
 
         {/* Vehicle GPS Tracking - EDITABLE */}
         <div className="mt-4">
@@ -1476,49 +1583,29 @@ export default function ApproveLoadingPanel() {
                     API Status: {gpsTracking.isTrackingActive ? 'Active' : 'Ready'}
                   </div>
                 </div>
+				
               </div>
             </div>
+			{/* Vehicle Photos - READ ONLY */}
+        <div className="mt-4">
+          <Card title="Vehicle Photos (Read Only)">
+            {existingFiles.vehiclePhotos && existingFiles.vehiclePhotos.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                {existingFiles.vehiclePhotos.map((file, idx) => (
+                  <FileDisplayItem key={idx} file={file} label="Vehicle Photo" />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                <p className="text-sm text-gray-500">No vehicle photos uploaded</p>
+              </div>
+            )}
+          </Card>
+        </div>
           </Card>
         </div>
 
-        {/* Arrival Details - EDITABLE with Out Time */}
-        <div className="mt-4">
-          <Card title="Arrival Details - Editable">
-            <div className="grid grid-cols-12 gap-4">
-              <div className="col-span-12 md:col-span-3">
-                <EditableInput
-                  label="Arrival Date"
-                  type="date"
-                  value={arrivalDetails.date}
-                  onChange={(v) => setArrivalDetails({ ...arrivalDetails, date: v })}
-                />
-              </div>
-              <div className="col-span-12 md:col-span-3">
-                <EditableInput
-                  label="Arrival Time"
-                  type="time"
-                  value={arrivalDetails.time}
-                  onChange={(v) => setArrivalDetails({ ...arrivalDetails, time: v })}
-                />
-              </div>
-              <div className="col-span-12 md:col-span-3">
-                <EditableInput
-                  label="Out Time"
-                  type="time"
-                  value={arrivalDetails.outTime}
-                  onChange={(v) => setArrivalDetails({ ...arrivalDetails, outTime: v })}
-                />
-              </div>
-              <div className="col-span-12 md:col-span-3">
-                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                  <p className="text-xs text-blue-800">
-                    <span className="font-bold">Note:</span> JV need for making the payment in Driver or Motor Owner Account.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </div>
+        
 
         {/* Documents & Consignment Note Card */}
         <div className="mt-4">
@@ -1562,6 +1649,24 @@ export default function ApproveLoadingPanel() {
               </div>
             </div>
           </Card>
+        </div>
+		{/* Loaded Vehicle Slip - Bottom section */}
+        <div className="mt-4">
+          <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
+            <label className="text-xs font-bold text-indigo-700">Loaded Vehicle Slip</label>
+            <p className="text-xs text-slate-400 mb-1">Uploaded loaded vehicle slip after loading (Image/PDF)</p>
+            {existingFiles.loadedVehicleSlips && existingFiles.loadedVehicleSlips.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-2">
+                {existingFiles.loadedVehicleSlips.map((file, idx) => (
+                  <FileDisplayItem key={idx} file={file} label="Loaded Vehicle Slip" />
+                ))}
+              </div>
+            ) : (
+              <div className="mt-1 w-full rounded-lg border border-indigo-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                No loaded vehicle slip uploaded
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

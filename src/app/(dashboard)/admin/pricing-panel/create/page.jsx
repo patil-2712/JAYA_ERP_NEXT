@@ -2349,14 +2349,15 @@ function SearchableDropdown({
 }
 
 /* =========================
-  LOCATION RATE DROPDOWN COMPONENT
+  LOCATION RATE DROPDOWN COMPONENT - Shows only locations from selected Price List
 ========================= */
 function LocationRateDropdown({ 
-  locations, 
+  locations,  // All locations from API
   selectedName,
   onSelect, 
   placeholder = "Select Location...",
-  readOnly = false
+  readOnly = false,
+  selectedRateMaster = null  // The selected Price List object
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
@@ -2365,18 +2366,52 @@ function LocationRateDropdown({
   const inputRef = useRef(null);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
 
+  // Get location names that exist in the selected Price List
+  const availableLocationNames = useMemo(() => {
+    if (selectedRateMaster && selectedRateMaster.locationRates) {
+      return selectedRateMaster.locationRates.map(lr => lr.locationName);
+    }
+    return [];
+  }, [selectedRateMaster]);
+
+  // Filter locations - ONLY show locations that are in the selected Price List
+  const filteredLocationsByRateMaster = useMemo(() => {
+    if (!selectedRateMaster) {
+      // No Price List selected - show no locations (or show message)
+      return [];
+    }
+    
+    if (availableLocationNames.length === 0) {
+      return [];
+    }
+    
+    // Only return locations whose name is in the Price List's locationRates
+    return (locations || []).filter(loc => 
+      availableLocationNames.includes(loc.name)
+    );
+  }, [locations, selectedRateMaster, availableLocationNames]);
+
   useEffect(() => {
     if (selectedName && locations) {
-      const item = locations.find(l => l.name === selectedName);
-      setSelectedItem(item);
-      if (item) {
-        setSearchQuery(item.name);
+      // Check if the selected location exists in the available locations
+      const isValidLocation = availableLocationNames.includes(selectedName);
+      if (isValidLocation) {
+        const item = locations.find(l => l.name === selectedName);
+        setSelectedItem(item);
+        if (item) {
+          setSearchQuery(item.name);
+        }
+      } else {
+        // If selected location is not valid for this Price List, clear it
+        setSelectedItem(null);
+        setSearchQuery("");
+        onSelect?.(""); // Clear the location
       }
     } else if (!selectedName) {
       setSelectedItem(null);
       setSearchQuery("");
     }
-  }, [locations, selectedName]);
+  }, [locations, selectedName, availableLocationNames]);
 
   const handleSelectItem = (item) => {
     if (readOnly) return;
@@ -2387,7 +2422,7 @@ function LocationRateDropdown({
   };
 
   const handleInputFocus = () => {
-    if (!readOnly && inputRef.current) {
+    if (!readOnly && inputRef.current && filteredLocationsByRateMaster.length > 0) {
       const rect = inputRef.current.getBoundingClientRect();
       setDropdownPosition({
         top: rect.bottom + window.scrollY,
@@ -2406,12 +2441,23 @@ function LocationRateDropdown({
     }, 200);
   };
 
-  const filteredLocations = useMemo(() => {
-    if (!searchQuery.trim()) return locations || [];
-    return (locations || []).filter(loc => 
+  const searchedLocations = useMemo(() => {
+    if (!searchQuery.trim()) return filteredLocationsByRateMaster;
+    return filteredLocationsByRateMaster.filter(loc => 
       loc.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [locations, searchQuery]);
+  }, [filteredLocationsByRateMaster, searchQuery]);
+
+  // Determine placeholder text
+  const getPlaceholder = () => {
+    if (!selectedRateMaster) {
+      return "Please select Price List first";
+    }
+    if (filteredLocationsByRateMaster.length === 0) {
+      return "No locations available for this Price List";
+    }
+    return placeholder;
+  };
 
   return (
     <div className="relative w-full" ref={dropdownRef}>
@@ -2423,10 +2469,10 @@ function LocationRateDropdown({
         onFocus={handleInputFocus}
         onBlur={handleInputBlur}
         className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
-          readOnly ? 'bg-slate-50 cursor-not-allowed' : 'bg-white cursor-pointer'
+          (readOnly || !selectedRateMaster || filteredLocationsByRateMaster.length === 0) ? 'bg-slate-50 cursor-not-allowed' : 'bg-white cursor-pointer'
         }`}
-        placeholder={placeholder}
-        readOnly={readOnly}
+        placeholder={getPlaceholder()}
+        readOnly={readOnly || !selectedRateMaster || filteredLocationsByRateMaster.length === 0}
         autoComplete="off"
       />
       <div className="absolute right-2 top-2 text-gray-400 pointer-events-none">
@@ -2435,7 +2481,7 @@ function LocationRateDropdown({
         </svg>
       </div>
       
-      {showDropdown && !readOnly && filteredLocations.length > 0 && (
+      {showDropdown && !readOnly && selectedRateMaster && filteredLocationsByRateMaster.length > 0 && (
         <div 
           ref={dropdownRef}
           className="fixed z-[9999] bg-white border border-slate-200 rounded-lg shadow-xl overflow-y-auto"
@@ -2447,9 +2493,9 @@ function LocationRateDropdown({
           }}
         >
           <div className="sticky top-0 bg-gray-50 px-3 py-2 text-xs font-semibold text-slate-600 border-b">
-            Select Location
+            Select Location (from {selectedRateMaster.title})
           </div>
-          {filteredLocations.map((location) => (
+          {searchedLocations.map((location) => (
             <div
               key={location._id}
               onMouseDown={() => handleSelectItem(location)}
@@ -2797,7 +2843,7 @@ function VehicleNegotiationHeaderDropdown({
 }
 
 /* =========================
-  ORDERS TABLE COMPONENT - With All Fields in One Row
+  ORDERS TABLE COMPONENT
 ========================= */
 function OrdersTable({ 
   rows, 
@@ -2824,8 +2870,8 @@ function OrdersTable({
     { key: "district", label: "District", width: "100px" },
     { key: "state", label: "State", width: "100px" },
     { key: "country", label: "Country", width: "100px" },
-    { key: "locationRate", label: "Location Rate", width: "150px" },
     { key: "priceList", label: "Price List", width: "180px" },
+    { key: "locationRate", label: "Location Rate", width: "150px" },
     { key: "weight", label: "Weight", type: "number", width: "80px" },
     { key: "rate", label: "Rate (₹)", type: "number", width: "80px", readOnly: true },
     { key: "totalAmount", label: "Total Amount", type: "number", width: "100px", readOnly: true },
@@ -2840,7 +2886,8 @@ function OrdersTable({
   const handlePriceListSelect = (rowId, rateMaster) => {
     onChange(rowId, 'priceList', rateMaster.title);
     onChange(rowId, 'selectedRateMaster', rateMaster);
-    
+      onChange(rowId, 'locationRate', '');
+  onChange(rowId, 'rate', '');
     const currentRow = rows.find(r => r._id === rowId);
     if (currentRow && currentRow.weight && currentRow.locationRate) {
       const locationRate = rateMaster.locationRates?.find(lr => 
@@ -3068,21 +3115,6 @@ function OrdersTable({
                 </td>
 
                 <td className="border border-yellow-300 px-1 py-1">
-                  <LocationRateDropdown
-                    locations={locations}
-                    selectedName={row.locationRate}
-                    onSelect={(locationName) => {
-                      onChange(row._id, 'locationRate', locationName);
-                      onChange(row._id, 'priceList', '');
-                      onChange(row._id, 'rate', '');
-                      onChange(row._id, 'selectedRateMaster', null);
-                    }}
-                    readOnly={false}
-                    placeholder="Select Location..."
-                  />
-                </td>
-
-                <td className="border border-yellow-300 px-1 py-1">
                   <PriceListDropdown
                     rateMasters={rateMasters}
                     selectedValue={row.priceList}
@@ -3094,6 +3126,21 @@ function OrdersTable({
                     readOnly={false}
                   />
                 </td>
+
+                <td className="border border-yellow-300 px-1 py-1">
+  <LocationRateDropdown
+    locations={locations}
+    selectedName={row.locationRate}
+    onSelect={(locationName) => {
+      onChange(row._id, 'locationRate', locationName);
+      // Reset rate when location changes
+      onChange(row._id, 'rate', '');
+    }}
+    readOnly={false}
+    placeholder="Select Location..."
+    selectedRateMaster={row.selectedRateMaster}  // Pass the selected Price List
+  />
+</td>
 
                 <td className="border border-yellow-300 px-1 py-1">
                   <input
@@ -3712,69 +3759,67 @@ export default function PricingPanelPage() {
           </div>
 
           <div className="mb-4">
-            <div className="text-sm font-bold text-slate-700 mb-2">Billing Type / Charges</div>
-            <div className="overflow-auto rounded-xl border border-yellow-300">
-              <table className="min-w-full w-full text-sm">
-                <thead className="sticky top-0 bg-yellow-400">
-                  <tr>
-                    {billingColumns.map((col) => (
-                      <th
-                        key={col.key}
-                        className="border border-yellow-500 px-4 py-3 text-xs font-extrabold text-slate-900 text-center"
-                      >
-                        {col.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-
-                <tbody>
-                  <tr className="hover:bg-yellow-50 even:bg-slate-50">
-                    {billingColumns.map((col) => (
-                      <td key={col.key} className="border border-yellow-300 px-2 py-2">
-                        {col.options ? (
-                          <select
-                            value={billing[col.key] || ""}
-                            onChange={(e) => {
-                              if (col.key === "billingType") {
-                                handleBillingTypeChange(e.target.value);
-                              } else {
-                                setBilling(prev => ({ ...prev, [col.key]: e.target.value }));
-                              }
-                            }}
-                            disabled={col.key !== "billingType" && selectedVehicleNegotiation}
-                            className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
-                              (col.key !== "billingType" && selectedVehicleNegotiation) ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
-                            }`}
-                          >
-                            <option value="">Select {col.label}</option>
-                            {col.options.map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            type={col.type || "text"}
-                            step={col.type === "number" ? "1" : undefined}
-                            value={billing[col.key] || ""}
-                            onChange={(e) => setBilling(prev => ({ ...prev, [col.key]: e.target.value }))}
-                            readOnly={selectedVehicleNegotiation}
-                            className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
-                              selectedVehicleNegotiation ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
-                            }`}
-                            placeholder={`Enter ${col.label}`}
-                          />
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
+  <div className="text-sm font-bold text-slate-700 mb-2">Billing Type / Charges</div>
+  <div className="overflow-auto rounded-xl border border-yellow-300">
+    <table className="min-w-full w-full text-sm">
+      <thead className="sticky top-0 bg-yellow-400">
+        <tr>
+          {billingColumns.map((col) => (
+            <th
+              key={col.key}
+              className="border border-yellow-500 px-4 py-3 text-xs font-extrabold text-slate-900 text-center"
+            >
+              {col.label}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        <tr className="hover:bg-yellow-50 even:bg-slate-50">
+          {billingColumns.map((col) => (
+            <td key={col.key} className="border border-yellow-300 px-2 py-2">
+              {col.options ? (
+                <select
+                  value={billing[col.key] || ""}
+                  onChange={(e) => {
+                    if (col.key === "billingType") {
+                      handleBillingTypeChange(e.target.value);
+                    } else {
+                      setBilling(prev => ({ ...prev, [col.key]: e.target.value }));
+                    }
+                  }}
+                  disabled={col.key !== "billingType" && selectedVehicleNegotiation}
+                  className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                    (col.key !== "billingType" && selectedVehicleNegotiation) ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                  }`}
+                >
+                  <option value="">Select {col.label}</option>
+                  {col.options.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type={col.type || "text"}
+                  step={col.type === "number" ? "1" : undefined}
+                  value={billing[col.key] || ""}
+                  onChange={(e) => setBilling(prev => ({ ...prev, [col.key]: e.target.value }))}
+                  readOnly={selectedVehicleNegotiation}
+                  className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                    selectedVehicleNegotiation ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                  }`}
+                  placeholder={`Enter ${col.label}`}
+                />
+              )}
+            </td>
+          ))}
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
           <div>
             <div className="flex items-center justify-between mb-4">
               <div className="text-sm font-bold text-slate-700">
