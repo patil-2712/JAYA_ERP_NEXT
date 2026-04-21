@@ -291,53 +291,65 @@ function EditableInput({ label, value, onChange, col = "", type = "text" }) {
 }
 
 /* =======================
-  Orders Table Component (Read-only with Scroll)
+  Orders Table Component (Read-only)
 ========================= */
 function OrdersTable({ rows }) {
+  const calculateTotalWeight = () => {
+    return rows.reduce((sum, row) => sum + num(row.weight), 0);
+  };
+
   return (
-    <div className="overflow-x-auto rounded-xl border border-yellow-300">
-      <table className="min-w-max w-full text-sm">
-        <thead className="sticky top-0 bg-yellow-400 z-10">
-          <tr>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">Order No</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[150px]">Party Name</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[150px]">Plant</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">Order Type</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[100px]">Pin Code</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">From</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">To</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">Taluka</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">District</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[100px]">State</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[100px]">Weight (MT)</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[130px]">Collection Charges</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[140px]">Cancellation Charges</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[130px]">Loading Charges</th>
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[130px]">Other Charges</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, idx) => (
-            <tr key={row._id || idx} className="hover:bg-yellow-50 even:bg-slate-50">
-              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.orderNo || '-'}</td>
-              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.partyName || '-'}</td>
-              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.plantName || '-'}</td>
-              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.orderType || '-'}</td>
-              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.pinCode || '-'}</td>
-              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.fromName || row.from || '-'}</td>
-              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.toName || row.to || '-'}</td>
-              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.talukaName || row.taluka || '-'}</td>
-              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.districtName || row.district || '-'}</td>
-              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.stateName || row.state || '-'}</td>
-              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.weight || '0'}</td>
-              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.collectionCharges || '0'}</td>
-              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.cancellationCharges || '0'}</td>
-              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.loadingCharges || '0'}</td>
-              <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.otherCharges || '0'}</td>
+    <div>
+      <div className="overflow-x-auto rounded-xl border border-yellow-300">
+        <table className="min-w-max w-full text-sm">
+          <thead className="sticky top-0 bg-yellow-400 z-10">
+            <tr>
+              <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">Order No</th>
+              <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[150px]">Party Name</th>
+              <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[150px]">Plant</th>
+              <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">Order Type</th>
+              <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[100px]">Pin Code</th>
+              <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">From</th>
+              <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">To</th>
+              <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">Taluka</th>
+              <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">District</th>
+              <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[100px]">State</th>
+              <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[100px]">Weight (MT)</th>
+              <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[130px]">Collection Charges</th>
+              <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[140px]">Cancellation Charges</th>
+              <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[130px]">Loading Charges</th>
+              <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[130px]">Other Charges</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row, idx) => (
+              <tr key={row._id || idx} className="hover:bg-yellow-50 even:bg-slate-50">
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.orderNo || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.partyName || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.plantName || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.orderType || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.pinCode || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.fromName || row.from || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.toName || row.to || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.talukaName || row.taluka || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.districtName || row.district || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.stateName || row.state || '-'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.weight || '0'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.collectionCharges || '0'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.cancellationCharges || '0'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.loadingCharges || '0'}</td>
+                <td className="border border-yellow-300 px-2 py-2 text-slate-700">{row.otherCharges || '0'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex justify-end mt-4">
+        <div className="flex items-center gap-3 border border-yellow-300 px-6 py-3 bg-yellow-50 rounded-xl">
+          <div className="text-sm font-extrabold text-slate-900">Total Weight (MT):</div>
+          <div className="text-xl font-extrabold text-emerald-700">{calculateTotalWeight()}</div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -360,7 +372,7 @@ function PackTypeTable({ packType, rows }) {
         { key: "wtLtr", label: "WT (LTR)" },
         { key: "actualWt", label: "ACTUAL - WT" },
         { key: "chargedWt", label: "CHARGED - WT" },
-        { key: "wtUom", label: "UOM" },
+        { key: "wtUom", label: "WT UOM" },
       ];
     }
     if (packType === "UNIFORM - BAGS/BOXES") {
@@ -374,7 +386,7 @@ function PackTypeTable({ packType, rows }) {
         { key: "wtLtr", label: "WT (LTR)" },
         { key: "actualWt", label: "ACTUAL - WT" },
         { key: "chargedWt", label: "CHARGED - WT" },
-        { key: "wtUom", label: "UOM" },
+        { key: "wtUom", label: "WT UOM" },
       ];
     }
     if (packType === "LOOSE - CARGO") {
@@ -414,10 +426,10 @@ function PackTypeTable({ packType, rows }) {
         <thead className="sticky top-0 bg-yellow-400">
           <tr>
             {packType === "PALLETIZATION" && (
-              <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">UNIFORM</th>
+              <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-center">UNIFORM</th>
             )}
             {cols.map((c) => (
-              <th key={c.key} className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">
+              <th key={c.key} className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-center">
                 {c.label}
               </th>
             ))}
@@ -475,7 +487,6 @@ export default function ApproveLoadingPanel() {
   
   // New fields state
   const [detentionDays, setDetentionDays] = useState("");
-  const [detentionNumber, setDetentionNumber] = useState("");
   const [hasHelper, setHasHelper] = useState(false);
   const [helperInfo, setHelperInfo] = useState({
     name: "",
@@ -500,8 +511,12 @@ export default function ApproveLoadingPanel() {
     weighment: { weighSlip: [] },
     loadedVehicleSlips: [],
     vehiclePhotos: [],
-    vehicleSlips: []  // Added for Vehicle Slip
+    vehicleSlips: []
   });
+
+  // VL Photo Details
+  const [vlPhotoDetails, setVlPhotoDetails] = useState({});
+  const [vlFields, setVlFields] = useState([1, 2, 3, 4, 5]);
 
   // Approval states - EDITABLE
   const [vbpUploads, setVbpUploads] = useState({
@@ -597,7 +612,6 @@ export default function ApproveLoadingPanel() {
           vehicleOwnerName: panel.vehicleInfo.vehicleOwnerName || "",
           vehicleOwnerRC: panel.vehicleInfo.vehicleOwnerRC || "",
           ownerPanCard: panel.vehicleInfo.ownerPanCard || "",
-          ownerAadharCard: panel.vehicleInfo.ownerAadharCard || "",
           verified: panel.vehicleInfo.verified || false,
           vehicleType: panel.vehicleInfo.vehicleType || "",
           message: panel.vehicleInfo.message || "",
@@ -624,7 +638,6 @@ export default function ApproveLoadingPanel() {
 
       // Set detention info
       if (panel.detentionDays) setDetentionDays(panel.detentionDays);
-      if (panel.detentionNumber) setDetentionNumber(panel.detentionNumber);
       
       // Set helper info
       if (panel.hasHelper !== undefined) setHasHelper(panel.hasHelper);
@@ -635,6 +648,14 @@ export default function ApproveLoadingPanel() {
           photo: panel.helperInfo.photo || [],
           aadharPhoto: panel.helperInfo.aadharPhoto || []
         });
+      }
+
+      // Set VL Photo Details and Fields
+      if (panel.vlPhotoDetails) {
+        setVlPhotoDetails(panel.vlPhotoDetails);
+      }
+      if (panel.vlFields && panel.vlFields.length > 0) {
+        setVlFields(panel.vlFields);
       }
 
       // Set existing files - Vehicle Documents
@@ -887,7 +908,6 @@ export default function ApproveLoadingPanel() {
           outTime: arrivalDetails.outTime,
         },
         detentionDays,
-        detentionNumber,
         hasHelper,
         helperInfo: {
           name: helperInfo.name,
@@ -924,10 +944,6 @@ export default function ApproveLoadingPanel() {
     } finally {
       setSaving(false);
     }
-  };
-
-  const calculateTotalWeight = () => {
-    return orderRows.reduce((sum, row) => sum + num(row.weight), 0);
   };
 
   const getTotalVlPhotosCount = () => {
@@ -1004,7 +1020,7 @@ export default function ApproveLoadingPanel() {
 
       {/* Main Content */}
       <div className="mx-auto max-w-full p-4">
-        {/* Vehicle Slip Upload - Top section (Empty Vehicle Slip) */}
+        {/* Vehicle Slip Upload - Top section */}
         <div className="mb-4">
           <div className="bg-white p-4 rounded-xl border-2 border-dashed border-slate-300">
             <label className="text-xs font-bold text-slate-600">Vehicle Slip</label>
@@ -1026,55 +1042,16 @@ export default function ApproveLoadingPanel() {
         {/* Vehicle Arrival Information - READ ONLY */}
         <Card title="Vehicle Arrival Information (Read Only)">
           <div className="grid grid-cols-12 gap-3">
-            <Input
-              col="col-span-12 md:col-span-3"
-              label="Vehicle Arrival No"
-              value={header.vehicleArrivalNo}
-            />
-            <Input
-              col="col-span-12 md:col-span-3"
-              label="Vehicle Negotiation No"
-              value={header.vehicleNegotiationNo}
-            />
-            <Input
-              col="col-span-12 md:col-span-2"
-              label="Vehicle Number"
-              value={vehicleInfo.vehicleNo}
-            />
-            <Input
-              col="col-span-12 md:col-span-2"
-              label="Mobile Number"
-              value={vehicleInfo.driverMobileNo}
-            />
-            <Input
-              col="col-span-12 md:col-span-2"
-              label="Branch"
-              value={header.branchName}
-            />
-            <Input
-              col="col-span-12 md:col-span-2"
-              label="Date"
-              value={header.date}
-            />
-            <Input
-              col="col-span-12 md:col-span-2"
-              label="Delivery"
-              value={header.delivery}
-            />
-            <Input
-              col="col-span-12 md:col-span-2"
-              label="Driving License"
-              value={vehicleInfo.drivingLicense}
-            />
-            <Input
-              col="col-span-12 md:col-span-2"
-              label="Owner Aadhar Card"
-              value={vehicleInfo.ownerAadharCard}
-            />
+            <Input col="col-span-12 md:col-span-3" label="Vehicle Arrival No" value={header.vehicleArrivalNo} />
+            <Input col="col-span-12 md:col-span-3" label="Vehicle Negotiation No" value={header.vehicleNegotiationNo} />
+            <Input col="col-span-12 md:col-span-2" label="Vehicle Number" value={vehicleInfo.vehicleNo} />
+            <Input col="col-span-12 md:col-span-2" label="Mobile Number" value={vehicleInfo.driverMobileNo} />
+            <Input col="col-span-12 md:col-span-2" label="Branch" value={header.branchName} />
+            <Input col="col-span-12 md:col-span-2" label="Date" value={header.date} />
+            <Input col="col-span-12 md:col-span-2" label="Delivery" value={header.delivery} />
+            <Input col="col-span-12 md:col-span-2" label="Driving Licence" value={vehicleInfo.drivingLicense} />
           </div>
         </Card>
-
-        
 
         {/* Owner Documents Section - READ ONLY */}
         <div className="mt-4">
@@ -1105,20 +1082,6 @@ export default function ApproveLoadingPanel() {
                     </div>
                   ) : (
                     <div className="mt-2 text-sm text-slate-500">No PAN document uploaded</div>
-                  )}
-                </div>
-              </div>
-              <div className="col-span-12 md:col-span-4">
-                <div className="bg-purple-50 p-4 rounded-xl border border-purple-200">
-                  <label className="text-xs font-bold text-purple-700">Owner Aadhar Document</label>
-                  {existingFiles.vehicle?.aadhar && existingFiles.vehicle.aadhar.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-2 mt-2">
-                      {existingFiles.vehicle.aadhar.map((file, idx) => (
-                        <FileDisplayItem key={idx} file={file} label="Aadhar Document" />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="mt-2 text-sm text-slate-500">No Aadhar document uploaded</div>
                   )}
                 </div>
               </div>
@@ -1154,12 +1117,6 @@ export default function ApproveLoadingPanel() {
         <div className="mt-4">
           <Card title="Order Details (Read Only)">
             <OrdersTable rows={orderRows} />
-            <div className="flex justify-end mt-4">
-              <div className="flex items-center gap-3 border border-yellow-300 px-6 py-3 bg-yellow-50 rounded-xl">
-                <div className="text-sm font-extrabold text-slate-900">Total Weight (MT):</div>
-                <div className="text-xl font-extrabold text-emerald-700">{calculateTotalWeight()}</div>
-              </div>
-            </div>
           </Card>
         </div>
 
@@ -1202,6 +1159,18 @@ export default function ApproveLoadingPanel() {
                       <Input label="Driver Name" value={vehicleInfo.driverName} />
                       <Input label="Driver Mobile No" value={vehicleInfo.driverMobileNo} />
                       <Input label="Driving License No" value={vehicleInfo.drivingLicense} />
+                      
+                      {/* Driver Photo */}
+                      {existingFiles.vehicle?.photo && existingFiles.vehicle.photo.length > 0 && (
+                        <div className="mt-3">
+                          <label className="text-xs font-bold text-slate-600">Driver Photo</label>
+                          <div className="grid grid-cols-2 gap-2 mt-1">
+                            {existingFiles.vehicle.photo.map((file, idx) => (
+                              <FileDisplayItem key={idx} file={file} label="Driver Photo" />
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       
                       {/* Helper Section */}
                       {hasHelper && (
@@ -1248,26 +1217,23 @@ export default function ApproveLoadingPanel() {
           </Card>
         </div>
 
-        {/* Driver Photo - READ ONLY */}
+        {/* Vehicle Photos - READ ONLY */}
         <div className="mt-4">
-          <Card title="Driver Photo (Read Only)">
-            <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
-              {existingFiles.vehicle?.photo && existingFiles.vehicle.photo.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                  {existingFiles.vehicle.photo.map((file, idx) => (
-                    <FileDisplayItem key={idx} file={file} label="Driver Photo" />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                  <p className="text-sm text-gray-500">No driver photo uploaded</p>
-                </div>
-              )}
-            </div>
+          <Card title="Vehicle Photos (Read Only)">
+            {existingFiles.vehiclePhotos && existingFiles.vehiclePhotos.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                {existingFiles.vehiclePhotos.map((file, idx) => (
+                  <FileDisplayItem key={idx} file={file} label="Vehicle Photo" />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                <p className="text-sm text-gray-500">No vehicle photos uploaded</p>
+              </div>
+            )}
           </Card>
         </div>
 
-       
         {/* Pack Type - READ ONLY with ALL pack types displayed */}
         <div className="mt-4">
           <Card title="Pack Type (Read Only)">
@@ -1430,7 +1396,7 @@ export default function ApproveLoadingPanel() {
           </Card>
         </div>
 
-        {/* Loaded Vehicle Weighment - EDITABLE */}
+        {/* Loaded Vehicle Weighment & Charges - EDITABLE */}
         <div className="mt-4">
           <Card title="Loaded Vehicle Weighment & Charges - Editable">
             <div className="grid grid-cols-12 gap-4">
@@ -1456,56 +1422,18 @@ export default function ApproveLoadingPanel() {
                       </div>
                     </div>
                   )}
-				
                 </div>
 
-				    <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
+                {/* Detention Days */}
+                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 mt-4">
                   <label className="text-xs font-bold text-orange-700">Detention Days</label>
                   <div className="mt-1 w-full rounded-lg border border-orange-200 bg-slate-50 px-3 py-2 text-sm">
                     {detentionDays || '-'}
                   </div>
                   <p className="text-xs text-orange-600 mt-1">Number of days vehicle is detained</p>
                 </div>
-				  {/* Arrival Details - EDITABLE with Out Date and Out Time */}
-        <div className="mt-4">
-          <Card title="Arrival Details - Editable">
-            <div className="grid grid-cols-12 gap-4">
-              <div className="col-span-12 md:col-span-3">
-                <EditableInput
-                  label="Arrival Date"
-                  type="date"
-                  value={arrivalDetails.date}
-                  onChange={(v) => setArrivalDetails({ ...arrivalDetails, date: v })}
-                />
               </div>
-              <div className="col-span-12 md:col-span-3">
-                <EditableInput
-                  label="Arrival Time"
-                  type="time"
-                  value={arrivalDetails.time}
-                  onChange={(v) => setArrivalDetails({ ...arrivalDetails, time: v })}
-                />
-              </div>
-              <div className="col-span-12 md:col-span-3">
-                <EditableInput
-                  label="Out Date"
-                  type="date"
-                  value={arrivalDetails.outDate}
-                  onChange={(v) => setArrivalDetails({ ...arrivalDetails, outDate: v })}
-                />
-              </div>
-              <div className="col-span-12 md:col-span-3">
-                <EditableInput
-                  label="Out Time"
-                  type="time"
-                  value={arrivalDetails.outTime}
-                  onChange={(v) => setArrivalDetails({ ...arrivalDetails, outTime: v })}
-                />
-              </div>
-            </div>
-          </Card>
-        </div>
-              </div>
+
               <div className="col-span-12 md:col-span-6">
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                   <h3 className="text-sm font-bold text-slate-800 mb-3">Loading Charges</h3>
@@ -1553,7 +1481,45 @@ export default function ApproveLoadingPanel() {
           </Card>
         </div>
 
-        
+        {/* Arrival Details - EDITABLE */}
+        <div className="mt-4">
+          <Card title="Arrival Details - Editable">
+            <div className="grid grid-cols-12 gap-4">
+              <div className="col-span-12 md:col-span-3">
+                <EditableInput
+                  label="Arrival Date"
+                  type="date"
+                  value={arrivalDetails.date}
+                  onChange={(v) => setArrivalDetails({ ...arrivalDetails, date: v })}
+                />
+              </div>
+              <div className="col-span-12 md:col-span-3">
+                <EditableInput
+                  label="Arrival Time"
+                  type="time"
+                  value={arrivalDetails.time}
+                  onChange={(v) => setArrivalDetails({ ...arrivalDetails, time: v })}
+                />
+              </div>
+              <div className="col-span-12 md:col-span-3">
+                <EditableInput
+                  label="Out Date"
+                  type="date"
+                  value={arrivalDetails.outDate}
+                  onChange={(v) => setArrivalDetails({ ...arrivalDetails, outDate: v })}
+                />
+              </div>
+              <div className="col-span-12 md:col-span-3">
+                <EditableInput
+                  label="Out Time"
+                  type="time"
+                  value={arrivalDetails.outTime}
+                  onChange={(v) => setArrivalDetails({ ...arrivalDetails, outTime: v })}
+                />
+              </div>
+            </div>
+          </Card>
+        </div>
 
         {/* Vehicle GPS Tracking - EDITABLE */}
         <div className="mt-4">
@@ -1583,29 +1549,10 @@ export default function ApproveLoadingPanel() {
                     API Status: {gpsTracking.isTrackingActive ? 'Active' : 'Ready'}
                   </div>
                 </div>
-				
               </div>
             </div>
-			{/* Vehicle Photos - READ ONLY */}
-        <div className="mt-4">
-          <Card title="Vehicle Photos (Read Only)">
-            {existingFiles.vehiclePhotos && existingFiles.vehiclePhotos.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                {existingFiles.vehiclePhotos.map((file, idx) => (
-                  <FileDisplayItem key={idx} file={file} label="Vehicle Photo" />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                <p className="text-sm text-gray-500">No vehicle photos uploaded</p>
-              </div>
-            )}
           </Card>
         </div>
-          </Card>
-        </div>
-
-        
 
         {/* Documents & Consignment Note Card */}
         <div className="mt-4">
@@ -1650,7 +1597,8 @@ export default function ApproveLoadingPanel() {
             </div>
           </Card>
         </div>
-		{/* Loaded Vehicle Slip - Bottom section */}
+
+        {/* Loaded Vehicle Slip - Bottom section */}
         <div className="mt-4">
           <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
             <label className="text-xs font-bold text-indigo-700">Loaded Vehicle Slip</label>

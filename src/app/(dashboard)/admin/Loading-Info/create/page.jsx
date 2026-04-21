@@ -769,65 +769,75 @@ function PackTypeTable({ packType, rows, onChange, onRemove, onDuplicate, onTogg
   const getColumns = (type) => {
     if (type === "PALLETIZATION") {
       return [
-        { key: "noOfPallets", label: "NO OF PALLETS", type: "number" },
-        { key: "unitPerPallets", label: "UNIT PER PALLETS", type: "number" },
+        { key: "noOfPallets", label: "NO OF PALLETS", type: "number", readOnly: true },
+        { key: "unitPerPallets", label: "UNIT PER PALLETS", type: "number", readOnly: true },
         { key: "totalPkgs", label: "TOTAL PKGS", type: "number", readOnly: true },
-        { key: "pkgsType", label: "PKGS TYPE", type: "text", options: PKGS_TYPE_OPTIONS },
-        { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
-        { key: "skuSize", label: "SKU - SIZE", type: "text", options: SKU_SIZE_OPTIONS },
-        { key: "packWeight", label: "PACK - WEIGHT", type: "number" },
-        { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS },
+        { key: "pkgsType", label: "PKGS TYPE", type: "text", options: PKGS_TYPE_OPTIONS, readOnly: true },
+        { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS, readOnly: true },
+        { key: "skuSize", label: "SKU - SIZE", type: "text", options: SKU_SIZE_OPTIONS, readOnly: true },
+        { key: "packWeight", label: "PACK - WEIGHT", type: "number", readOnly: true },
+        { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS, readOnly: true },
         { key: "wtLtr", label: "WT (LTR)", type: "number", readOnly: true },
         { key: "actualWt", label: "ACTUAL - WT", type: "number", readOnly: true },
-        { key: "chargedWt", label: "CHARGED - WT", type: "number" },
+        { key: "chargedWt", label: "CHARGED - WT", type: "number", readOnly: false },
         { key: "wtUom", label: "WT UOM", type: "text", readOnly: true },
       ];
     }
 
     if (type === "UNIFORM - BAGS/BOXES") {
       return [
-        { key: "totalPkgs", label: "TOTAL PKGS", type: "number" },
-        { key: "pkgsType", label: "PKGS TYPE", type: "text", options: PKGS_TYPE_OPTIONS },
-        { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
-        { key: "skuSize", label: "SKU - SIZE", type: "text", options: SKU_SIZE_OPTIONS },
-        { key: "packWeight", label: "PACK - WEIGHT", type: "number" },
-        { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS },
+        { key: "totalPkgs", label: "TOTAL PKGS", type: "number", readOnly: true },
+        { key: "pkgsType", label: "PKGS TYPE", type: "text", options: PKGS_TYPE_OPTIONS, readOnly: true },
+        { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS, readOnly: true },
+        { key: "skuSize", label: "SKU - SIZE", type: "text", options: SKU_SIZE_OPTIONS, readOnly: true },
+        { key: "packWeight", label: "PACK - WEIGHT", type: "number", readOnly: true },
+        { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS, readOnly: true },
         { key: "wtLtr", label: "WT (LTR)", type: "number", readOnly: true },
         { key: "actualWt", label: "ACTUAL - WT", type: "number", readOnly: true },
-        { key: "chargedWt", label: "CHARGED - WT", type: "number" },
+        { key: "chargedWt", label: "CHARGED - WT", type: "number", readOnly: false },
         { key: "wtUom", label: "WT UOM", type: "text", readOnly: true },
       ];
     }
 
     if (type === "LOOSE - CARGO") {
       return [
-        { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
-        { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS },
-        { key: "actualWt", label: "ACTUAL - WT", type: "number" },
-        { key: "chargedWt", label: "CHARGED - WT", type: "number" },
+        { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS, readOnly: true },
+        { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS, readOnly: true },
+        { key: "actualWt", label: "ACTUAL - WT", type: "number", readOnly: true },
+        { key: "chargedWt", label: "CHARGED - WT", type: "number", readOnly: false },
       ];
     }
 
     // NON-UNIFORM - GENERAL CARGO
     return [
-      { key: "nos", label: "NOS", type: "number" },
-      { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS },
-      { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
-      { key: "length", label: "LENGTH", type: "number" },
-      { key: "width", label: "WIDTH", type: "number" },
-      { key: "height", label: "HEIGHT", type: "number" },
-      { key: "actualWt", label: "ACTUAL - WT", type: "number" },
-      { key: "chargedWt", label: "CHARGED - WT", type: "number" },
+      { key: "nos", label: "NOS", type: "number", readOnly: true },
+      { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS, readOnly: true },
+      { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS, readOnly: true },
+      { key: "length", label: "LENGTH", type: "number", readOnly: true },
+      { key: "width", label: "WIDTH", type: "number", readOnly: true },
+      { key: "height", label: "HEIGHT", type: "number", readOnly: true },
+      { key: "actualWt", label: "ACTUAL - WT", type: "number", readOnly: true },
+      { key: "chargedWt", label: "CHARGED - WT", type: "number", readOnly: false },
     ];
   };
 
   const cols = useMemo(() => getColumns(packType), [packType]);
 
+  // Helper function to get display value for readonly dropdowns
+  const getDisplayValue = (value, options) => {
+    if (!value || !options) return value || '';
+    // If options is an array of strings
+    if (typeof options[0] === 'string') {
+      return value;
+    }
+    return value;
+  };
+
   if (!rows || rows.length === 0) {
     return (
       <div className="overflow-auto rounded-xl border border-yellow-300">
         <div className="p-8 text-center text-slate-400">
-          No rows yet. Click <b>Add Row</b> to add data.
+          No data available
         </div>
       </div>
     );
@@ -847,9 +857,6 @@ function PackTypeTable({ packType, rows, onChange, onRemove, onDuplicate, onTogg
                 {c.readOnly && <span className="ml-1 text-xs text-blue-600">*Auto</span>}
               </th>
             ))}
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
-              Actions
-            </th>
           </tr>
         </thead>
         <tbody>
@@ -857,56 +864,51 @@ function PackTypeTable({ packType, rows, onChange, onRemove, onDuplicate, onTogg
             <tr key={r._id} className="hover:bg-yellow-50 even:bg-slate-50">
               {cols.map((c) => (
                 <td key={c.key} className="border border-yellow-300 px-2 py-2">
-                  {c.options ? (
-                    <select
-                      value={r[c.key] || ""}
-                      onChange={(e) => onChange(r._id, c.key, e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                    >
-                      <option value="">Select {c.label}</option>
-                      {c.options.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
+                  {c.readOnly ? (
+                    // For readonly fields, show as text/display value
+                    c.options ? (
+                      <div className="w-full px-2 py-1.5 text-sm bg-slate-50 rounded-lg border border-slate-200">
+                        {r[c.key] || '-'}
+                      </div>
+                    ) : (
+                      <div className="w-full px-2 py-1.5 text-sm bg-slate-50 rounded-lg border border-slate-200">
+                        {r[c.key] || '-'}
+                      </div>
+                    )
                   ) : (
-                    <input
-                      type={c.type || "text"}
-                      value={r[c.key] || ""}
-                      readOnly={c.readOnly}
-                      onChange={(e) => onChange(r._id, c.key, e.target.value)}
-                      className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
-                        c.readOnly ? 'bg-slate-50' : 'bg-white'
-                      }`}
-                      placeholder={`Enter ${c.label}`}
-                      step={c.type === "number" ? "0.001" : undefined}
-                    />
+                    // For editable fields (only CHARGED - WT)
+                    c.options ? (
+                      <select
+                        value={r[c.key] || ""}
+                        onChange={(e) => onChange(r._id, c.key, e.target.value)}
+                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                      >
+                        <option value="">Select {c.label}</option>
+                        {c.options.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type={c.type || "text"}
+                        value={r[c.key] || ""}
+                        onChange={(e) => onChange(r._id, c.key, e.target.value)}
+                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                        placeholder={`Enter ${c.label}`}
+                        step={c.type === "number" ? "0.001" : undefined}
+                      />
+                    )
                   )}
                 </td>
               ))}
-              <td className="border border-yellow-300 px-2 py-2">
-                <div className="flex gap-2 justify-center">
-                  <button
-                    onClick={() => onDuplicate(r._id)}
-                    className="rounded-lg border border-yellow-500 bg-yellow-100 px-3 py-1.5 text-xs font-bold text-yellow-800 hover:bg-yellow-200 transition"
-                  >
-                    Duplicate
-                  </button>
-                  <button
-                    onClick={() => onRemove(r._id)}
-                    className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-600 transition"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </td>
             </tr>
           ))}
         </tbody>
         <tfoot className="bg-yellow-100">
           <tr>
-            <td colSpan={cols.length} className="border border-yellow-300 px-3 py-2 text-right font-bold">
+            <td colSpan={cols.length - 1} className="border border-yellow-300 px-3 py-2 text-right font-bold">
               Total Actual Weight:
             </td>
             <td className="border border-yellow-300 px-3 py-2 font-bold">
@@ -3398,296 +3400,378 @@ export default function CreateLoadingInfoPanel() {
                 <tbody>
                   <tr className="hover:bg-yellow-50 even:bg-slate-50">
                     {/* Vehicle Search Column */}
-                    <td className="border border-yellow-300 px-4 py-3 align-top">
-                      <div className="space-y-3">
-                        <div>
-                          <label className="text-xs font-bold text-slate-600">Search Vehicle</label>
-                          <VehicleSearchDropdown
-                            onSelect={handleVehicleSelect}
-                            placeholder="Type to search vehicle..."
-                            selectedVehicleId={selectedVehicle?._id}
-                          />
-                          <div className="text-xs text-slate-400 mt-1">Search by vehicle number or owner name</div>
-                        </div>
+<td className="border border-yellow-300 px-4 py-3 align-top">
+  <div className="space-y-3">
+    <div>
+      <label className="text-xs font-bold text-slate-600">Search Vehicle</label>
+      <VehicleSearchDropdown
+        onSelect={handleVehicleSelect}
+        placeholder="Type to search vehicle..."
+        selectedVehicleId={selectedVehicle?._id}
+      />
+      <div className="text-xs text-slate-400 mt-1">Search by vehicle number or owner name</div>
+    </div>
 
-                        <div className="mt-3 pt-2 border-t border-slate-200">
-                          <label className="text-xs font-bold text-slate-600">Or Search by Owner Name</label>
-                          <OwnerSearchDropdown
-                            onSelect={(owner) => {
-                              if (owner) {
-                                setVehicleInfo(prev => ({
-                                  ...prev,
-                                  vehicleNo: owner.vehicleNumber || "",
-                                  vehicleOwnerName: owner.ownerName || "",
-                                  vehicleOwnerRC: owner.rcNumber || "",
-                                  ownerPanCard: owner.ownerPanCard || "",
-                                  message: `Vehicle Owner: ${owner.ownerName}\nContact: ${owner.mobileNumber1 || owner.mobileNumber2}\nRC Number: ${owner.rcNumber || ''}`,
-                                  remarks: `Pan Card: ${owner.ownerPanCard || 'N/A'}\nAdhar Card: ${owner.adharCardNumber || 'N/A'}`
-                                }));
-                                
-                                setSelectedVehicle({
-                                  _id: owner._id,
-                                  vehicleNumber: owner.vehicleNumber,
-                                  ownerName: owner.ownerName
-                                });
-                                
-                                setExistingFiles(prev => ({
-                                  ...prev,
-                                  vehicle: {
-                                    ...prev.vehicle,
-                                    rc: owner.rcDocuments?.map(doc => ({ name: 'RC Document', path: doc })) || [],
-                                    pan: owner.panCardDocuments?.map(doc => ({ name: 'PAN Document', path: doc })) || [],
-                                  }
-                                }));
-                                
-                                alert(`✅ Owner ${owner.ownerName} loaded!\nVehicle: ${owner.vehicleNumber}`);
-                              }
-                            }}
-                            placeholder="Search by owner name, vehicle number, or RC number..."
-                          />
-                        </div>
+    <div className="mt-3 pt-2 border-t border-slate-200">
+      <label className="text-xs font-bold text-slate-600">Or Search by Owner Name</label>
+      <OwnerSearchDropdown
+        onSelect={(owner) => {
+          if (owner) {
+            setVehicleInfo(prev => ({
+              ...prev,
+              vehicleNo: owner.vehicleNumber || "",
+              vehicleOwnerName: owner.ownerName || "",
+              vehicleOwnerRC: owner.rcNumber || "",
+              ownerPanCard: owner.ownerPanCard || "",
+              message: `Vehicle Owner: ${owner.ownerName}\nContact: ${owner.mobileNumber1 || owner.mobileNumber2}\nRC Number: ${owner.rcNumber || ''}`,
+              remarks: `Pan Card: ${owner.ownerPanCard || 'N/A'}\nAdhar Card: ${owner.adharCardNumber || 'N/A'}`
+            }));
+            
+            setSelectedVehicle({
+              _id: owner._id,
+              vehicleNumber: owner.vehicleNumber,
+              ownerName: owner.ownerName
+            });
+            
+            setExistingFiles(prev => ({
+              ...prev,
+              vehicle: {
+                ...prev.vehicle,
+                rc: owner.rcDocuments?.map(doc => ({ name: 'RC Document', path: doc })) || [],
+                pan: owner.panCardDocuments?.map(doc => ({ name: 'PAN Document', path: doc })) || [],
+              }
+            }));
+            
+            alert(`✅ Owner ${owner.ownerName} loaded!\nVehicle: ${owner.vehicleNumber}`);
+          }
+        }}
+        placeholder="Search by owner name, vehicle number, or RC number..."
+      />
+    </div>
 
-                        <button
-                          onClick={handleCreateVehicle}
-                          className="w-full rounded-lg bg-green-600 px-3 py-2 text-xs font-bold text-white hover:bg-green-700 transition"
-                        >
-                          + Create New Vehicle
-                        </button>
-                        
-                        {selectedVehicle && (
-                          <div className="mt-2 p-2 bg-green-50 rounded-lg border border-green-200">
-                            <div className="text-xs font-medium text-green-800">Selected Vehicle:</div>
-                            <div className="text-xs text-green-700 mt-1">{selectedVehicle.vehicleNumber}</div>
-                            <div className="text-xs text-green-600">Owner: {selectedVehicle.ownerName}</div>
-                          </div>
-                        )}
+    <button
+      onClick={handleCreateVehicle}
+      className="w-full rounded-lg bg-green-600 px-3 py-2 text-xs font-bold text-white hover:bg-green-700 transition"
+    >
+      + Create New Vehicle
+    </button>
+    
+    {selectedVehicle && (
+      <div className="mt-2 p-2 bg-green-50 rounded-lg border border-green-200">
+        <div className="text-xs font-medium text-green-800">Selected Vehicle:</div>
+        <div className="text-xs text-green-700 mt-1">{selectedVehicle.vehicleNumber}</div>
+        <div className="text-xs text-green-600">Owner: {selectedVehicle.ownerName}</div>
+      </div>
+    )}
 
-                        <div className="pt-2 border-t border-slate-200">
-                          <label className="text-xs font-bold text-slate-600">Vehicle Photos</label>
-                          <p className="text-xs text-slate-400 mb-1">Upload vehicle photos (Max 10)</p>
-                          <button 
-                            onClick={handleVehiclePhotoSelect}
-                            className="w-full rounded-lg bg-cyan-50 px-3 py-2 text-xs font-bold text-cyan-700 border border-cyan-200 hover:bg-cyan-100 transition flex items-center justify-center gap-2"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            {vehiclePhotoFiles.length > 0 ? `✓ ${vehiclePhotoFiles.length} / 10 photos` : '+ Upload Vehicle Photos'}
-                          </button>
-                          <div className="mt-2 max-h-40 overflow-y-auto">
-                            {vehiclePhotoFiles.map((file, idx) => (
-                              <FileUploadItem 
-                                key={idx} 
-                                file={file} 
-                                index={idx}
-                                onRemove={removeVehiclePhoto}
-                                label={`Vehicle Photo ${idx + 1}`}
-                              />
-                            ))}
-                          </div>
-                          {vehiclePhotoFiles.length > 0 && (
-                            <div className="w-full bg-slate-200 rounded-full h-1.5 mt-2">
-                              <div 
-                                className="bg-cyan-500 h-1.5 rounded-full transition-all"
-                                style={{ width: `${(vehiclePhotoFiles.length / 10) * 100}%` }}
-                              />
-                            </div>
-                          )}
-                        </div>
+    <div className="pt-2 border-t border-slate-200">
+      <label className="text-xs font-bold text-slate-600">Vehicle Photos</label>
+      <p className="text-xs text-slate-400 mb-1">Upload vehicle photos (Max 10)</p>
+      <button 
+        onClick={handleVehiclePhotoSelect}
+        className="w-full rounded-lg bg-cyan-50 px-3 py-2 text-xs font-bold text-cyan-700 border border-cyan-200 hover:bg-cyan-100 transition flex items-center justify-center gap-2"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+        {vehiclePhotoFiles.length > 0 ? `✓ ${vehiclePhotoFiles.length} / 10 photos` : '+ Upload Vehicle Photos'}
+      </button>
+      <div className="mt-2 max-h-40 overflow-y-auto">
+        {vehiclePhotoFiles.map((file, idx) => (
+          <FileUploadItem 
+            key={idx} 
+            file={file} 
+            index={idx}
+            onRemove={removeVehiclePhoto}
+            label={`Vehicle Photo ${idx + 1}`}
+          />
+        ))}
+      </div>
+      {vehiclePhotoFiles.length > 0 && (
+        <div className="w-full bg-slate-200 rounded-full h-1.5 mt-2">
+          <div 
+            className="bg-cyan-500 h-1.5 rounded-full transition-all"
+            style={{ width: `${(vehiclePhotoFiles.length / 10) * 100}%` }}
+          />
+        </div>
+      )}
+    </div>
 
-                        <div>
-                          <label className="text-xs font-bold text-slate-600">Insurance Number</label>
-                          <input
-                            type="text"
-                            value={vehicleInfo.insuranceNumber}
-                            onChange={(e) => setVehicleInfo({ ...vehicleInfo, insuranceNumber: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                            placeholder="Enter insurance number"
-                          />
-                        </div>
+    <div>
+      <label className="text-xs font-bold text-slate-600">Insurance Number</label>
+      <input
+        type="text"
+        value={vehicleInfo.insuranceNumber}
+        readOnly
+        className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
+        placeholder="Auto-filled from vehicle"
+      />
+    </div>
 
-                        <div>
-                          <label className="text-xs font-bold text-slate-600">Chasis Number</label>
-                          <input
-                            type="text"
-                            value={vehicleInfo.chasisNumber}
-                            onChange={(e) => setVehicleInfo({ ...vehicleInfo, chasisNumber: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                            placeholder="Enter chasis number"
-                          />
-                        </div>
+    <div>
+      <label className="text-xs font-bold text-slate-600">Chasis Number</label>
+      <input
+        type="text"
+        value={vehicleInfo.chasisNumber}
+        readOnly
+        className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
+        placeholder="Auto-filled from vehicle"
+      />
+    </div>
 
-                        <div>
-                          <label className="text-xs font-bold text-slate-600">Fitness Number</label>
-                          <input
-                            type="text"
-                            value={vehicleInfo.fitnessNumber}
-                            onChange={(e) => setVehicleInfo({ ...vehicleInfo, fitnessNumber: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                            placeholder="Enter fitness number"
-                          />
-                        </div>
+    <div>
+      <label className="text-xs font-bold text-slate-600">Fitness Number</label>
+      <input
+        type="text"
+        value={vehicleInfo.fitnessNumber}
+        readOnly
+        className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
+        placeholder="Auto-filled from vehicle"
+      />
+    </div>
 
-                        <div>
-                          <label className="text-xs font-bold text-slate-600">PUC Number</label>
-                          <input
-                            type="text"
-                            value={vehicleInfo.pucNumber}
-                            onChange={(e) => setVehicleInfo({ ...vehicleInfo, pucNumber: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                            placeholder="Enter PUC number"
-                          />
-                        </div>
-                      </div>
-                    </td>
+    <div>
+      <label className="text-xs font-bold text-slate-600">PUC Number</label>
+      <input
+        type="text"
+        value={vehicleInfo.pucNumber}
+        readOnly
+        className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
+        placeholder="Auto-filled from vehicle"
+      />
+    </div>
+  </div>
+</td>
 
-                    {/* Vehicle Information Column */}
-                    <td className="border border-yellow-300 px-4 py-3 align-top">
-                      <div className="space-y-3">
-                        <div>
-                          <label className="text-xs font-bold text-slate-600">Vehicle No *</label>
-                          <input
-                            type="text"
-                            value={vehicleInfo.vehicleNo}
-                            onChange={(e) => setVehicleInfo({ ...vehicleInfo, vehicleNo: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                            placeholder="Enter vehicle number"
-                          />
-                        </div>
+      {/* Vehicle Information Column */}
+<td className="border border-yellow-300 px-4 py-3 align-top">
+  <div className="space-y-3">
+    <div>
+      <label className="text-xs font-bold text-slate-600">Vehicle No *</label>
+      <input
+        type="text"
+        value={vehicleInfo.vehicleNo}
+        onChange={(e) => setVehicleInfo({ ...vehicleInfo, vehicleNo: e.target.value })}
+        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+        placeholder="Enter vehicle number"
+      />
+    </div>
 
-                        <div>
-                          <label className="text-xs font-bold text-slate-600">Vehicle Type</label>
-                          <select
-                            value={vehicleInfo.vehicleType}
-                            onChange={(e) => setVehicleInfo({ ...vehicleInfo, vehicleType: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                          >
-                            <option value="">Select Vehicle Type</option>
-                            {VEHICLE_TYPE_OPTIONS.map((opt) => (
-                              <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                          </select>
-                        </div>
+    <div>
+      <label className="text-xs font-bold text-slate-600">Vehicle Type</label>
+      <input
+        type="text"
+        value={vehicleInfo.vehicleType}
+        readOnly
+        className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
+        placeholder="Auto-filled from vehicle"
+      />
+    </div>
 
-                        <div>
-                          <label className="text-xs font-bold text-slate-600">Vehicle Weight (MT)</label>
-                          <input
-                            type="number"
-                            value={vehicleInfo.vehicleWeight}
-                            onChange={(e) => setVehicleInfo({ ...vehicleInfo, vehicleWeight: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                            placeholder="Enter weight"
-                          />
-                        </div>
+    <div>
+      <label className="text-xs font-bold text-slate-600">Vehicle Weight (MT)</label>
+      <input
+        type="number"
+        value={vehicleInfo.vehicleWeight}
+        readOnly
+        className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
+        placeholder="Auto-filled from vehicle"
+      />
+    </div>
 
-                        <div>
-                          <label className="text-xs font-bold text-slate-600">Vehicle Owner RC</label>
-                          <input
-                            type="text"
-                            value={vehicleInfo.vehicleOwnerRC}
-                            onChange={(e) => setVehicleInfo({ ...vehicleInfo, vehicleOwnerRC: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                            placeholder="Enter RC number"
-                          />
-                        </div>
+    <div>
+      <label className="text-xs font-bold text-slate-600">Vehicle Owner RC</label>
+      <input
+        type="text"
+        value={vehicleInfo.vehicleOwnerRC}
+        readOnly
+        className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
+        placeholder="Auto-filled from vehicle"
+      />
+    </div>
 
-                        <div>
-                          <label className="text-xs font-bold text-slate-600">Vehicle Owner Name</label>
-                          <input
-                            type="text"
-                            value={vehicleInfo.vehicleOwnerName}
-                            onChange={(e) => setVehicleInfo({ ...vehicleInfo, vehicleOwnerName: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                            placeholder="Enter owner name"
-                          />
-                        </div>
+    <div>
+      <label className="text-xs font-bold text-slate-600">Vehicle Owner Name</label>
+      <input
+        type="text"
+        value={vehicleInfo.vehicleOwnerName}
+        readOnly
+        className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
+        placeholder="Auto-filled from vehicle"
+      />
+    </div>
 
-                        <div>
-                          <label className="text-xs font-bold text-slate-600">Owner Pan Card</label>
-                          <input
-                            type="text"
-                            value={vehicleInfo.ownerPanCard}
-                            onChange={(e) => setVehicleInfo({ ...vehicleInfo, ownerPanCard: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                            placeholder="Enter PAN number"
-                          />
-                        </div>
+    <div>
+      <label className="text-xs font-bold text-slate-600">Owner Pan Card</label>
+      <input
+        type="text"
+        value={vehicleInfo.ownerPanCard}
+        readOnly
+        className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
+        placeholder="Auto-filled from vehicle"
+      />
+    </div>
 
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="text-xs font-bold text-slate-600">Owner RC Doc</label>
-                            <button 
-                              onClick={() => handleFileSelect('vehicle', 'rc')}
-                              className="mt-1 w-full rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 border border-blue-200 hover:bg-blue-100"
-                            >
-                              {vehicleFiles.rc.length > 0 ? `✓ ${vehicleFiles.rc.length} file(s)` : '+ Select File'}
-                            </button>
-                            {vehicleFiles.rc.map((file, idx) => (
-                              <FileUploadItem 
-                                key={idx} 
-                                file={file} 
-                                index={idx}
-                                onRemove={() => removeFile('vehicle', 'rc', idx)}
-                                label="RC"
-                              />
-                            ))}
-                            {existingFiles.vehicle?.rc?.map((file, idx) => (
-                              <FileUploadItem 
-                                key={`existing-rc-${idx}`}
-                                file={file}
-                                index={idx}
-                                onRemove={() => removeFile('vehicle', 'rc', idx, true)}
-                                label="RC"
-                                isExisting={true}
-                              />
-                            ))}
-                          </div>
-                          <div>
-                            <label className="text-xs font-bold text-slate-600">Owner Pan Doc</label>
-                            <button 
-                              onClick={() => handleFileSelect('vehicle', 'pan')}
-                              className="mt-1 w-full rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 border border-blue-200 hover:bg-blue-100"
-                            >
-                              {vehicleFiles.pan.length > 0 ? `✓ ${vehicleFiles.pan.length} file(s)` : '+ Select File'}
-                            </button>
-                            {vehicleFiles.pan.map((file, idx) => (
-                              <FileUploadItem 
-                                key={idx} 
-                                file={file} 
-                                index={idx}
-                                onRemove={() => removeFile('vehicle', 'pan', idx)}
-                                label="PAN"
-                              />
-                            ))}
-                            {existingFiles.vehicle?.pan?.map((file, idx) => (
-                              <FileUploadItem 
-                                key={`existing-pan-${idx}`}
-                                file={file}
-                                index={idx}
-                                onRemove={() => removeFile('vehicle', 'pan', idx, true)}
-                                label="PAN"
-                                isExisting={true}
-                              />
-                            ))}
-                          </div>
-                        </div>
+    <div className="grid grid-cols-2 gap-2">
+      <div>
+        <label className="text-xs font-bold text-slate-600">Owner RC Doc</label>
+        <div className="mt-1 space-y-2">
+          {vehicleFiles.rc.length > 0 && vehicleFiles.rc.map((file, idx) => (
+            <div key={idx} className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  // Create object URL for the file and open in new tab
+                  const url = URL.createObjectURL(file);
+                  window.open(url, '_blank');
+                  // Revoke the URL after opening to free memory
+                  setTimeout(() => URL.revokeObjectURL(url), 100);
+                }}
+                className="flex-1 rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 border border-blue-200 hover:bg-blue-100 transition flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                View RC Document {idx + 1}
+              </button>
+              <button
+                onClick={() => removeFile('vehicle', 'rc', idx)}
+                className="rounded-lg bg-red-500 px-2 py-2 text-xs font-bold text-white hover:bg-red-600"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ))}
+          {existingFiles.vehicle?.rc?.map((file, idx) => (
+            <div key={`existing-rc-${idx}`} className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  // For existing files, open the URL/path
+                  const filePath = file.path || file;
+                  if (filePath) {
+                    window.open(filePath, '_blank');
+                  }
+                }}
+                className="flex-1 rounded-lg bg-green-50 px-3 py-2 text-xs font-bold text-green-700 border border-green-200 hover:bg-green-100 transition flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                View RC Document {idx + 1}
+              </button>
+              <button
+                onClick={() => removeFile('vehicle', 'rc', idx, true)}
+                className="rounded-lg bg-red-500 px-2 py-2 text-xs font-bold text-white hover:bg-red-600"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ))}
+          {vehicleFiles.rc.length === 0 && (!existingFiles.vehicle?.rc || existingFiles.vehicle.rc.length === 0) && (
+            <button 
+              onClick={() => handleFileSelect('vehicle', 'rc')}
+              className="w-full rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 border border-blue-200 hover:bg-blue-100 transition flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              + Upload RC Document
+            </button>
+          )}
+        </div>
+      </div>
+      
+      <div>
+        <label className="text-xs font-bold text-slate-600">Owner Pan Doc</label>
+        <div className="mt-1 space-y-2">
+          {vehicleFiles.pan.length > 0 && vehicleFiles.pan.map((file, idx) => (
+            <div key={idx} className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const url = URL.createObjectURL(file);
+                  window.open(url, '_blank');
+                  setTimeout(() => URL.revokeObjectURL(url), 100);
+                }}
+                className="flex-1 rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 border border-blue-200 hover:bg-blue-100 transition flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                View PAN Document {idx + 1}
+              </button>
+              <button
+                onClick={() => removeFile('vehicle', 'pan', idx)}
+                className="rounded-lg bg-red-500 px-2 py-2 text-xs font-bold text-white hover:bg-red-600"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ))}
+          {existingFiles.vehicle?.pan?.map((file, idx) => (
+            <div key={`existing-pan-${idx}`} className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const filePath = file.path || file;
+                  if (filePath) {
+                    window.open(filePath, '_blank');
+                  }
+                }}
+                className="flex-1 rounded-lg bg-green-50 px-3 py-2 text-xs font-bold text-green-700 border border-green-200 hover:bg-green-100 transition flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                View PAN Document {idx + 1}
+              </button>
+              <button
+                onClick={() => removeFile('vehicle', 'pan', idx, true)}
+                className="rounded-lg bg-red-500 px-2 py-2 text-xs font-bold text-white hover:bg-red-600"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ))}
+          {vehicleFiles.pan.length === 0 && (!existingFiles.vehicle?.pan || existingFiles.vehicle.pan.length === 0) && (
+            <button 
+              onClick={() => handleFileSelect('vehicle', 'pan')}
+              className="w-full rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 border border-blue-200 hover:bg-blue-100 transition flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              + Upload PAN Document
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
 
-                        <div className="flex items-center mt-2">
-                          <input
-                            type="checkbox"
-                            id="verified"
-                            checked={vehicleInfo.verified}
-                            onChange={(e) => setVehicleInfo({ ...vehicleInfo, verified: e.target.checked })}
-                            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                          />
-                          <label htmlFor="verified" className="ml-2 text-sm font-medium text-slate-700">
-                            Verified
-                          </label>
-                        </div>
-                      </div>
-                    </td>
-
+    <div className="flex items-center mt-2">
+      <input
+        type="checkbox"
+        id="verified"
+        checked={vehicleInfo.verified}
+        onChange={(e) => setVehicleInfo({ ...vehicleInfo, verified: e.target.checked })}
+        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+      />
+      <label htmlFor="verified" className="ml-2 text-sm font-medium text-slate-700">
+        Verified
+      </label>
+    </div>
+  </div>
+</td>
                     {/* Driver Information Column */}
                     <td className="border border-yellow-300 px-4 py-3 align-top">
                       <div className="space-y-3">
@@ -3878,43 +3962,38 @@ export default function CreateLoadingInfoPanel() {
           </Card>
         </div>
 
-        {/* Pack Type Card */}
-        <div className="mt-4">
-          <Card title="Pack Type">
-            <div className="mb-4 flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <div className="text-sm font-bold text-slate-700">Select Pack Type:</div>
-                <select
-                  value={activePack}
-                  onChange={(e) => setActivePack(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
-                >
-                  {PACK_TYPES.map((p) => (
-                    <option key={p.key} value={p.key}>
-                      {p.label} ({packData[p.key]?.length || 0} rows)
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <button
-                onClick={addPackRow}
-                className="rounded-xl bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-700 transition"
-              >
-                + Add Row
-              </button>
-            </div>
-            
-            <PackTypeTable
-              key={activePack}
-              packType={activePack}
-              rows={rows}
-              onChange={updatePackRow}
-              onRemove={removePackRow}
-              onDuplicate={duplicatePackRow}
-              onToggleUniform={toggleUniformMode}
-            />
-          </Card>
-        </div>
+       {/* Pack Type Card */}
+<div className="mt-4">
+  <Card title="Pack Type">
+    <div className="mb-4 flex justify-between items-center">
+      <div className="flex items-center gap-3">
+        <div className="text-sm font-bold text-slate-700">Select Pack Type:</div>
+        <select
+          value={activePack}
+          onChange={(e) => setActivePack(e.target.value)}
+          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+        >
+          {PACK_TYPES.map((p) => (
+            <option key={p.key} value={p.key}>
+              {p.label} ({packData[p.key]?.length || 0} rows)
+            </option>
+          ))}
+        </select>
+      </div>
+      {/* Remove the Add Row button */}
+    </div>
+    
+    <PackTypeTable
+      key={activePack}
+      packType={activePack}
+      rows={rows}
+      onChange={updatePackRow}
+      onRemove={removePackRow}
+      onDuplicate={duplicatePackRow}
+      onToggleUniform={toggleUniformMode}
+    />
+  </Card>
+</div>
 
         {/* VBP Panel Card */}
         <div className="mt-4">

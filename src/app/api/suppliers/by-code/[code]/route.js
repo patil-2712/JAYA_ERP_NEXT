@@ -22,7 +22,7 @@ export async function GET(req, { params }) {
         { status: 401 }
       );
 
-    const { code } = params;
+   const { code } = await params;
     if (!code?.trim())
       return NextResponse.json(
         { success: false, error: "Supplier code required" },

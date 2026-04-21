@@ -1,3 +1,4 @@
+// AdvancePayment.js
 import mongoose from 'mongoose';
 
 const advancePaymentSchema = new mongoose.Schema({
@@ -26,6 +27,12 @@ const advancePaymentSchema = new mongoose.Schema({
   pricingSerialNo: {
     type: String,
     default: ''
+  },
+  
+  // Purchase Amount from VNN (A x B)
+  purchaseAmountFromVNN: {
+    type: Number,
+    default: 0
   },
   
   // Header Information
@@ -67,8 +74,19 @@ const advancePaymentSchema = new mongoose.Schema({
     priceList: { type: String, default: '' },
     weight: { type: Number, default: 0 },
     rate: { type: Number, default: 0 },
-    totalAmount: { type: Number, default: 0 }
+    totalAmount: { type: Number, default: 0 },
+    collectionCharges: { type: String, default: '0' },
+    cancellationCharges: { type: String, default: 'Nil' },
+    loadingCharges: { type: String, default: 'Nil' },
+    otherCharges: { type: String, default: '0' }
   }],
+
+  // Purchase Terms (separate from vendorDetails)
+  purchaseTerms: {
+    purchaseType: { type: String, default: 'Loading & Unloading' },
+    rateType: { type: String, enum: ['Per MT', 'Fixed'], default: 'Per MT' },
+    paymentTerms: { type: String, default: '80 % Advance' }
+  },
 
   // Vendor Details
   vendorDetails: {
@@ -76,12 +94,9 @@ const advancePaymentSchema = new mongoose.Schema({
     vendorCode: { type: String, default: '' },
     vendorName: { type: String, default: '' },
     vehicleNo: { type: String, default: '' },
-    purchaseType: { type: String, enum: ['Loading & Unloading', 'Unloading Only', 'Safi Vehicle'], default: 'Loading & Unloading' },
     rate: { type: Number, default: 0 },
     weight: { type: Number, default: 0 },
     amount: { type: Number, default: 0 },
-    rateType: { type: String, enum: ['Per MT', 'Fixed'], default: 'Per MT' },
-    paymentTerms: { type: String, default: '80 % Advance' },
     advance: { type: Number, default: 0 },
     accountNo: { type: String, default: '' },
     bankName: { type: String, default: '' },
@@ -119,6 +134,16 @@ const advancePaymentSchema = new mongoose.Schema({
     bankVendorCode: { type: String, default: '' },
     paymentDate: { type: Date, default: Date.now },
     paymentStatus: { type: String, enum: ['Pending', 'Approved', 'Rejected', 'Paid', 'Completed'], default: 'Pending' }
+  },
+
+  // Memo File from Vehicle Negotiation
+  memoFile: {
+    filePath: { type: String },
+    fullPath: { type: String },
+    filename: { type: String },
+    originalName: { type: String },
+    size: { type: Number },
+    mimeType: { type: String }
   },
 
   // Calculated Fields
@@ -173,20 +198,33 @@ const advancePaymentSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Pre-save middleware to calculate balance
+// Pre-save middleware to calculate totals
 advancePaymentSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   
-  // Calculate total order amount
-  this.totalOrderAmount = this.orderRows.reduce((sum, row) => sum + (row.totalAmount || 0), 0);
+  // Calculate total order amount from orderRows
+  this.totalOrderAmount = this.orderRows.reduce((sum, row) => {
+    const totalAmount = row.totalAmount || 0;
+    const collectionCharges = num(row.collectionCharges);
+    const cancellationCharges = num(row.cancellationCharges);
+    const loadingCharges = num(row.loadingCharges);
+    const otherCharges = num(row.otherCharges);
+    return sum + totalAmount + collectionCharges + cancellationCharges + loadingCharges + otherCharges;
+  }, 0);
   
-  // Calculate balance: amount - advance - deductions + additions
-  const amount = this.vendorDetails?.amount || 0;
+  // Calculate total additions
+  this.additions.totalAddition = this.additions.items.reduce((sum, item) => sum + (item.amount || 0), 0);
+  
+  // Calculate total deductions
+  this.deductions.totalDeduction = this.deductions.items.reduce((sum, item) => sum + (item.amount || 0), 0);
+  
+  // Calculate balance: Purchase Amount - Advance + Additions - Deductions
+  const purchaseAmount = this.purchaseAmountFromVNN || this.vendorDetails?.amount || 0;
   const advance = this.vendorDetails?.advance || 0;
-  const totalAdditions = this.additions?.totalAddition || 0;
-  const totalDeductions = this.deductions?.totalDeduction || 0;
+  const totalAdditions = this.additions.totalAddition || 0;
+  const totalDeductions = this.deductions.totalDeduction || 0;
   
-  this.balance = amount - advance - totalDeductions + totalAdditions;
+  this.balance = purchaseAmount - advance + totalAdditions - totalDeductions;
   
   // Set final amount in payment details if not set
   if (!this.paymentDetails.finalAmount) {
@@ -195,6 +233,11 @@ advancePaymentSchema.pre('save', function(next) {
   
   next();
 });
+
+function num(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
 
 const AdvancePayment = mongoose.models.AdvancePayment || 
   mongoose.model('AdvancePayment', advancePaymentSchema);

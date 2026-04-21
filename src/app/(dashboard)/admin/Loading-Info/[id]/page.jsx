@@ -119,6 +119,44 @@ function useVehicleSearch() {
 }
 
 /* =======================
+  Owner Search Hook
+========================= */
+function useOwnerSearch() {
+  const [owners, setOwners] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const searchOwners = async (vehicleNumber = "") => {
+    setLoading(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem('token');
+      const url = vehicleNumber ? `/api/owners?search=${encodeURIComponent(vehicleNumber)}` : '/api/owners';
+      
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      
+      if (data.success && Array.isArray(data.data)) {
+        setOwners(data.data);
+      } else {
+        setOwners([]);
+        setError(data.message || 'No owners found');
+      }
+    } catch (err) {
+      console.error('Error fetching owners:', err);
+      setOwners([]);
+      setError('Failed to fetch owners');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { owners, loading, error, searchOwners };
+}
+
+/* =======================
   Vehicle Negotiation Hook
 ========================= */
 function useVehicleNegotiation() {
@@ -359,20 +397,30 @@ function FileUploadItem({ file, onRemove, index, label, isExisting = false, read
     }
   }, [file, isExisting]);
 
+  const handleView = () => {
+    if (isExisting && file.path) {
+      window.open(file.path, '_blank');
+    } else if (file.type && file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    }
+  };
+
   return (
     <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 mt-1">
       {imagePreview && !isExisting && (
-        <img src={imagePreview} alt="Preview" className="w-10 h-10 rounded object-cover" />
+        <img src={imagePreview} alt="Preview" className="w-10 h-10 rounded object-cover cursor-pointer" onClick={handleView} />
       )}
       {isExisting && (
-        <div className="w-10 h-10 bg-green-100 rounded flex items-center justify-center">
+        <div className="w-10 h-10 bg-green-100 rounded flex items-center justify-center cursor-pointer" onClick={handleView}>
           <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
       )}
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium text-slate-700 truncate">
+        <p className="text-xs font-medium text-slate-700 truncate cursor-pointer" onClick={handleView}>
           {isExisting ? (file.name || 'Existing Document') : file.name}
         </p>
         <p className="text-xs text-slate-500">
@@ -635,119 +683,102 @@ function SearchableDropdown({ items, selectedId, onSelect, placeholder = "Search
   );
 }
 
-function TableSearchableDropdown({ items, selectedId, onSelect, placeholder = "Search...", displayField = 'name', codeField = 'code', disabled = false, cellId = "" }) {
+function OwnerSearchDropdown({ onSelect, placeholder = "Search owner...", readOnly = false }) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [filteredItems, setFilteredItems] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
-  const inputRef = useRef(null);
+  const [filteredOwners, setFilteredOwners] = useState([]);
+  const [owners, setOwners] = useState([]);
+  const [loading, setLoading] = useState(false);
   const dropdownRef = useRef(null);
 
-  useEffect(() => {
-    setFilteredItems(items || []);
-    if (selectedId && items?.length > 0) {
-      const item = items.find(i => i._id === selectedId || i.name === selectedId);
-      setSelectedItem(item);
-      if (item) {
-        setSearchQuery(getDisplayValue(item));
+  const fetchOwners = async (query = "") => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const url = query ? `/api/owners?search=${encodeURIComponent(query)}` : '/api/owners';
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setOwners(data.data);
+        setFilteredOwners(data.data);
       }
-    } else {
-      setSelectedItem(null);
-      setSearchQuery("");
+    } catch (err) {
+      console.error("Error fetching owners:", err);
+    } finally {
+      setLoading(false);
     }
-  }, [items, selectedId]);
-
-  const getDisplayValue = (item) => {
-    if (!item) return "";
-    const display = item[displayField] || "";
-    const code = item[codeField] ? `(${item[codeField]})` : "";
-    return `${display} ${code}`.trim();
   };
+
+  useEffect(() => {
+    fetchOwners();
+  }, []);
 
   const handleSearch = (query) => {
-    if (disabled) return;
+    if (readOnly) return;
     setSearchQuery(query);
     if (!query.trim()) {
-      setFilteredItems(items || []);
+      setFilteredOwners(owners);
     } else {
-      const filtered = (items || []).filter(item =>
-        (item[displayField]?.toLowerCase().includes(query.toLowerCase())) ||
-        (item[codeField]?.toLowerCase().includes(query.toLowerCase()))
+      const filtered = owners.filter(owner =>
+        owner.ownerName?.toLowerCase().includes(query.toLowerCase()) ||
+        owner.vehicleNumber?.toLowerCase().includes(query.toLowerCase()) ||
+        owner.rcNumber?.toLowerCase().includes(query.toLowerCase())
       );
-      setFilteredItems(filtered);
+      setFilteredOwners(filtered);
     }
+    if (!showDropdown) setShowDropdown(true);
   };
 
-  const handleInputFocus = () => {
-    if (!disabled && !showDropdown && inputRef.current) {
-      setFilteredItems(items || []);
-      const inputRect = inputRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        top: inputRect.bottom + window.scrollY + 4,
-        left: inputRect.left + window.scrollX,
-        width: inputRect.width
-      });
-      setShowDropdown(true);
-    }
-  };
-
-  const handleSelectItem = (item) => {
-    if (disabled) return;
-    setSelectedItem(item);
-    setSearchQuery(getDisplayValue(item));
+  const handleSelectOwner = (owner) => {
+    if (readOnly) return;
+    setSearchQuery(owner.ownerName);
     setShowDropdown(false);
-    onSelect?.(item);
+    onSelect(owner);
   };
 
   return (
-    <>
-      <div className="relative">
-        <input
-          ref={inputRef}
-          type="text"
-          value={searchQuery}
-          onChange={(e) => handleSearch(e.target.value)}
-          onFocus={handleInputFocus}
-          onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 ${
-            disabled ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-          }`}
-          placeholder={placeholder}
-          disabled={disabled}
-        />
-      </div>
-      {showDropdown && !disabled && (
-        <div 
-          ref={dropdownRef}
-          className="fixed z-[9999] bg-white border border-slate-200 rounded-lg shadow-lg overflow-y-auto max-h-60"
-          style={{
-            top: `${dropdownPosition.top}px`,
-            left: `${dropdownPosition.left}px`,
-            width: `${dropdownPosition.width}px`
-          }}
-        >
-          {filteredItems?.length > 0 ? (
-            filteredItems.map((item) => (
+    <div className="relative w-full" ref={dropdownRef}>
+      <input
+        type="text"
+        value={searchQuery}
+        onChange={(e) => handleSearch(e.target.value)}
+        onFocus={() => !readOnly && setShowDropdown(true)}
+        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+        className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+          readOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+        }`}
+        placeholder={placeholder}
+        autoComplete="off"
+        readOnly={readOnly}
+      />
+      {showDropdown && !readOnly && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+          {loading ? (
+            <div className="p-3 text-center text-sm text-slate-500">Loading owners...</div>
+          ) : filteredOwners.length > 0 ? (
+            filteredOwners.map((owner) => (
               <div
-                key={item._id}
-                onMouseDown={() => handleSelectItem(item)}
-                className="p-2 hover:bg-slate-50 cursor-pointer border-b border-slate-100"
+                key={owner._id}
+                onMouseDown={() => handleSelectOwner(owner)}
+                className="p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100"
               >
-                <div className="font-medium text-slate-800 text-sm">
-                  {item[displayField]}
+                <div className="font-medium text-slate-800">{owner.ownerName}</div>
+                <div className="text-xs text-slate-500 mt-1">
+                  Vehicle: {owner.vehicleNumber} | RC: {owner.rcNumber || 'N/A'}
                 </div>
-                {item[codeField] && (
-                  <div className="text-xs text-slate-500">Code: {item[codeField]}</div>
-                )}
+                <div className="text-xs text-slate-400">
+                  Mobile: {owner.mobileNumber1 || owner.mobileNumber2 || 'N/A'}
+                </div>
               </div>
             ))
           ) : (
-            <div className="p-2 text-center text-sm text-slate-500">No items found</div>
+            <div className="p-3 text-center text-sm text-slate-500">No owners found</div>
           )}
         </div>
       )}
-    </> 
+    </div>
   );
 }
 
@@ -755,55 +786,54 @@ function PackTypeTable({ packType, rows, onChange, onRemove, onDuplicate, onTogg
   const getColumns = (type) => {
     if (type === "PALLETIZATION") {
       return [
-        { key: "noOfPallets", label: "NO OF PALLETS", type: "number" },
-        { key: "unitPerPallets", label: "UNIT PER PALLETS", type: "number" },
+        { key: "noOfPallets", label: "NO OF PALLETS", type: "number", readOnly: true },
+        { key: "unitPerPallets", label: "UNIT PER PALLETS", type: "number", readOnly: true },
         { key: "totalPkgs", label: "TOTAL PKGS", type: "number", readOnly: true },
-        { key: "pkgsType", label: "PKGS TYPE", type: "text", options: PKGS_TYPE_OPTIONS },
-        { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
-        { key: "skuSize", label: "SKU - SIZE", type: "text", options: SKU_SIZE_OPTIONS },
-        { key: "packWeight", label: "PACK - WEIGHT", type: "number" },
-        { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS },
+        { key: "pkgsType", label: "PKGS TYPE", type: "text", options: PKGS_TYPE_OPTIONS, readOnly: true },
+        { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS, readOnly: true },
+        { key: "skuSize", label: "SKU - SIZE", type: "text", options: SKU_SIZE_OPTIONS, readOnly: true },
+        { key: "packWeight", label: "PACK - WEIGHT", type: "number", readOnly: true },
+        { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS, readOnly: true },
         { key: "wtLtr", label: "WT (LTR)", type: "number", readOnly: true },
         { key: "actualWt", label: "ACTUAL - WT", type: "number", readOnly: true },
-        { key: "chargedWt", label: "CHARGED - WT", type: "number" },
+        { key: "chargedWt", label: "CHARGED - WT", type: "number", readOnly: false },
         { key: "wtUom", label: "WT UOM", type: "text", readOnly: true },
       ];
     }
 
     if (type === "UNIFORM - BAGS/BOXES") {
       return [
-        { key: "totalPkgs", label: "TOTAL PKGS", type: "number" },
-        { key: "pkgsType", label: "PKGS TYPE", type: "text", options: PKGS_TYPE_OPTIONS },
-        { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
-        { key: "skuSize", label: "SKU - SIZE", type: "text", options: SKU_SIZE_OPTIONS },
-        { key: "packWeight", label: "PACK - WEIGHT", type: "number" },
-        { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS },
+        { key: "totalPkgs", label: "TOTAL PKGS", type: "number", readOnly: true },
+        { key: "pkgsType", label: "PKGS TYPE", type: "text", options: PKGS_TYPE_OPTIONS, readOnly: true },
+        { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS, readOnly: true },
+        { key: "skuSize", label: "SKU - SIZE", type: "text", options: SKU_SIZE_OPTIONS, readOnly: true },
+        { key: "packWeight", label: "PACK - WEIGHT", type: "number", readOnly: true },
+        { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS, readOnly: true },
         { key: "wtLtr", label: "WT (LTR)", type: "number", readOnly: true },
         { key: "actualWt", label: "ACTUAL - WT", type: "number", readOnly: true },
-        { key: "chargedWt", label: "CHARGED - WT", type: "number" },
+        { key: "chargedWt", label: "CHARGED - WT", type: "number", readOnly: false },
         { key: "wtUom", label: "WT UOM", type: "text", readOnly: true },
       ];
     }
 
     if (type === "LOOSE - CARGO") {
       return [
-        { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
-        { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS },
-        { key: "actualWt", label: "ACTUAL - WT", type: "number" },
-        { key: "chargedWt", label: "CHARGED - WT", type: "number" },
+        { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS, readOnly: true },
+        { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS, readOnly: true },
+        { key: "actualWt", label: "ACTUAL - WT", type: "number", readOnly: true },
+        { key: "chargedWt", label: "CHARGED - WT", type: "number", readOnly: false },
       ];
     }
 
-    // NON-UNIFORM - GENERAL CARGO
     return [
-      { key: "nos", label: "NOS", type: "number" },
-      { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS },
-      { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS },
-      { key: "length", label: "LENGTH", type: "number" },
-      { key: "width", label: "WIDTH", type: "number" },
-      { key: "height", label: "HEIGHT", type: "number" },
-      { key: "actualWt", label: "ACTUAL - WT", type: "number" },
-      { key: "chargedWt", label: "CHARGED - WT", type: "number" },
+      { key: "nos", label: "NOS", type: "number", readOnly: true },
+      { key: "productName", label: "PRODUCT NAME", type: "text", options: PRODUCT_NAME_OPTIONS, readOnly: true },
+      { key: "uom", label: "UOM", type: "text", options: UOM_OPTIONS, readOnly: true },
+      { key: "length", label: "LENGTH", type: "number", readOnly: true },
+      { key: "width", label: "WIDTH", type: "number", readOnly: true },
+      { key: "height", label: "HEIGHT", type: "number", readOnly: true },
+      { key: "actualWt", label: "ACTUAL - WT", type: "number", readOnly: true },
+      { key: "chargedWt", label: "CHARGED - WT", type: "number", readOnly: false },
     ];
   };
 
@@ -813,28 +843,17 @@ function PackTypeTable({ packType, rows, onChange, onRemove, onDuplicate, onTogg
     return (
       <div className="overflow-auto rounded-xl border border-yellow-300">
         <div className="p-8 text-center text-slate-400">
-          No rows yet. Click <b>Add Row</b> to add data.
+          No data available
         </div>
       </div>
     );
   }
-
-  const handleChange = (rowId, key, value) => {
-    if (!readOnly) {
-      onChange(rowId, key, value);
-    }
-  };
 
   return (
     <div className="overflow-auto rounded-xl border border-yellow-300">
       <table className="min-w-full w-full text-sm">
         <thead className="sticky top-0 bg-yellow-400">
           <tr>
-            {packType === "PALLETIZATION" && (
-              <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
-                UNIFORM
-              </th>
-            )}
             {cols.map((c) => (
               <th
                 key={c.key}
@@ -844,96 +863,61 @@ function PackTypeTable({ packType, rows, onChange, onRemove, onDuplicate, onTogg
                 {c.readOnly && <span className="ml-1 text-xs text-blue-600">*Auto</span>}
               </th>
             ))}
-            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
-              Actions
-            </th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r._id} className="hover:bg-yellow-50 even:bg-slate-50">
-              {packType === "PALLETIZATION" && (
-                <td className="border border-yellow-300 px-2 py-2 text-center">
-                  <input
-                    type="checkbox"
-                    checked={r.isUniform || false}
-                    onChange={() => !readOnly && onToggleUniform(r._id)}
-                    disabled={readOnly}
-                    className={`h-4 w-4 rounded border-yellow-300 text-yellow-600 focus:ring-yellow-500 ${
-                      readOnly ? 'cursor-not-allowed opacity-50' : ''
-                    }`}
-                  />
-                </td>
-              )}
-              
               {cols.map((c) => (
                 <td key={c.key} className="border border-yellow-300 px-2 py-2">
-                  {c.options ? (
-                    <select
-                      value={r[c.key] || ""}
-                      onChange={(e) => handleChange(r._id, c.key, e.target.value)}
-                      disabled={readOnly}
-                      className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
-                        readOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                      }`}
-                    >
-                      <option value="">Select {c.label}</option>
-                      {c.options.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
+                  {c.readOnly ? (
+                    c.options ? (
+                      <div className="w-full px-2 py-1.5 text-sm bg-slate-50 rounded-lg border border-slate-200">
+                        {r[c.key] || '-'}
+                      </div>
+                    ) : (
+                      <div className="w-full px-2 py-1.5 text-sm bg-slate-50 rounded-lg border border-slate-200">
+                        {r[c.key] || '-'}
+                      </div>
+                    )
                   ) : (
-                    <input
-                      type={c.type || "text"}
-                      value={r[c.key] || ""}
-                      readOnly={c.readOnly || readOnly}
-                      onChange={(e) => handleChange(r._id, c.key, e.target.value)}
-                      className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
-                        (c.readOnly || readOnly) ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                      }`}
-                      placeholder={c.readOnly ? "Auto-calculated" : `Enter ${c.label}`}
-                      step={c.type === "number" ? "0.001" : undefined}
-                    />
+                    c.options ? (
+                      <select
+                        value={r[c.key] || ""}
+                        onChange={(e) => onChange(r._id, c.key, e.target.value)}
+                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                      >
+                        <option value="">Select {c.label}</option>
+                        {c.options.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type={c.type || "text"}
+                        value={r[c.key] || ""}
+                        onChange={(e) => onChange(r._id, c.key, e.target.value)}
+                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                        placeholder={`Enter ${c.label}`}
+                        step={c.type === "number" ? "0.001" : undefined}
+                      />
+                    )
                   )}
                 </td>
               ))}
-              <td className="border border-yellow-300 px-2 py-2">
-                <div className="flex gap-2 justify-center">
-                  {!readOnly && (
-                    <>
-                      <button
-                        onClick={() => onDuplicate(r._id)}
-                        className="rounded-lg border border-yellow-500 bg-yellow-100 px-3 py-1.5 text-xs font-bold text-yellow-800 hover:bg-yellow-200 transition"
-                      >
-                        Duplicate
-                      </button>
-                      <button
-                        onClick={() => onRemove(r._id)}
-                        className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-600 transition"
-                      >
-                        Remove
-                      </button>
-                    </>
-                  )}
-                </div>
-              </td>
             </tr>
           ))}
         </tbody>
         <tfoot className="bg-yellow-100">
           <tr>
-            <td
-              colSpan={packType === "PALLETIZATION" ? cols.length + 1 : cols.length}
-              className="border border-yellow-300 px-3 py-2 text-right font-bold"
-            >
+            <td colSpan={cols.length - 1} className="border border-yellow-300 px-3 py-2 text-right font-bold">
               Total Actual Weight:
             </td>
             <td className="border border-yellow-300 px-3 py-2 font-bold">
               {rows.reduce((sum, r) => sum + num(r.actualWt), 0).toFixed(2)}
             </td>
-            <td className="border border-yellow-300 px-3 py-2"></td>
           </tr>
         </tfoot>
       </table>
@@ -967,6 +951,7 @@ export default function EditLoadingInfoPanel() {
   const vehicleSearch = useVehicleSearch();
   const vehicleNegotiation = useVehicleNegotiation();
   const loadingInfo = useLoadingInfo();
+  const ownerSearch = useOwnerSearch();
 
   /** =========================
    * VEHICLE NEGOTIATION SEARCH STATE
@@ -1014,7 +999,6 @@ export default function EditLoadingInfoPanel() {
     vehicleOwnerName: "",
     vehicleOwnerRC: "",
     ownerPanCard: "",
-    ownerAadharCard: "",
     verified: false,
     vehicleType: "",
     message: "",
@@ -1023,7 +1007,6 @@ export default function EditLoadingInfoPanel() {
     panDocument: "",
     licenseDocument: "",
     driverPhoto: "",
-    aadharDocument: "",
     vehicleId: "",
     insuranceNumber: "",
     chasisNumber: "",
@@ -1072,11 +1055,7 @@ export default function EditLoadingInfoPanel() {
   });
 
   const [vehicleFiles, setVehicleFiles] = useState({
-    rc: [],
-    pan: [],
-    license: [],
-    photo: [],
-    aadhar: []
+    rc: [], pan: [], license: [], photo: []
   });
 
   const [weighmentFiles, setWeighmentFiles] = useState({
@@ -1088,7 +1067,6 @@ export default function EditLoadingInfoPanel() {
    ========================= */
   const [vehiclePhotoFiles, setVehiclePhotoFiles] = useState([]);
   const [detentionDays, setDetentionDays] = useState("");
-  const [detentionNumber, setDetentionNumber] = useState("");
   const [vehicleSlipFiles, setVehicleSlipFiles] = useState([]);
   const [loadedVehicleSlipFiles, setLoadedVehicleSlipFiles] = useState([]);
   const [hasHelper, setHasHelper] = useState(false);
@@ -1117,8 +1095,7 @@ export default function EditLoadingInfoPanel() {
       rc: [],
       pan: [],
       license: [],
-      photo: [],
-      aadhar: []
+      photo: []
     },
     vbp: {},
     vft: {},
@@ -1193,155 +1170,7 @@ export default function EditLoadingInfoPanel() {
   const canvasRef = useRef(null);
   const [stream, setStream] = useState(null);
 
-  /** =========================
-   * ADD MORE VL FIELD FUNCTION
-   ========================= */
-  const handleAddMoreVlField = () => {
-    if (isReadOnly) return;
-    if (vlFields.length < 15) {
-      const nextNumber = vlFields.length + 1;
-      setVlFields([...vlFields, nextNumber]);
-      
-      if (!vlFiles[`vl${nextNumber}`]) {
-        setVlFiles(prev => ({
-          ...prev,
-          [`vl${nextNumber}`]: []
-        }));
-      }
-    } else {
-      alert("Maximum 15 VL fields allowed!");
-    }
-  };
-
-  /** =========================
-   * REMOVE VL FIELD FUNCTION
-   ========================= */
-  const handleRemoveVlField = (fieldNum) => {
-    if (isReadOnly) return;
-    if (fieldNum <= 5) {
-      alert("Cannot remove first 5 VL fields (VL-1 to VL-5)");
-      return;
-    }
-    
-    const currentCount = vlFiles[`vl${fieldNum}`]?.length || 0;
-    if (currentCount > 0) {
-      if (!confirm(`Field VL-${fieldNum} has ${currentCount} photo(s). Removing this field will delete all its photos. Are you sure?`)) {
-        return;
-      }
-    }
-    
-    setVlFields(prev => prev.filter(num => num !== fieldNum));
-    
-    setVlFiles(prev => {
-      const newFiles = { ...prev };
-      delete newFiles[`vl${fieldNum}`];
-      return newFiles;
-    });
-    
-    setVlPhotoDetails(prev => {
-      const newDetails = { ...prev };
-      Object.keys(newDetails).forEach(key => {
-        if (key.startsWith(`vl${fieldNum}_`)) {
-          delete newDetails[key];
-        }
-      });
-      return newDetails;
-    });
-    
-    alert(`✅ VL-${fieldNum} field removed successfully`);
-  };
-
-  /** =========================
-   * GET TOTAL VL PHOTOS COUNT
-   ========================= */
-  const getTotalVlPhotosCount = () => {
-    let total = 0;
-    for (let i = 1; i <= Math.max(...vlFields, 5); i++) {
-      total += vlFiles[`vl${i}`]?.length || 0;
-    }
-    return total;
-  };
-
-  /** =========================
-   * CAMERA FUNCTIONS
-   ========================= */
-  const startCamera = async () => {
-    if (isReadOnly) return;
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
-      setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
-      setShowCamera(true);
-    } catch (err) {
-      console.error("Error accessing camera:", err);
-      alert("Unable to access camera. Please check permissions.");
-    }
-  };
-
-  const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-    }
-    setShowCamera(false);
-  };
-
-  const capturePhoto = () => {
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      const context = canvas.getContext('2d');
-      
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-      canvas.toBlob((blob) => {
-        const now = new Date();
-        const filename = `driver_photo_${now.getTime()}.jpg`;
-        const file = new File([blob], filename, { type: 'image/jpeg' });
-        
-        setVehicleFiles(prev => ({
-          ...prev,
-          photo: [...prev.photo, file]
-        }));
-        
-        setArrivalDetails(prev => ({
-          ...prev,
-          date: now.toISOString().split('T')[0],
-          time: now.toLocaleTimeString(),
-        }));
-        
-        alert(`✅ Driver photo captured successfully!\n📅 Date: ${now.toLocaleDateString()}\n⏰ Time: ${now.toLocaleTimeString()}`);
-        
-        stopCamera();
-      }, 'image/jpeg', 0.9);
-    }
-  };
-
-  /** =========================
-   * GENERATE LR FUNCTION
-   ========================= */
-  const handleGenerateLR = () => {
-    const now = new Date();
-    const outTime = now.toLocaleTimeString();
-    const outDate = now.toISOString().split('T')[0];
-    
-    setArrivalDetails(prev => ({
-      ...prev,
-      outDate: outDate,
-      outTime: outTime,
-    }));
-    
-    alert(`✅ Consignment Note (LR) Generated!\n📅 Out Date: ${outDate}\n⏰ Out Time: ${outTime}`);
-  };
-
-  /** =========================
-   * FETCH LOADING PANEL DATA
-   ========================= */
+  // Fetch loading panel data
   useEffect(() => {
     if (panelId) {
       fetchLoadingPanelData();
@@ -1419,7 +1248,6 @@ export default function EditLoadingInfoPanel() {
           vehicleOwnerName: panel.vehicleInfo.vehicleOwnerName || "",
           vehicleOwnerRC: panel.vehicleInfo.vehicleOwnerRC || "",
           ownerPanCard: panel.vehicleInfo.ownerPanCard || "",
-          ownerAadharCard: panel.vehicleInfo.ownerAadharCard || "",
           verified: panel.vehicleInfo.verified || false,
           vehicleType: panel.vehicleInfo.vehicleType || "",
           message: panel.vehicleInfo.message || "",
@@ -1428,7 +1256,6 @@ export default function EditLoadingInfoPanel() {
           panDocument: panel.vehicleInfo.panDocument || "",
           licenseDocument: panel.vehicleInfo.licenseDocument || "",
           driverPhoto: panel.vehicleInfo.driverPhoto || "",
-          aadharDocument: panel.vehicleInfo.aadharDocument || "",
           vehicleId: panel.vehicleInfo.vehicleId || "",
           insuranceNumber: panel.vehicleInfo.insuranceNumber || "",
           chasisNumber: panel.vehicleInfo.chasisNumber || "",
@@ -1461,17 +1288,10 @@ export default function EditLoadingInfoPanel() {
             vehicle: { ...prev.vehicle, photo: [{ name: 'Driver Photo', path: panel.vehicleInfo.driverPhoto }] }
           }));
         }
-        if (panel.vehicleInfo.aadharDocument) {
-          setExistingFiles(prev => ({
-            ...prev,
-            vehicle: { ...prev.vehicle, aadhar: [{ name: 'Aadhar Document', path: panel.vehicleInfo.aadharDocument }] }
-          }));
-        }
       }
 
       // Set detention info
       if (panel.detentionDays) setDetentionDays(panel.detentionDays);
-      if (panel.detentionNumber) setDetentionNumber(panel.detentionNumber);
       
       // Set helper info
       if (panel.hasHelper !== undefined) setHasHelper(panel.hasHelper);
@@ -1867,11 +1687,11 @@ export default function EditLoadingInfoPanel() {
     }
   };
 
-  const handleHelperFileSelect = (field, isVideo = false) => {
+  const handleHelperFileSelect = (field) => {
     if (isReadOnly) return;
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = isVideo ? 'video/*' : 'image/*';
+    input.accept = 'image/*';
     input.multiple = false;
     
     input.onchange = async (e) => {
@@ -1906,6 +1726,20 @@ export default function EditLoadingInfoPanel() {
       pucNumber: vehicle.pucNumber || "",
       vehicleId: vehicle._id || "",
     });
+
+    // Set existing documents
+    if (vehicle.rcDocuments && vehicle.rcDocuments.length > 0) {
+      setExistingFiles(prev => ({
+        ...prev,
+        vehicle: { ...prev.vehicle, rc: vehicle.rcDocuments.map(doc => ({ name: 'RC Document', path: doc })) }
+      }));
+    }
+    if (vehicle.panCardDocuments && vehicle.panCardDocuments.length > 0) {
+      setExistingFiles(prev => ({
+        ...prev,
+        vehicle: { ...prev.vehicle, pan: vehicle.panCardDocuments.map(doc => ({ name: 'PAN Document', path: doc })) }
+      }));
+    }
 
     alert(`✅ Vehicle ${vehicle.vehicleNumber} loaded successfully`);
   };
@@ -1970,7 +1804,6 @@ export default function EditLoadingInfoPanel() {
             vehicleOwnerName: vInfo.vehicleOwnerName || "",
             vehicleOwnerRC: vInfo.vehicleOwnerRC || "",
             ownerPanCard: vInfo.ownerPanCard || "",
-            ownerAadharCard: vInfo.ownerAadharCard || "",
             verified: vInfo.verified || false,
             vehicleType: vInfo.vehicleType || "",
             message: vInfo.message || "",
@@ -1979,7 +1812,6 @@ export default function EditLoadingInfoPanel() {
             panDocument: vInfo.panDocument || "",
             licenseDocument: vInfo.licenseDocument || "",
             driverPhoto: vInfo.driverPhoto || "",
-            aadharDocument: vInfo.aadharDocument || "",
             vehicleId: vInfo.vehicleId || "",
             insuranceNumber: vInfo.insuranceNumber || "",
             chasisNumber: vInfo.chasisNumber || "",
@@ -2346,12 +2178,6 @@ export default function EditLoadingInfoPanel() {
     );
   };
 
-  const billingColumns = [
-    { key: "billingType", label: "Billing Type", options: BILLING_TYPES },
-    { key: "noOfLoadingPoints", label: "No. of Loading Points", type: "number" },
-    { key: "noOfDroppingPoint", label: "No. of Dropping Point", type: "number" },
-  ];
-
   /** =========================
    * HANDLE FILE SELECTION
    ========================= */
@@ -2427,7 +2253,6 @@ export default function EditLoadingInfoPanel() {
         if (field === 'pan') setVehicleInfo(prev => ({ ...prev, panDocument: '' }));
         if (field === 'license') setVehicleInfo(prev => ({ ...prev, licenseDocument: '' }));
         if (field === 'photo') setVehicleInfo(prev => ({ ...prev, driverPhoto: '' }));
-        if (field === 'aadhar') setVehicleInfo(prev => ({ ...prev, aadharDocument: '' }));
       }
     } else {
       switch(section) {
@@ -2471,9 +2296,150 @@ export default function EditLoadingInfoPanel() {
     }
   };
 
-  /** =========================
-   * UPLOAD ALL FILES DURING UPDATE
-   ========================= */
+  // Camera functions
+  const startCamera = async () => {
+    if (isReadOnly) return;
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      setStream(mediaStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+      setShowCamera(true);
+    } catch (err) {
+      console.error("Error accessing camera:", err);
+      alert("Unable to access camera. Please check permissions.");
+    }
+  };
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    setShowCamera(false);
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      canvas.toBlob((blob) => {
+        const now = new Date();
+        const filename = `driver_photo_${now.getTime()}.jpg`;
+        const file = new File([blob], filename, { type: 'image/jpeg' });
+        
+        setVehicleFiles(prev => ({
+          ...prev,
+          photo: [...prev.photo, file]
+        }));
+        
+        setArrivalDetails(prev => ({
+          ...prev,
+          date: now.toISOString().split('T')[0],
+          time: now.toLocaleTimeString(),
+        }));
+        
+        alert(`✅ Driver photo captured successfully!\n📅 Date: ${now.toLocaleDateString()}\n⏰ Time: ${now.toLocaleTimeString()}`);
+        
+        stopCamera();
+      }, 'image/jpeg', 0.9);
+    }
+  };
+
+  // Generate LR function
+  const handleGenerateLR = () => {
+    const now = new Date();
+    const outTime = now.toLocaleTimeString();
+    const outDate = now.toISOString().split('T')[0];
+    
+    setArrivalDetails(prev => ({
+      ...prev,
+      outDate: outDate,
+      outTime: outTime,
+    }));
+    
+    alert(`✅ Consignment Note (LR) Generated!\n📅 Out Date: ${outDate}\n⏰ Out Time: ${outTime}`);
+  };
+
+  const getTotalVlPhotosCount = () => {
+    let total = 0;
+    for (let i = 1; i <= Math.max(...vlFields, 5); i++) {
+      total += (vlFiles[`vl${i}`]?.length || 0);
+      total += (existingFiles.vl?.[`vl${i}`]?.length || 0);
+    }
+    return total;
+  };
+
+  const handleAddMoreVlField = () => {
+    if (isReadOnly) return;
+    if (vlFields.length < 15) {
+      const nextNumber = vlFields.length + 1;
+      setVlFields([...vlFields, nextNumber]);
+      
+      if (!vlFiles[`vl${nextNumber}`]) {
+        setVlFiles(prev => ({
+          ...prev,
+          [`vl${nextNumber}`]: []
+        }));
+      }
+    } else {
+      alert("Maximum 15 VL fields allowed!");
+    }
+  };
+
+  const handleRemoveVlField = (fieldNum) => {
+    if (isReadOnly) return;
+    if (fieldNum <= 5) {
+      alert("Cannot remove first 5 VL fields (VL-1 to VL-5)");
+      return;
+    }
+    
+    const currentCount = (vlFiles[`vl${fieldNum}`]?.length || 0) + (existingFiles.vl?.[`vl${fieldNum}`]?.length || 0);
+    if (currentCount > 0) {
+      if (!confirm(`Field VL-${fieldNum} has ${currentCount} photo(s). Removing this field will delete all its photos. Are you sure?`)) {
+        return;
+      }
+    }
+    
+    setVlFields(prev => prev.filter(num => num !== fieldNum));
+    
+    setVlFiles(prev => {
+      const newFiles = { ...prev };
+      delete newFiles[`vl${fieldNum}`];
+      return newFiles;
+    });
+    
+    setExistingFiles(prev => ({
+      ...prev,
+      vl: Object.keys(prev.vl).reduce((acc, key) => {
+        if (key !== `vl${fieldNum}`) {
+          acc[key] = prev.vl[key];
+        }
+        return acc;
+      }, {})
+    }));
+    
+    setVlPhotoDetails(prev => {
+      const newDetails = { ...prev };
+      Object.keys(newDetails).forEach(key => {
+        if (key.startsWith(`vl${fieldNum}_`)) {
+          delete newDetails[key];
+        }
+      });
+      return newDetails;
+    });
+    
+    alert(`✅ VL-${fieldNum} field removed successfully`);
+  };
+
   const uploadAllFiles = async (token) => {
     const uploadFile = async (file, section, field) => {
       const formData = new FormData();
@@ -2597,7 +2563,7 @@ export default function EditLoadingInfoPanel() {
       }
     }
 
-    // Upload vehicle files (RC, PAN, License, Photo, Aadhar)
+    // Upload vehicle files (RC, PAN, License, Photo)
     for (const [field, files] of Object.entries(vehicleFiles)) {
       for (const file of files) {
         uploadPromises.push(
@@ -2704,9 +2670,6 @@ export default function EditLoadingInfoPanel() {
     return uploadedPaths;
   };
 
-  /** =========================
-   * HANDLE UPDATE
-   ========================= */
   const handleUpdate = async () => {
     if (isReadOnly) {
       alert("This record is in read-only mode and cannot be edited.");
@@ -2744,7 +2707,6 @@ export default function EditLoadingInfoPanel() {
         panDocument: vehicleInfo.panDocument || uploadedPaths.vehicle.pan || (existingFiles.vehicle?.pan?.[0]?.path || ''),
         licenseDocument: vehicleInfo.licenseDocument || uploadedPaths.vehicle.license || (existingFiles.vehicle?.license?.[0]?.path || ''),
         driverPhoto: vehicleInfo.driverPhoto || uploadedPaths.vehicle.photo || (existingFiles.vehicle?.photo?.[0]?.path || ''),
-        aadharDocument: vehicleInfo.aadharDocument || uploadedPaths.vehicle.aadhar || (existingFiles.vehicle?.aadhar?.[0]?.path || ''),
       };
 
       const finalVbpUploads = {
@@ -2850,7 +2812,6 @@ export default function EditLoadingInfoPanel() {
           vnnNo: selectedVehicleNegotiation.vnnNo
         } : null,
         detentionDays,
-        detentionNumber,
         vehiclePhotos: finalVehiclePhotos,
         vehicleSlips: finalVehicleSlips,
         loadedVehicleSlips: finalLoadedVehicleSlips,
@@ -2910,9 +2871,6 @@ export default function EditLoadingInfoPanel() {
     );
   }
 
-  /** =========================
-   * RENDER
-   ========================= */
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white">
       {/* Sticky Top Bar */}
@@ -3158,15 +3116,12 @@ export default function EditLoadingInfoPanel() {
 
             <div className="col-span-12 md:col-span-2">
               <label className="text-xs font-bold text-slate-600">Vehicle Number</label>
-              <input
-                type="text"
+              <VehicleSearchDropdown
+                onSelect={handleVehicleSelect}
+                placeholder="Type to search vehicle..."
+                selectedVehicleId={selectedVehicle?._id}
                 value={vehicleInfo.vehicleNo}
-                onChange={(e) => !isReadOnly && setVehicleInfo({ ...vehicleInfo, vehicleNo: e.target.value })}
                 readOnly={isReadOnly}
-                className={`mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none ${
-                  isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                }`}
-                placeholder="Enter vehicle number"
               />
             </div>
 
@@ -3226,114 +3181,91 @@ export default function EditLoadingInfoPanel() {
             </div>
 
             <div className="col-span-12 md:col-span-2">
-              <label className="text-xs font-bold text-slate-600">Owner Aadhar Card</label>
+              <label className="text-xs font-bold text-slate-600">Driving Licence</label>
               <div className="flex gap-2">
                 <input
                   type="text"
-                  value={vehicleInfo.ownerAadharCard}
-                  onChange={(e) => !isReadOnly && setVehicleInfo({ ...vehicleInfo, ownerAadharCard: e.target.value })}
+                  value={vehicleInfo.drivingLicense}
+                  onChange={(e) => !isReadOnly && setVehicleInfo({ ...vehicleInfo, drivingLicense: e.target.value })}
                   readOnly={isReadOnly}
                   className={`mt-1 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
                     isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
                   }`}
-                  placeholder="Enter Aadhar Number"
+                  placeholder="Enter License Number"
                 />
                 {!isReadOnly && (
                   <button 
-                    onClick={() => handleFileSelect('vehicle', 'aadhar')}
+                    onClick={() => handleFileSelect('vehicle', 'license')}
                     className="mt-1 rounded-lg bg-purple-50 px-3 py-2 text-xs font-bold text-purple-700 border border-purple-200 hover:bg-purple-100 whitespace-nowrap"
                   >
-                    {vehicleFiles.aadhar.length > 0 ? `✓ ${vehicleFiles.aadhar.length}` : 'Upload'}
+                    {vehicleFiles.license.length > 0 ? `✓ ${vehicleFiles.license.length}` : 'Upload'}
                   </button>
                 )}
               </div>
-              {existingFiles.vehicle?.aadhar?.map((file, idx) => (
+              {existingFiles.vehicle?.license?.map((file, idx) => (
                 <FileUploadItem 
-                  key={`existing-aadhar-${idx}`}
+                  key={`existing-license-${idx}`}
                   file={file}
                   index={idx}
-                  onRemove={() => removeFile('vehicle', 'aadhar', idx, true)}
-                  label="Aadhar"
+                  onRemove={() => removeFile('vehicle', 'license', idx, true)}
+                  label="License"
                   isExisting={true}
                   readOnly={isReadOnly}
                 />
               ))}
-              {vehicleFiles.aadhar.map((file, idx) => (
+              {vehicleFiles.license.map((file, idx) => (
                 <FileUploadItem 
-                  key={`new-aadhar-${idx}`}
+                  key={`new-license-${idx}`}
                   file={file}
                   index={idx}
-                  onRemove={() => removeFile('vehicle', 'aadhar', idx)}
-                  label="Aadhar"
+                  onRemove={() => removeFile('vehicle', 'license', idx)}
+                  label="License"
                   readOnly={isReadOnly}
                 />
               ))}
-              <p className="text-xs text-slate-400 mt-1">Upload Owner's Aadhar Card (PDF/Image)</p>
+              <p className="text-xs text-slate-400 mt-1">Upload Driving License (PDF/Image)</p>
             </div>
           </div>
-
-         
         </Card>
 
-        {/* Billing Type / Charges Card */}
+        {/* Billing Type / Charges Table - READ ONLY */}
         <div className="mt-4">
-          <Card title="Billing Type / Charges">
+          <Card title="Billing Type / Charges (Read Only)">
             <div className="overflow-auto rounded-xl border border-yellow-300">
               <table className="min-w-full w-full text-sm">
                 <thead className="sticky top-0 bg-yellow-400">
                   <tr>
-                    {billingColumns.map((col) => (
-                      <th
-                        key={col.key}
-                        className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center whitespace-nowrap"
-                      >
-                        {col.label}
-                      </th>
-                    ))}
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">Billing Type</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">No. of Loading Points</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">No. of Dropping Point</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr className="hover:bg-yellow-50 even:bg-slate-50">
-                    {billingColumns.map((col) => (
-                      <td key={col.key} className="border border-yellow-300 px-2 py-2">
-                        {col.options ? (
-                          <select
-                            value={header[col.key] || ""}
-                            onChange={(e) => {
-                              if (!isReadOnly) {
-                                if (col.key === "billingType") {
-                                  handleBillingTypeChange(e.target.value);
-                                } else {
-                                  setHeader(prev => ({ ...prev, [col.key]: e.target.value }));
-                                }
-                              }
-                            }}
-                            disabled={isReadOnly}
-                            className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
-                              isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                            }`}
-                          >
-                            <option value="">Select {col.label}</option>
-                            {col.options.map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            type={col.type || "text"}
-                            value={header[col.key] || ""}
-                            onChange={(e) => !isReadOnly && setHeader(prev => ({ ...prev, [col.key]: e.target.value }))}
-                            readOnly={isReadOnly}
-                            className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
-                              isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                            }`}
-                            placeholder={`Enter ${col.label}`}
-                          />
-                        )}
-                      </td>
-                    ))}
+                    <td className="border border-yellow-300 px-2 py-2">
+                      <input
+                        type="text"
+                        value={header.billingType || ""}
+                        readOnly
+                        className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm outline-none cursor-not-allowed"
+                      />
+                    </td>
+                    <td className="border border-yellow-300 px-2 py-2">
+                      <input
+                        type="text"
+                        value={header.noOfLoadingPoints || ""}
+                        readOnly
+                        className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm outline-none cursor-not-allowed"
+                      />
+                    </td>
+                    <td className="border border-yellow-300 px-2 py-2">
+                      <input
+                        type="text"
+                        value={header.noOfDroppingPoint || ""}
+                        readOnly
+                        className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm outline-none cursor-not-allowed"
+                      />
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -3341,259 +3273,86 @@ export default function EditLoadingInfoPanel() {
           </Card>
         </div>
 
-        {/* Order Details Card */}
+        {/* Order Details Table - READ ONLY */}
         <div className="mt-4">
-          <Card 
-            title="Order Details"
-            right={
-              !isReadOnly && (
-                <button
-                  onClick={addOrderRow}
-                  className="rounded-xl bg-yellow-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-yellow-700 transition"
-                >
-                  + Add Order
-                </button>
-              )
-            }
-          >
-            <div className="overflow-x-auto rounded-xl border border-yellow-300">
+          <Card title="Order Details (Read Only)">
+            <div className="overflow-auto rounded-xl border border-yellow-300 max-h-[500px] overflow-y-auto">
               <table className="min-w-max w-full text-sm">
                 <thead className="sticky top-0 bg-yellow-400 z-10">
                   <tr>
                     <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">Order No</th>
                     <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[150px]">Party Name</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[150px]">Plant</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">Order Type</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">Plant</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[100px]">Order Type</th>
                     <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[100px]">Pin Code</th>
                     <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">From</th>
                     <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">To</th>
                     <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">Taluka</th>
                     <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[120px]">District</th>
                     <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[100px]">State</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[100px]">Weight (MT)</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[80px]">Weight (MT)</th>
                     <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[130px]">Collection Charges</th>
                     <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[140px]">Cancellation Charges</th>
                     <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[130px]">Loading Charges</th>
                     <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[130px]">Other Charges</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 min-w-[80px]">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {orderRows.map((row) => (
-                    <tr key={row._id} className="hover:bg-yellow-50 even:bg-slate-50">
+                  {orderRows.map((row, idx) => (
+                    <tr key={row._id || idx} className="hover:bg-yellow-50 even:bg-slate-50">
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="text"
-                          value={row.orderNo || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'orderNo', e.target.value)}
-                          readOnly={isReadOnly}
-                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
-                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                          }`}
-                          placeholder="Order No"
-                        />
+                        <input type="text" value={row.orderNo || ""} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="Order No" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="text"
-                          value={row.partyName || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'partyName', e.target.value)}
-                          readOnly={isReadOnly}
-                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
-                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                          }`}
-                          placeholder="Party Name"
-                        />
+                        <input type="text" value={row.partyName || ""} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="Party Name" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <TableSearchableDropdown
-                          items={plants}
-                          selectedId={row.plantCode}
-                          onSelect={(plant) => {
-                            if (!isReadOnly && plant) {
-                              updateOrderRow(row._id, 'plantCode', plant._id);
-                              updateOrderRow(row._id, 'plantName', plant.name);
-                              if (plant.address || plant.city) {
-                                updateOrderRow(row._id, 'fromName', plant.address || plant.city || '');
-                              }
-                            }
-                          }}
-                          placeholder="Select Plant"
-                          displayField="name"
-                          codeField="code"
-                          cellId={`plant-${row._id}`}
-                          disabled={isReadOnly}
-                        />
+                        <input type="text" value={row.plantName || row.plantCode || ""} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="Plant" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <select
-                          value={row.orderType || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'orderType', e.target.value)}
-                          disabled={isReadOnly}
-                          className={`w-full rounded-lg border border-slate-200 px-2 py-2 text-sm outline-none ${
-                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                          }`}
-                        >
-                          <option value="">Select</option>
-                          {ORDER_TYPES.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
-                        </select>
+                        <input type="text" value={row.orderType || ""} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="Order Type" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="text"
-                          value={row.pinCode || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'pinCode', e.target.value)}
-                          readOnly={isReadOnly}
-                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
-                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                          }`}
-                          placeholder="Pin Code"
-                        />
+                        <input type="text" value={row.pinCode || ""} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="Pin Code" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="text"
-                          value={row.fromName || row.from || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'fromName', e.target.value)}
-                          readOnly={isReadOnly}
-                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
-                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                          }`}
-                          placeholder="From"
-                        />
+                        <input type="text" value={row.fromName || row.from || ""} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="From" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="text"
-                          value={row.toName || row.to || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'toName', e.target.value)}
-                          readOnly={isReadOnly}
-                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
-                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                          }`}
-                          placeholder="To"
-                        />
+                        <input type="text" value={row.toName || row.to || ""} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="To" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="text"
-                          value={row.talukaName || row.taluka || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'talukaName', e.target.value)}
-                          readOnly={isReadOnly}
-                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
-                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                          }`}
-                          placeholder="Taluka"
-                        />
+                        <input type="text" value={row.talukaName || row.taluka || ""} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="Taluka" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="text"
-                          value={row.districtName || row.district || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'districtName', e.target.value)}
-                          readOnly={isReadOnly}
-                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
-                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                          }`}
-                          placeholder="District"
-                        />
+                        <input type="text" value={row.districtName || row.district || ""} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="District" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="text"
-                          value={row.stateName || row.state || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'stateName', e.target.value)}
-                          readOnly={isReadOnly}
-                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
-                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                          }`}
-                          placeholder="State"
-                        />
+                        <input type="text" value={row.stateName || row.state || ""} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="State" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="number"
-                          value={row.weight || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'weight', e.target.value)}
-                          readOnly={isReadOnly}
-                          className={`w-24 rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
-                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                          }`}
-                          placeholder="Weight"
-                        />
+                        <input type="number" value={row.weight || ""} readOnly className="w-24 rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="0" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="text"
-                          value={row.collectionCharges || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'collectionCharges', e.target.value)}
-                          readOnly={isReadOnly}
-                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
-                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                          }`}
-                          placeholder="Collection Charges"
-                        />
+                        <input type="text" value={row.collectionCharges || "0"} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="Collection Charges" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="text"
-                          value={row.cancellationCharges || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'cancellationCharges', e.target.value)}
-                          readOnly={isReadOnly}
-                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
-                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                          }`}
-                          placeholder="Cancellation Charges"
-                        />
+                        <input type="text" value={row.cancellationCharges || "Nil"} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="Cancellation Charges" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="text"
-                          value={row.loadingCharges || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'loadingCharges', e.target.value)}
-                          readOnly={isReadOnly}
-                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
-                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                          }`}
-                          placeholder="Loading Charges"
-                        />
+                        <input type="text" value={row.loadingCharges || "Nil"} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="Loading Charges" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="text"
-                          value={row.otherCharges || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'otherCharges', e.target.value)}
-                          readOnly={isReadOnly}
-                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm ${
-                            isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                          }`}
-                          placeholder="Other Charges"
-                        />
-                      </td>
-                      <td className="border border-yellow-300 px-2 py-2">
-                        {!isReadOnly && (
-                          <button
-                            onClick={() => removeOrderRow(row._id)}
-                            className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-600"
-                          >
-                            Remove
-                          </button>
-                        )}
+                        <input type="number" value={row.otherCharges || "0"} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="Other Charges" />
                       </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot className="bg-yellow-100">
                   <tr>
-                    <td colSpan="10" className="border border-yellow-300 px-3 py-2 text-right font-bold">
-                      Total Quantity (MT):
-                    </td>
-                    <td className="border border-yellow-300 px-3 py-2 font-bold">
-                      {calculateTotalWeight()}
-                    </td>
-                    <td colSpan="5" className="border border-yellow-300 px-3 py-2"></td>
+                    <td colSpan="10" className="border border-yellow-300 px-3 py-2 text-right font-bold">Total Quantity (MT):</td>
+                    <td className="border border-yellow-300 px-3 py-2 font-bold">{calculateTotalWeight()}</td>
+                    <td colSpan="4" className="border border-yellow-300 px-3 py-2"></td>
                   </tr>
                 </tfoot>
               </table>
@@ -3601,25 +3360,17 @@ export default function EditLoadingInfoPanel() {
           </Card>
         </div>
 
-        {/* Vehicle & Driver Details */}
+        {/* Vehicle & Driver Details Card */}
         <div className="mt-4">
           <Card title="Vehicle & Driver Details">
             <div className="overflow-auto rounded-xl border border-yellow-300">
               <table className="min-w-full w-full text-sm">
                 <thead className="sticky top-0 bg-yellow-400">
                   <tr>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
-                      Vehicle Search
-                    </th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
-                      Vehicle Information
-                    </th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
-                      Driver Information
-                    </th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
-                      Message & Remarks
-                    </th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">Vehicle Search</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">Vehicle Information</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">Driver Information</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">Message & Remarks</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -3637,6 +3388,44 @@ export default function EditLoadingInfoPanel() {
                             readOnly={isReadOnly}
                           />
                           <div className="text-xs text-slate-400 mt-1">Search by vehicle number or owner name</div>
+                        </div>
+
+                        <div className="mt-3 pt-2 border-t border-slate-200">
+                          <label className="text-xs font-bold text-slate-600">Or Search by Owner Name</label>
+                          <OwnerSearchDropdown
+                            onSelect={(owner) => {
+                              if (owner) {
+                                setVehicleInfo(prev => ({
+                                  ...prev,
+                                  vehicleNo: owner.vehicleNumber || "",
+                                  vehicleOwnerName: owner.ownerName || "",
+                                  vehicleOwnerRC: owner.rcNumber || "",
+                                  ownerPanCard: owner.ownerPanCard || "",
+                                  message: `Vehicle Owner: ${owner.ownerName}\nContact: ${owner.mobileNumber1 || owner.mobileNumber2}\nRC Number: ${owner.rcNumber || ''}`,
+                                  remarks: `Pan Card: ${owner.ownerPanCard || 'N/A'}`
+                                }));
+                                
+                                setSelectedVehicle({
+                                  _id: owner._id,
+                                  vehicleNumber: owner.vehicleNumber,
+                                  ownerName: owner.ownerName
+                                });
+                                
+                                setExistingFiles(prev => ({
+                                  ...prev,
+                                  vehicle: {
+                                    ...prev.vehicle,
+                                    rc: owner.rcDocuments?.map(doc => ({ name: 'RC Document', path: doc })) || [],
+                                    pan: owner.panCardDocuments?.map(doc => ({ name: 'PAN Document', path: doc })) || [],
+                                  }
+                                }));
+                                
+                                alert(`✅ Owner ${owner.ownerName} loaded!\nVehicle: ${owner.vehicleNumber}`);
+                              }
+                            }}
+                            placeholder="Search by owner name, vehicle number, or RC number..."
+                            readOnly={isReadOnly}
+                          />
                         </div>
                         
                         {!isReadOnly && (
@@ -3705,65 +3494,53 @@ export default function EditLoadingInfoPanel() {
                           )}
                         </div>
 
+                        {/* Insurance Number - READ ONLY */}
                         <div>
                           <label className="text-xs font-bold text-slate-600">Insurance Number</label>
                           <input
                             type="text"
                             value={vehicleInfo.insuranceNumber}
-                            onChange={(e) => !isReadOnly && setVehicleInfo({ ...vehicleInfo, insuranceNumber: e.target.value })}
-                            readOnly={isReadOnly}
-                            className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                              isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                            }`}
-                            placeholder="Enter insurance number"
+                            readOnly
+                            className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
                           />
                         </div>
 
+                        {/* Chasis Number - READ ONLY */}
                         <div>
                           <label className="text-xs font-bold text-slate-600">Chasis Number</label>
                           <input
                             type="text"
                             value={vehicleInfo.chasisNumber}
-                            onChange={(e) => !isReadOnly && setVehicleInfo({ ...vehicleInfo, chasisNumber: e.target.value })}
-                            readOnly={isReadOnly}
-                            className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                              isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                            }`}
-                            placeholder="Enter chasis number"
+                            readOnly
+                            className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
                           />
                         </div>
 
+                        {/* Fitness Number - READ ONLY */}
                         <div>
                           <label className="text-xs font-bold text-slate-600">Fitness Number</label>
                           <input
                             type="text"
                             value={vehicleInfo.fitnessNumber}
-                            onChange={(e) => !isReadOnly && setVehicleInfo({ ...vehicleInfo, fitnessNumber: e.target.value })}
-                            readOnly={isReadOnly}
-                            className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                              isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                            }`}
-                            placeholder="Enter fitness number"
+                            readOnly
+                            className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
                           />
                         </div>
 
+                        {/* PUC Number - READ ONLY */}
                         <div>
                           <label className="text-xs font-bold text-slate-600">PUC Number</label>
                           <input
                             type="text"
                             value={vehicleInfo.pucNumber}
-                            onChange={(e) => !isReadOnly && setVehicleInfo({ ...vehicleInfo, pucNumber: e.target.value })}
-                            readOnly={isReadOnly}
-                            className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                              isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                            }`}
-                            placeholder="Enter PUC number"
+                            readOnly
+                            className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
                           />
                         </div>
                       </div>
                     </td>
 
-                    {/* Vehicle Information Column */}
+                    {/* Vehicle Information Column - READ ONLY */}
                     <td className="border border-yellow-300 px-4 py-3 align-top">
                       <div className="space-y-3">
                         <div>
@@ -3771,43 +3548,28 @@ export default function EditLoadingInfoPanel() {
                           <input
                             type="text"
                             value={vehicleInfo.vehicleNo}
-                            onChange={(e) => !isReadOnly && setVehicleInfo({ ...vehicleInfo, vehicleNo: e.target.value })}
-                            readOnly={isReadOnly}
-                            className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-500 ${
-                              isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                            }`}
-                            placeholder="Enter vehicle number"
+                            readOnly
+                            className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
                           />
                         </div>
 
                         <div>
                           <label className="text-xs font-bold text-slate-600">Vehicle Type</label>
-                          <select
+                          <input
+                            type="text"
                             value={vehicleInfo.vehicleType}
-                            onChange={(e) => !isReadOnly && setVehicleInfo({ ...vehicleInfo, vehicleType: e.target.value })}
-                            disabled={isReadOnly}
-                            className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                              isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                            }`}
-                          >
-                            <option value="">Select Vehicle Type</option>
-                            {VEHICLE_TYPE_OPTIONS.map((opt) => (
-                              <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                          </select>
+                            readOnly
+                            className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
+                          />
                         </div>
 
                         <div>
                           <label className="text-xs font-bold text-slate-600">Vehicle Weight (MT)</label>
                           <input
-                            type="number"
+                            type="text"
                             value={vehicleInfo.vehicleWeight}
-                            onChange={(e) => !isReadOnly && setVehicleInfo({ ...vehicleInfo, vehicleWeight: e.target.value })}
-                            readOnly={isReadOnly}
-                            className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                              isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                            }`}
-                            placeholder="Enter weight"
+                            readOnly
+                            className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
                           />
                         </div>
 
@@ -3816,12 +3578,8 @@ export default function EditLoadingInfoPanel() {
                           <input
                             type="text"
                             value={vehicleInfo.vehicleOwnerRC}
-                            onChange={(e) => !isReadOnly && setVehicleInfo({ ...vehicleInfo, vehicleOwnerRC: e.target.value })}
-                            readOnly={isReadOnly}
-                            className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                              isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                            }`}
-                            placeholder="Enter RC number"
+                            readOnly
+                            className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
                           />
                         </div>
 
@@ -3830,12 +3588,8 @@ export default function EditLoadingInfoPanel() {
                           <input
                             type="text"
                             value={vehicleInfo.vehicleOwnerName}
-                            onChange={(e) => !isReadOnly && setVehicleInfo({ ...vehicleInfo, vehicleOwnerName: e.target.value })}
-                            readOnly={isReadOnly}
-                            className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                              isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                            }`}
-                            placeholder="Enter owner name"
+                            readOnly
+                            className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
                           />
                         </div>
 
@@ -3844,16 +3598,12 @@ export default function EditLoadingInfoPanel() {
                           <input
                             type="text"
                             value={vehicleInfo.ownerPanCard}
-                            onChange={(e) => !isReadOnly && setVehicleInfo({ ...vehicleInfo, ownerPanCard: e.target.value })}
-                            readOnly={isReadOnly}
-                            className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                              isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                            }`}
-                            placeholder="Enter PAN number"
+                            readOnly
+                            className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
                           />
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-2 gap-2">
                           <div>
                             <label className="text-xs font-bold text-slate-600">Owner RC Doc</label>
                             {!isReadOnly && (
@@ -3918,38 +3668,6 @@ export default function EditLoadingInfoPanel() {
                               />
                             ))}
                           </div>
-                          <div>
-                            <label className="text-xs font-bold text-slate-600">Owner Aadhar Doc</label>
-                            {!isReadOnly && (
-                              <button 
-                                onClick={() => handleFileSelect('vehicle', 'aadhar')}
-                                className="mt-1 w-full rounded-lg bg-purple-50 px-3 py-2 text-xs font-bold text-purple-700 border border-purple-200 hover:bg-purple-100"
-                              >
-                                {vehicleFiles.aadhar.length > 0 ? `✓ ${vehicleFiles.aadhar.length} new` : '+ Select'}
-                              </button>
-                            )}
-                            {existingFiles.vehicle?.aadhar?.map((file, idx) => (
-                              <FileUploadItem 
-                                key={`existing-aadhar-${idx}`}
-                                file={file}
-                                index={idx}
-                                onRemove={() => removeFile('vehicle', 'aadhar', idx, true)}
-                                label="Aadhar"
-                                isExisting={true}
-                                readOnly={isReadOnly}
-                              />
-                            ))}
-                            {vehicleFiles.aadhar.map((file, idx) => (
-                              <FileUploadItem 
-                                key={`new-aadhar-${idx}`}
-                                file={file}
-                                index={idx}
-                                onRemove={() => removeFile('vehicle', 'aadhar', idx)}
-                                label="Aadhar"
-                                readOnly={isReadOnly}
-                              />
-                            ))}
-                          </div>
                         </div>
 
                         <div className="flex items-center mt-2">
@@ -3957,7 +3675,6 @@ export default function EditLoadingInfoPanel() {
                             type="checkbox"
                             id="verified"
                             checked={vehicleInfo.verified}
-                            onChange={(e) => !isReadOnly && setVehicleInfo({ ...vehicleInfo, verified: e.target.checked })}
                             disabled={isReadOnly}
                             className={`rounded border-slate-300 text-sky-600 focus:ring-sky-500 ${
                               isReadOnly ? 'cursor-not-allowed opacity-50' : ''
@@ -4003,47 +3720,16 @@ export default function EditLoadingInfoPanel() {
 
                         <div>
                           <label className="text-xs font-bold text-slate-600">Driving License No</label>
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={vehicleInfo.drivingLicense}
-                              onChange={(e) => !isReadOnly && setVehicleInfo({ ...vehicleInfo, drivingLicense: e.target.value })}
-                              readOnly={isReadOnly}
-                              className={`mt-1 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                                isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                              }`}
-                              placeholder="License No"
-                            />
-                            {!isReadOnly && (
-                              <button 
-                                onClick={() => handleFileSelect('vehicle', 'license')}
-                                className="mt-1 rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 border border-blue-200 hover:bg-blue-100 whitespace-nowrap"
-                              >
-                                {vehicleFiles.license.length > 0 ? `✓ ${vehicleFiles.license.length}` : 'Select'}
-                              </button>
-                            )}
-                          </div>
-                          {existingFiles.vehicle?.license?.map((file, idx) => (
-                            <FileUploadItem 
-                              key={`existing-license-${idx}`}
-                              file={file}
-                              index={idx}
-                              onRemove={() => removeFile('vehicle', 'license', idx, true)}
-                              label="License"
-                              isExisting={true}
-                              readOnly={isReadOnly}
-                            />
-                          ))}
-                          {vehicleFiles.license.map((file, idx) => (
-                            <FileUploadItem 
-                              key={`new-license-${idx}`}
-                              file={file}
-                              index={idx}
-                              onRemove={() => removeFile('vehicle', 'license', idx)}
-                              label="License"
-                              readOnly={isReadOnly}
-                            />
-                          ))}
+                          <input
+                            type="text"
+                            value={vehicleInfo.drivingLicense}
+                            onChange={(e) => !isReadOnly && setVehicleInfo({ ...vehicleInfo, drivingLicense: e.target.value })}
+                            readOnly={isReadOnly}
+                            className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
+                              isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                            }`}
+                            placeholder="License No"
+                          />
                         </div>
 
                         <div>
@@ -4109,7 +3795,7 @@ export default function EditLoadingInfoPanel() {
                                 value={helperInfo.name}
                                 onChange={(e) => !isReadOnly && setHelperInfo({ ...helperInfo, name: e.target.value })}
                                 readOnly={isReadOnly}
-                                className={`mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 ${
+                                className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
                                   isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
                                 }`}
                                 placeholder="Enter helper name"
@@ -4123,7 +3809,7 @@ export default function EditLoadingInfoPanel() {
                                 value={helperInfo.mobileNo}
                                 onChange={(e) => !isReadOnly && setHelperInfo({ ...helperInfo, mobileNo: e.target.value })}
                                 readOnly={isReadOnly}
-                                className={`mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 ${
+                                className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
                                   isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
                                 }`}
                                 placeholder="Enter mobile number"
@@ -4217,21 +3903,16 @@ export default function EditLoadingInfoPanel() {
           </Card>
         </div>
 
-       
-
-        {/* Pack Type Section */}
+        {/* Pack Type Section - READ ONLY */}
         <div className="mt-4">
-          <Card title="Pack Type">
+          <Card title="Pack Type (Read Only)">
             <div className="mb-4 flex justify-between items-center">
               <div className="flex items-center gap-3">
                 <div className="text-sm font-bold text-slate-700">Select Pack Type:</div>
                 <select
                   value={activePack}
-                  onChange={(e) => !isReadOnly && setActivePack(e.target.value)}
-                  disabled={isReadOnly}
-                  className={`rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
-                    isReadOnly ? 'bg-slate-100 cursor-not-allowed' : ''
-                  }`}
+                  onChange={(e) => setActivePack(e.target.value)}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
                 >
                   {PACK_TYPES.map((p) => (
                     <option key={p.key} value={p.key}>
@@ -4240,24 +3921,17 @@ export default function EditLoadingInfoPanel() {
                   ))}
                 </select>
               </div>
-              {!isReadOnly && (
-                <button
-                  onClick={addPackRow}
-                  className="rounded-xl bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-700 transition"
-                >
-                  + Add Row
-                </button>
-              )}
             </div>
             
             <PackTypeTable
+              key={activePack}
               packType={activePack}
               rows={rows}
               onChange={updatePackRow}
               onRemove={removePackRow}
               onDuplicate={duplicatePackRow}
               onToggleUniform={toggleUniformMode}
-              readOnly={isReadOnly}
+              readOnly={true}
             />
           </Card>
         </div>
@@ -4358,19 +4032,9 @@ export default function EditLoadingInfoPanel() {
               <div className="mt-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-bold text-slate-600">Approval:</span>
-                  <select
-                    value={vbpUploads.approval}
-                    onChange={(e) => !isReadOnly && setVbpUploads({ ...vbpUploads, approval: e.target.value })}
-                    disabled={isReadOnly}
-                    className={`rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                      isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                    }`}
-                  >
-                    <option value="">Select</option>
-                    <option value="Approved">Approved</option>
-                    <option value="Rejected">Rejected</option>
-                    <option value="Pending">Pending</option>
-                  </select>
+                  <span className={`text-sm px-3 py-1 rounded-full ${vbpUploads.approval === 'Approved' ? 'bg-green-100 text-green-800' : vbpUploads.approval === 'Rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                    {vbpUploads.approval || 'Not Set'}
+                  </span>
                 </div>
                 <div className="text-xs text-slate-500">
                   <span className="font-bold">Note:</span> Vehicle Negotiation Entry will be cancelled if the Vehicle is rejected because of Vehicle Body.
@@ -4379,16 +4043,9 @@ export default function EditLoadingInfoPanel() {
 
               <div className="mt-3">
                 <label className="text-xs font-bold text-slate-600">Remark</label>
-                <input
-                  type="text"
-                  className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                    isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                  }`}
-                  placeholder="Enter remark"
-                  value={vbpUploads.remark || ""}
-                  onChange={(e) => !isReadOnly && setVbpUploads({ ...vbpUploads, remark: e.target.value })}
-                  readOnly={isReadOnly}
-                />
+                <div className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  {vbpUploads.remark || 'No remarks'}
+                </div>
               </div>
             </div>
           </Card>
@@ -4489,18 +4146,9 @@ export default function EditLoadingInfoPanel() {
 
               <div className="mt-4 flex items-center gap-3">
                 <span className="text-xs font-bold text-slate-600">Vehicle - Floor Tarpaulin Approval:</span>
-                <select
-                  value={vftUploads.approval}
-                  onChange={(e) => !isReadOnly && setVftUploads({ ...vftUploads, approval: e.target.value })}
-                  disabled={isReadOnly}
-                  className={`rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                    isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                  }`}
-                >
-                  <option value="">Select</option>
-                  <option value="Approved">Approved</option>
-                  <option value="Rejected">Rejected</option>
-                </select>
+                <span className={`text-sm px-3 py-1 rounded-full ${vftUploads.approval === 'Approved' ? 'bg-green-100 text-green-800' : vftUploads.approval === 'Rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                  {vftUploads.approval || 'Not Set'}
+                </span>
               </div>
             </div>
           </Card>
@@ -4601,18 +4249,9 @@ export default function EditLoadingInfoPanel() {
 
               <div className="mt-4 flex items-center gap-3">
                 <span className="text-xs font-bold text-slate-600">Vehicle - Outer Tarpaulin Approval:</span>
-                <select
-                  value={votUploads.approval}
-                  onChange={(e) => !isReadOnly && setVotUploads({ ...votUploads, approval: e.target.value })}
-                  disabled={isReadOnly}
-                  className={`rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                    isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                  }`}
-                >
-                  <option value="">Select</option>
-                  <option value="Approved">Approved</option>
-                  <option value="Rejected">Rejected</option>
-                </select>
+                <span className={`text-sm px-3 py-1 rounded-full ${votUploads.approval === 'Approved' ? 'bg-green-100 text-green-800' : votUploads.approval === 'Rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                  {votUploads.approval || 'Not Set'}
+                </span>
               </div>
             </div>
           </Card>
@@ -4654,7 +4293,7 @@ export default function EditLoadingInfoPanel() {
               
               <div className="grid grid-cols-12 gap-4">
                 {vlFields.map((fieldNum) => {
-                  const currentCount = vlFiles[`vl${fieldNum}`]?.length || 0;
+                  const currentCount = (vlFiles[`vl${fieldNum}`]?.length || 0) + (existingFiles.vl?.[`vl${fieldNum}`]?.length || 0);
                   const totalCount = getTotalVlPhotosCount();
                   const isMaxReached = totalCount >= 25;
                   const isDisabled = isMaxReached && currentCount === 0;
@@ -4716,6 +4355,75 @@ export default function EditLoadingInfoPanel() {
                           </div>
                         )}
 
+                        {/* Existing VL files */}
+                        {existingFiles.vl?.[`vl${fieldNum}`]?.map((file, idx) => (
+                          <div key={`existing-vl-${fieldNum}-${idx}`} className="mt-2">
+                            <FileUploadItem 
+                              file={file}
+                              index={idx}
+                              onRemove={() => removeFile('vl', `vl${fieldNum}`, idx, true)}
+                              label={`VL(stack)-${fieldNum}`}
+                              isExisting={true}
+                              readOnly={isReadOnly}
+                            />
+                            {/* Height, Width, Nose inputs for existing files */}
+                            <div className="grid grid-cols-3 gap-2 mt-2">
+                              <div>
+                                <label className="text-xs font-bold text-slate-600">Height (ft)</label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={vlPhotoDetails[`vl${fieldNum}_${idx}_height`] || ""}
+                                  onChange={(e) => !isReadOnly && setVlPhotoDetails(prev => ({
+                                    ...prev,
+                                    [`vl${fieldNum}_${idx}_height`]: e.target.value
+                                  }))}
+                                  readOnly={isReadOnly}
+                                  className={`mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-emerald-500 ${
+                                    isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                                  }`}
+                                  placeholder="Height in ft"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs font-bold text-slate-600">Width (ft)</label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={vlPhotoDetails[`vl${fieldNum}_${idx}_width`] || ""}
+                                  onChange={(e) => !isReadOnly && setVlPhotoDetails(prev => ({
+                                    ...prev,
+                                    [`vl${fieldNum}_${idx}_width`]: e.target.value
+                                  }))}
+                                  readOnly={isReadOnly}
+                                  className={`mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-emerald-500 ${
+                                    isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                                  }`}
+                                  placeholder="Width in ft"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs font-bold text-slate-600">Nose (ft)</label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={vlPhotoDetails[`vl${fieldNum}_${idx}_nose`] || ""}
+                                  onChange={(e) => !isReadOnly && setVlPhotoDetails(prev => ({
+                                    ...prev,
+                                    [`vl${fieldNum}_${idx}_nose`]: e.target.value
+                                  }))}
+                                  readOnly={isReadOnly}
+                                  className={`mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-emerald-500 ${
+                                    isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                                  }`}
+                                  placeholder="Nose in ft"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* New VL files with height, width, nose inputs */}
                         {vlFiles[`vl${fieldNum}`] && vlFiles[`vl${fieldNum}`].length > 0 && (
                           <div className="mt-3 space-y-2 max-h-96 overflow-y-auto">
                             <div className="text-xs font-bold text-slate-600 mb-2">Uploaded Photos:</div>
@@ -4786,20 +4494,6 @@ export default function EditLoadingInfoPanel() {
                             ))}
                           </div>
                         )}
-                        
-                        {/* Existing files for this VL field */}
-                        {existingFiles.vl?.[`vl${fieldNum}`]?.map((file, idx) => (
-                          <div key={`existing-vl-${fieldNum}-${idx}`} className="mt-2">
-                            <FileUploadItem 
-                              file={file}
-                              index={idx}
-                              onRemove={() => removeFile('vl', `vl${fieldNum}`, idx, true)}
-                              label={`VL(stack)-${fieldNum}`}
-                              isExisting={true}
-                              readOnly={isReadOnly}
-                            />
-                          </div>
-                        ))}
                       </div>
                     </div>
                   );
@@ -4856,38 +4550,17 @@ export default function EditLoadingInfoPanel() {
                 </div>
               </div>
 
-         
-
               <div className="mt-4 flex items-center gap-3">
                 <span className="text-xs font-bold text-slate-600">Vehicle - Loading Approval:</span>
-                <select
-                  value={vlUploads.approval}
-                  onChange={(e) => !isReadOnly && setVlUploads({ ...vlUploads, approval: e.target.value })}
-                  disabled={isReadOnly}
-                  className={`rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                    isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                  }`}
-                >
-                  <option value="">Select</option>
-                  <option value="Approved">Approved</option>
-                  <option value="Rejected">Rejected</option>
-                  <option value="Pending">Pending</option>
-                </select>
+                <span className={`text-sm px-3 py-1 rounded-full ${vlUploads.approval === 'Approved' ? 'bg-green-100 text-green-800' : vlUploads.approval === 'Rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                  {vlUploads.approval || 'Not Set'}
+                </span>
               </div>
               <div className="mt-2 flex items-center gap-3">
                 <span className="text-xs font-bold text-slate-600">Loading Status:</span>
-                <select
-                  value={vlUploads.loadingStatus}
-                  onChange={(e) => !isReadOnly && setVlUploads({ ...vlUploads, loadingStatus: e.target.value })}
-                  disabled={isReadOnly}
-                  className={`rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                    isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                  }`}
-                >
-                  <option value="Not Loaded">Not Loaded</option>
-                  <option value="Partially Loaded">Partially Loaded</option>
-                  <option value="Loaded">Loaded</option>
-                </select>
+                <span className={`text-sm px-3 py-1 rounded-full ${vlUploads.loadingStatus === 'Loaded' ? 'bg-green-100 text-green-800' : vlUploads.loadingStatus === 'Partially Loaded' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
+                  {vlUploads.loadingStatus || 'Not Set'}
+                </span>
               </div>
               
               {getTotalVlPhotosCount() > 0 && getTotalVlPhotosCount() < 5 && (
@@ -4969,25 +4642,15 @@ export default function EditLoadingInfoPanel() {
                     
                     <div className="flex items-center gap-3">
                       <span className="text-xs font-bold text-slate-600">Approval:</span>
-                      <select
-                        value={loadedWeighment.approval}
-                        onChange={(e) => !isReadOnly && setLoadedWeighment({ ...loadedWeighment, approval: e.target.value })}
-                        disabled={isReadOnly}
-                        className={`rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                          isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                        }`}
-                      >
-                        <option value="">Select</option>
-                        <option value="Approved">Approved</option>
-                        <option value="Rejected">Rejected</option>
-                        <option value="Pending">Pending</option>
-                      </select>
+                      <span className={`text-sm px-3 py-1 rounded-full ${loadedWeighment.approval === 'Approved' ? 'bg-green-100 text-green-800' : loadedWeighment.approval === 'Rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                        {loadedWeighment.approval || 'Not Set'}
+                      </span>
                     </div>
-
                   </div>
-                  
                 </div>
-                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
+                
+                {/* Detention Days */}
+                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 mt-4">
                   <label className="text-xs font-bold text-orange-700">Detention Days</label>
                   <input
                     type="number"
@@ -5006,7 +4669,12 @@ export default function EditLoadingInfoPanel() {
 
               <div className="col-span-12 md:col-span-6">
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                  <h3 className="text-sm font-bold text-slate-800 mb-3">Loading Charges & Expenses</h3>
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-sm font-bold text-slate-800">Loading Charges & Expenses</h3>
+                    <div className="bg-orange-100 text-orange-800 text-xs px-3 py-1 rounded-full font-medium">
+                      Deduct at Office
+                    </div>
+                  </div>
                   
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
@@ -5076,7 +4744,7 @@ export default function EditLoadingInfoPanel() {
                     </div>
                     <div className="flex justify-between items-center pt-2 border-t border-slate-200 mt-2">
                       <span className="text-sm font-bold text-slate-800">Total:</span>
-                      <span className="font-bold text-emerald-700">
+                      <span className="font-bold text-orange-700 text-lg">
                         ₹{calculateTotalCharges().toLocaleString()}
                       </span>
                     </div>
@@ -5084,173 +4752,173 @@ export default function EditLoadingInfoPanel() {
                 </div>
               </div>
             </div>
-             {/* Arrival Details with Out Date and Out Time */}
-        <div className="mt-4">
-          <Card title="Arrival Details">
-            <div className="grid grid-cols-12 gap-4">
-              <div className="col-span-12 md:col-span-3">
-                <div className="bg-slate-50 p-3 rounded-lg">
-                  <label className="text-xs font-bold text-slate-600">Arrival Date</label>
-                  <input
-                    type="date"
-                    value={arrivalDetails.date}
-                    onChange={(e) => !isReadOnly && setArrivalDetails({ ...arrivalDetails, date: e.target.value })}
-                    readOnly={isReadOnly}
-                    className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                      isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                    }`}
-                  />
-                  <p className="text-xs text-green-600 mt-1">Auto-filled from camera capture</p>
-                </div>
-              </div>
-              <div className="col-span-12 md:col-span-3">
-                <div className="bg-slate-50 p-3 rounded-lg">
-                  <label className="text-xs font-bold text-slate-600">Arrival Time</label>
-                  <input
-                    type="time"
-                    value={arrivalDetails.time}
-                    onChange={(e) => !isReadOnly && setArrivalDetails({ ...arrivalDetails, time: e.target.value })}
-                    readOnly={isReadOnly}
-                    className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
-                      isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                    }`}
-                    placeholder="HH:MM"
-                  />
-                  <p className="text-xs text-green-600 mt-1">Auto-filled from camera capture</p>
-                </div>
-              </div>
-              <div className="col-span-12 md:col-span-3">
-                <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
-                  <label className="text-xs font-bold text-orange-700">Out Date</label>
-                  <input
-                    type="date"
-                    value={arrivalDetails.outDate || ""}
-                    onChange={(e) => !isReadOnly && setArrivalDetails({ ...arrivalDetails, outDate: e.target.value })}
-                    readOnly={isReadOnly}
-                    className={`mt-1 w-full rounded-lg border border-orange-200 px-3 py-2 text-sm outline-none ${
-                      isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                    }`}
-                  />
-                  <p className="text-xs text-orange-600 mt-1">Auto-filled when generating LR</p>
-                </div>
-              </div>
-              <div className="col-span-12 md:col-span-3">
-                <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
-                  <label className="text-xs font-bold text-orange-700">Out Time</label>
-                  <input
-                    type="time"
-                    value={arrivalDetails.outTime}
-                    onChange={(e) => !isReadOnly && setArrivalDetails({ ...arrivalDetails, outTime: e.target.value })}
-                    readOnly={isReadOnly}
-                    className={`mt-1 w-full rounded-lg border border-orange-200 px-3 py-2 text-sm outline-none ${
-                      isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                    }`}
-                    placeholder="HH:MM"
-                  />
-                  <p className="text-xs text-orange-600 mt-1">Auto-filled when generating LR</p>
+
+            {/* Arrival Details with Out Date and Out Time */}
+            <div className="mt-4">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <h3 className="text-sm font-bold text-slate-800 mb-3">Arrival Details</h3>
+                <div className="grid grid-cols-12 gap-4">
+                  <div className="col-span-12 md:col-span-3">
+                    <div className="bg-slate-50 p-3 rounded-lg">
+                      <label className="text-xs font-bold text-slate-600">Arrival Date</label>
+                      <input
+                        type="date"
+                        value={arrivalDetails.date}
+                        onChange={(e) => !isReadOnly && setArrivalDetails({ ...arrivalDetails, date: e.target.value })}
+                        readOnly={isReadOnly}
+                        className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
+                          isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                        }`}
+                      />
+                      <p className="text-xs text-green-600 mt-1">Auto-filled from camera capture</p>
+                    </div>
+                  </div>
+                  <div className="col-span-12 md:col-span-3">
+                    <div className="bg-slate-50 p-3 rounded-lg">
+                      <label className="text-xs font-bold text-slate-600">Arrival Time</label>
+                      <input
+                        type="time"
+                        value={arrivalDetails.time}
+                        onChange={(e) => !isReadOnly && setArrivalDetails({ ...arrivalDetails, time: e.target.value })}
+                        readOnly={isReadOnly}
+                        className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none ${
+                          isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                        }`}
+                        placeholder="HH:MM"
+                      />
+                      <p className="text-xs text-green-600 mt-1">Auto-filled from camera capture</p>
+                    </div>
+                  </div>
+                  <div className="col-span-12 md:col-span-3">
+                    <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                      <label className="text-xs font-bold text-orange-700">Out Date</label>
+                      <input
+                        type="date"
+                        value={arrivalDetails.outDate || ""}
+                        onChange={(e) => !isReadOnly && setArrivalDetails({ ...arrivalDetails, outDate: e.target.value })}
+                        readOnly={isReadOnly}
+                        className={`mt-1 w-full rounded-lg border border-orange-200 px-3 py-2 text-sm outline-none ${
+                          isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                        }`}
+                      />
+                      <p className="text-xs text-orange-600 mt-1">Auto-filled when generating LR</p>
+                    </div>
+                  </div>
+                  <div className="col-span-12 md:col-span-3">
+                    <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                      <label className="text-xs font-bold text-orange-700">Out Time</label>
+                      <input
+                        type="time"
+                        value={arrivalDetails.outTime}
+                        onChange={(e) => !isReadOnly && setArrivalDetails({ ...arrivalDetails, outTime: e.target.value })}
+                        readOnly={isReadOnly}
+                        className={`mt-1 w-full rounded-lg border border-orange-200 px-3 py-2 text-sm outline-none ${
+                          isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                        }`}
+                        placeholder="HH:MM"
+                      />
+                      <p className="text-xs text-orange-600 mt-1">Auto-filled when generating LR</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </Card>
         </div>
-          </Card>
-        </div>
 
-       
-
-        {/* Vehicle GPS Tracking */}
+        {/* Vehicle GPS Tracking & Driver Photo */}
         <div className="mt-4">
-          <Card title="Vehicle GPS Tracking">
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
+          <Card title="Vehicle GPS Tracking & Driver Photo">
+            <div className="grid grid-cols-12 gap-4">
+              <div className="col-span-12 md:col-span-6">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-800">Live Vehicle Tracking</h3>
+                        <p className="text-xs text-slate-600">Track vehicle location in real-time via API integration</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="text"
+                        placeholder="Driver Mobile Number"
+                        value={gpsTracking.driverMobileNumber}
+                        onChange={(e) => !isReadOnly && setGpsTracking({ ...gpsTracking, driverMobileNumber: e.target.value })}
+                        readOnly={isReadOnly}
+                        className={`rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 ${
+                          isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
+                        }`}
+                      />
+                      {!isReadOnly && (
+                        <button 
+                          onClick={handleActivateTracking}
+                          className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                        >
+                          {gpsTracking.isTrackingActive ? 'Tracking Active' : 'Activate Tracking'}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-800">Live Vehicle Tracking</h3>
-                    <p className="text-xs text-slate-600">Track vehicle location in real-time via API integration</p>
+                  <div className="mt-3 text-xs text-slate-500">
+                    <span className="font-bold">API Status:</span> {gpsTracking.isTrackingActive ? 'Active' : 'Ready'}
+                    {gpsTracking.isTrackingActive && (
+                      <span className="ml-3 text-green-600">
+                        ✓ Tracking active for: {gpsTracking.driverMobileNumber}
+                      </span>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="text"
-                    placeholder="Driver Mobile Number"
-                    value={gpsTracking.driverMobileNumber}
-                    onChange={(e) => !isReadOnly && setGpsTracking({ ...gpsTracking, driverMobileNumber: e.target.value })}
-                    readOnly={isReadOnly}
-                    className={`rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 ${
-                      isReadOnly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'
-                    }`}
-                  />
-                  {!isReadOnly && (
-                    <button 
-                      onClick={handleActivateTracking}
-                      className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
-                    >
-                      {gpsTracking.isTrackingActive ? 'Tracking Active' : 'Activate Tracking'}
-                    </button>
+              </div>
+
+              <div className="col-span-12 md:col-span-6">
+                <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 h-full">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-800">Driver Photo Capture</h3>
+                      <p className="text-xs text-slate-600 mt-1">Click to open camera and capture driver photo</p>
+                      <p className="text-xs text-green-600 mt-1">📸 Photo capture will auto-fill Arrival Date & Time</p>
+                    </div>
+                    {!isReadOnly && (
+                      <button
+                        onClick={startCamera}
+                        className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Open Camera
+                      </button>
+                    )}
+                  </div>
+                  {vehicleFiles.photo.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-xs font-bold text-slate-600 mb-2">Captured Photos:</p>
+                      {vehicleFiles.photo.map((file, idx) => (
+                        <FileUploadItem 
+                          key={idx} 
+                          file={file} 
+                          index={idx}
+                          onRemove={() => removeFile('vehicle', 'photo', idx)}
+                          label="Driver Photo"
+                          isCameraPhoto={true}
+                          readOnly={isReadOnly}
+                        />
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>
-              <div className="mt-3 text-xs text-slate-500">
-                <span className="font-bold">API Status:</span> {gpsTracking.isTrackingActive ? 'Active' : 'Ready'}
-                {gpsTracking.isTrackingActive && (
-                  <span className="ml-3 text-green-600">
-                    ✓ Tracking active for: {gpsTracking.driverMobileNumber}
-                  </span>
-                )}
-              </div>
-              
             </div>
-             {/* Driver Photo Capture Section */}
-          <div className="mt-4 pt-4 border-t border-slate-200">
-            <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-800">Driver Photo Capture</h3>
-                  <p className="text-xs text-slate-600 mt-1">Click to open camera and capture driver photo</p>
-                  <p className="text-xs text-green-600 mt-1">📸 Photo capture will auto-fill Arrival Date & Time</p>
-                </div>
-                {!isReadOnly && (
-                  <button
-                    onClick={startCamera}
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    Open Camera
-                  </button>
-                )}
-              </div>
-              {vehicleFiles.photo.length > 0 && (
-                <div className="mt-3">
-                  <p className="text-xs font-bold text-slate-600 mb-2">Captured Photos:</p>
-                  {vehicleFiles.photo.map((file, idx) => (
-                    <FileUploadItem 
-                      key={idx} 
-                      file={file} 
-                      index={idx}
-                      onRemove={() => removeFile('vehicle', 'photo', idx)}
-                      label="Driver Photo"
-                      isCameraPhoto={true}
-                      readOnly={isReadOnly}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
           </Card>
-          
         </div>
-
-      
 
         {/* Documents Section */}
         <div className="mt-4">
@@ -5295,7 +4963,7 @@ export default function EditLoadingInfoPanel() {
           </Card>
         </div>
 
-          {/* Loaded Vehicle Slip Upload - Bottom section */}
+        {/* Loaded Vehicle Slip Upload - Bottom section */}
         <div className="mt-4">
           <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
             <label className="text-xs font-bold text-indigo-700">Loaded Vehicle Slip</label>

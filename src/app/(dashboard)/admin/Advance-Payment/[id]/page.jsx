@@ -38,7 +38,7 @@ function useVendors() {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/vendors', {
+      const res = await fetch('/api/suppliers', {
         headers: { Authorization: `Bearer ${token}` },
       });
       
@@ -74,6 +74,10 @@ function defaultOrderRow() {
     weight: "",
     rate: "",
     totalAmount: "",
+    collectionCharges: "0",
+    cancellationCharges: "Nil",
+    loadingCharges: "Nil",
+    otherCharges: "0",
   };
 }
 
@@ -107,6 +111,10 @@ export default function EditAdvancePayment() {
   const [saving, setSaving] = useState(false);
   const [apiError, setApiError] = useState(null);
 
+  // Purchase Amount from VNN
+  const [purchaseAmountFromVNN, setPurchaseAmountFromVNN] = useState(0);
+  const [memoFileInfo, setMemoFileInfo] = useState(null);
+
   const [header, setHeader] = useState({
     purchaseNo: "",
     pricingSerialNo: "",
@@ -129,17 +137,21 @@ export default function EditAdvancePayment() {
 
   const [orderRows, setOrderRows] = useState([]);
 
+  // Purchase Terms - READ ONLY
+  const [purchaseTerms, setPurchaseTerms] = useState({
+    purchaseType: "Loading & Unloading",
+    rateType: "Per MT",
+    paymentTerms: "80 % Advance",
+  });
+
   const [vendorDetails, setVendorDetails] = useState({
     vendorStatus: "Active",
     vendorCode: "",
     vendorName: "",
     vehicleNo: "",
-    purchaseType: "Loading & Unloading",
     rate: "",
     weight: "",
     amount: "",
-    rateType: "Per MT",
-    paymentTerms: "80 % Advance",
     advance: "",
     accountNo: "",
     bankName: "",
@@ -174,11 +186,7 @@ export default function EditAdvancePayment() {
   const billingColumns = [
     { key: "billingType", label: "Billing Type", options: BILLING_TYPES },
     { key: "noOfLoadingPoints", label: "No. of Loading Points", type: "number" },
-    { key: "noOfDroppingPoint", label: "No. of Droping Point", type: "number" },
-    { key: "collectionCharges", label: "Collection Charges", type: "number" },
-    { key: "cancellationCharges", label: "Cancellation Charges", type: "text" },
-    { key: "loadingCharges", label: "Loading Charges", type: "text" },
-    { key: "otherCharges", label: "Other Charges", type: "number" },
+    { key: "noOfDroppingPoint", label: "No. of Dropping Point", type: "number" },
   ];
 
   useEffect(() => {
@@ -213,6 +221,16 @@ export default function EditAdvancePayment() {
       setPaymentNo(payment.paymentNo || "");
       setQueueGenerated(payment.queueGenerated || false);
       
+      // Set Purchase Amount from VNN
+      if (payment.purchaseAmountFromVNN) {
+        setPurchaseAmountFromVNN(payment.purchaseAmountFromVNN);
+      }
+      
+      // Set Memo File
+      if (payment.memoFile) {
+        setMemoFileInfo(payment.memoFile);
+      }
+      
       // Set header
       if (payment.header) {
         setHeader({
@@ -239,15 +257,38 @@ export default function EditAdvancePayment() {
         });
       }
 
-      // Set order rows
+      // Set purchase terms
+      if (payment.purchaseTerms) {
+        setPurchaseTerms({
+          purchaseType: payment.purchaseTerms.purchaseType || "Loading & Unloading",
+          rateType: payment.purchaseTerms.rateType || "Per MT",
+          paymentTerms: payment.purchaseTerms.paymentTerms || "80 % Advance",
+        });
+      }
+
+      // Set order rows with all fields
       if (payment.orderRows && payment.orderRows.length > 0) {
         const processedRows = payment.orderRows.map(row => ({
-          ...row,
           _id: row._id || uid(),
+          orderNo: row.orderNo || "",
+          partyName: row.partyName || "",
+          plantCode: row.plantCode || "",
+          plantName: row.plantName || "",
+          orderType: row.orderType || "",
+          pinCode: row.pinCode || "",
+          state: row.state || "",
+          district: row.district || "",
+          from: row.from || "",
+          to: row.to || "",
+          locationRate: row.locationRate?.toString() || "",
+          priceList: row.priceList || "",
           weight: row.weight?.toString() || "",
           rate: row.rate?.toString() || "",
           totalAmount: row.totalAmount?.toString() || "",
-          locationRate: row.locationRate?.toString() || "",
+          collectionCharges: row.collectionCharges?.toString() || "0",
+          cancellationCharges: row.cancellationCharges || "Nil",
+          loadingCharges: row.loadingCharges || "Nil",
+          otherCharges: row.otherCharges?.toString() || "0",
         }));
         setOrderRows(processedRows);
       } else {
@@ -262,12 +303,9 @@ export default function EditAdvancePayment() {
           vendorCode: vd.vendorCode || "",
           vendorName: vd.vendorName || "",
           vehicleNo: vd.vehicleNo || "",
-          purchaseType: vd.purchaseType || "Loading & Unloading",
           rate: vd.rate?.toString() || "",
           weight: vd.weight?.toString() || "",
           amount: vd.amount?.toString() || "",
-          rateType: vd.rateType || "Per MT",
-          paymentTerms: vd.paymentTerms || "80 % Advance",
           advance: vd.advance?.toString() || "",
           accountNo: vd.accountNo || "",
           bankName: vd.bankName || "",
@@ -472,29 +510,36 @@ export default function EditAdvancePayment() {
         ...vendorDetails,
         vendorName: vendor.supplierName || vendor.name || "",
         vendorCode: vendor.supplierCode || vendor.code || "",
-        accountNo: vendor.accountNo || "",
+        accountNo: vendor.accountNo || vendor.bankAccountNumber || "",
         bankName: vendor.bankName || "",
-        ifsc: vendor.ifsc || "",
+        ifsc: vendor.ifsc || vendor.ifscCode || "",
       });
       setPaymentDetails({
         ...paymentDetails,
         vendorNameDebit: vendor.supplierName || vendor.name || "",
-        accountNoCredit: vendor.accountNo || "",
+        accountNoCredit: vendor.accountNo || vendor.bankAccountNumber || "",
         bankVendorCode: vendor.supplierCode || vendor.code || "",
       });
     }
   };
 
+  const calculateTotalOrderAmount = () => {
+    return orderRows.reduce((sum, row) => {
+      const totalAmount = num(row.totalAmount);
+      const collectionCharges = num(row.collectionCharges);
+      const cancellationCharges = num(row.cancellationCharges);
+      const loadingCharges = num(row.loadingCharges);
+      const otherCharges = num(row.otherCharges);
+      return sum + totalAmount + collectionCharges + cancellationCharges + loadingCharges + otherCharges;
+    }, 0);
+  };
+
   const calculateBalance = () => {
-    const amount = num(vendorDetails.amount);
+    const amount = purchaseAmountFromVNN;
     const advance = num(vendorDetails.advance);
     const totalAdditions = num(additions.totalAddition);
     const totalDeductions = num(deductions.totalDeduction);
-    return (amount - advance - totalDeductions + totalAdditions).toFixed(2);
-  };
-
-  const calculateTotalOrderAmount = () => {
-    return orderRows.reduce((sum, row) => sum + num(row.totalAmount), 0);
+    return (amount - advance + totalAdditions - totalDeductions).toFixed(2);
   };
 
   const handleGenerateQueue = () => {
@@ -505,8 +550,6 @@ export default function EditAdvancePayment() {
     
     const finalAmount = calculateBalance();
     alert(`✅ Payment queue ready to generate for ${paymentDetails.vendorNameDebit}\nAmount: ₹${num(finalAmount).toLocaleString()}`);
-    
-    // In a real app, you would call an API here
     setQueueGenerated(true);
   };
 
@@ -536,11 +579,12 @@ export default function EditAdvancePayment() {
         header,
         billing,
         orderRows,
+        purchaseTerms,
         vendorDetails: {
           ...vendorDetails,
           rate: num(vendorDetails.rate),
           weight: num(vendorDetails.weight),
-          amount: num(vendorDetails.amount),
+          amount: purchaseAmountFromVNN,
           advance: num(vendorDetails.advance),
         },
         additions: {
@@ -561,8 +605,10 @@ export default function EditAdvancePayment() {
         },
         paymentDetails: {
           ...paymentDetails,
-          finalAmount: num(calculateBalance()), // Set final amount to balance
+          finalAmount: num(calculateBalance()),
         },
+        purchaseAmountFromVNN,
+        memoFile: memoFileInfo,
         balance: calculateBalance(),
         totalOrderAmount: calculateTotalOrderAmount(),
         queueGenerated,
@@ -679,7 +725,7 @@ export default function EditAdvancePayment() {
 
       {/* Main Content */}
       <div className="mx-auto max-w-full p-4">
-        {/* Header Information */}
+        {/* Header Information - READ ONLY */}
         <Card title="Purchase Information">
           <div className="grid grid-cols-12 gap-3">
             <div className="col-span-12 md:col-span-2">
@@ -687,9 +733,8 @@ export default function EditAdvancePayment() {
               <input
                 type="text"
                 value={header.purchaseNo}
-                onChange={(e) => setHeader({ ...header, purchaseNo: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                readOnly={queueGenerated}
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
               />
             </div>
 
@@ -698,105 +743,67 @@ export default function EditAdvancePayment() {
               <input
                 type="text"
                 value={header.pricingSerialNo}
-                onChange={(e) => setHeader({ ...header, pricingSerialNo: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                readOnly={queueGenerated}
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
               />
             </div>
 
             <div className="col-span-12 md:col-span-2">
               <label className="text-xs font-bold text-slate-600">Branch *</label>
-              <SearchableDropdown
-                items={branches}
-                selectedId={header.branch}
-                onSelect={(branch) => setHeader({ 
-                  ...header, 
-                  branch: branch?._id || '',
-                  branchName: branch?.name || '',
-                  branchCode: branch?.code || ''
-                })}
-                placeholder="Search branch..."
-                displayField="name"
-                codeField="code"
-                disabled={queueGenerated}
+              <input
+                type="text"
+                value={`${header.branchName} (${header.branchCode})`}
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
               />
             </div>
 
             <div className="col-span-12 md:col-span-2">
               <label className="text-xs font-bold text-slate-600">Date</label>
               <input
-                type="date"
+                type="text"
                 value={header.date}
-                onChange={(e) => setHeader({ ...header, date: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                disabled={queueGenerated}
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
               />
             </div>
 
             <div className="col-span-12 md:col-span-2">
-              <Select
-                label="Delivery"
+              <label className="text-xs font-bold text-slate-600">Delivery</label>
+              <input
+                type="text"
                 value={header.delivery}
-                onChange={(v) => setHeader({ ...header, delivery: v })}
-                options={DELIVERY_OPTIONS}
-                disabled={queueGenerated}
+                readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
               />
             </div>
           </div>
         </Card>
 
-        {/* Billing Type / Charges Table */}
+        {/* Billing Type / Charges Table - READ ONLY */}
         <div className="mt-4">
-          <Card title="Billing Type / Charges">
+          <Card title="Billing Type / Charges (Read Only)">
             <div className="overflow-auto rounded-xl border border-yellow-300">
               <table className="min-w-full w-full text-sm">
                 <thead className="sticky top-0 bg-yellow-400">
                   <tr>
                     {billingColumns.map((col) => (
-                      <th
-                        key={col.key}
-                        className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
-                      >
+                      <th key={col.key} className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center">
                         {col.label}
                       </th>
                     ))}
                   </tr>
                 </thead>
-
                 <tbody>
                   <tr className="hover:bg-yellow-50 even:bg-slate-50">
                     {billingColumns.map((col) => (
                       <td key={col.key} className="border border-yellow-300 px-2 py-2">
-                        {col.options ? (
-                          <select
-                            value={billing[col.key] || ""}
-                            onChange={(e) => {
-                              if (col.key === "billingType") {
-                                handleBillingTypeChange(e.target.value);
-                              } else {
-                                setBilling(prev => ({ ...prev, [col.key]: e.target.value }));
-                              }
-                            }}
-                            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-emerald-500"
-                            disabled={queueGenerated}
-                          >
-                            <option value="">Select {col.label}</option>
-                            {col.options.map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            type={col.type || "text"}
-                            value={billing[col.key] || ""}
-                            onChange={(e) => setBilling(prev => ({ ...prev, [col.key]: e.target.value }))}
-                            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-emerald-500"
-                            placeholder={`Enter ${col.label}`}
-                            disabled={queueGenerated}
-                          />
-                        )}
+                        <input
+                          type="text"
+                          value={billing[col.key] || ""}
+                          readOnly
+                          className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm outline-none cursor-not-allowed"
+                        />
                       </td>
                     ))}
                   </tr>
@@ -806,214 +813,120 @@ export default function EditAdvancePayment() {
           </Card>
         </div>
 
-        {/* Orders Table */}
+        {/* Orders Table - READ ONLY with all charge columns */}
         <div className="mt-4">
-          <Card 
-            title="Order Details"
-            right={
-              !queueGenerated && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={addOrderRow}
-                    className="rounded-xl bg-yellow-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-yellow-700 transition"
-                  >
-                    + Add Order
-                  </button>
-                </div>
-              )
-            }
-          >
-            <div className="overflow-auto rounded-xl border border-yellow-300">
-              <table className="min-w-full w-full text-sm">
+          <Card title="Order Details (Read Only)">
+            <div className="overflow-auto rounded-xl border border-yellow-300 max-h-[500px] overflow-y-auto">
+              <table className="min-w-max w-full text-sm">
                 <thead className="sticky top-0 bg-yellow-400 z-10">
                   <tr>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Order No</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Party Name</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Plant</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Order Type</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Pin Code</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">State</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">District</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">From</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">To</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Location Rate</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Price List</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Weight</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Rate</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Total Amount</th>
-                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold">Actions</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">Order No</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[150px]">Party Name</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">Plant</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[100px]">Order Type</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[100px]">Pin Code</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">State</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">District</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">From</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[120px]">To</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[100px]">Location Rate</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[100px]">Price List</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[80px]">Weight (MT)</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[80px]">Rate (₹)</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[100px]">Total Amount</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[130px]">Collection Charges</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[140px]">Cancellation Charges</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[130px]">Loading Charges</th>
+                    <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold min-w-[130px]">Other Charges</th>
                   </tr>
                 </thead>
                 <tbody>
                   {orderRows.map((row) => (
                     <tr key={row._id} className="hover:bg-yellow-50 even:bg-slate-50">
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          value={row.orderNo || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'orderNo', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                          placeholder="Order No"
-                          disabled={queueGenerated}
-                        />
+                        <input type="text" value={row.orderNo || ""} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="Order No" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          value={row.partyName || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'partyName', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                          placeholder="Party Name"
-                          disabled={queueGenerated}
-                        />
+                        <input type="text" value={row.partyName || ""} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="Party Name" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          value={row.plantName || row.plantCode || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'plantName', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                          placeholder="Plant"
-                          disabled={queueGenerated}
-                        />
+                        <input type="text" value={row.plantName || row.plantCode || ""} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="Plant" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <select
-                          value={row.orderType || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'orderType', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm"
-                          disabled={queueGenerated}
-                        >
-                          <option value="">Select</option>
-                          {ORDER_TYPES.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
-                        </select>
+                        <input type="text" value={row.orderType || ""} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="Order Type" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          value={row.pinCode || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'pinCode', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                          placeholder="Pin Code"
-                          disabled={queueGenerated}
-                        />
+                        <input type="text" value={row.pinCode || ""} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="Pin Code" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          value={row.state || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'state', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                          placeholder="State"
-                          disabled={queueGenerated}
-                        />
+                        <input type="text" value={row.state || ""} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="State" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          value={row.district || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'district', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                          placeholder="District"
-                          disabled={queueGenerated}
-                        />
+                        <input type="text" value={row.district || ""} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="District" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          value={row.from || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'from', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                          placeholder="From"
-                          disabled={queueGenerated}
-                        />
+                        <input type="text" value={row.from || ""} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="From" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          value={row.to || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'to', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                          placeholder="To"
-                          disabled={queueGenerated}
-                        />
+                        <input type="text" value={row.to || ""} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="To" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          value={row.locationRate || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'locationRate', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                          placeholder="Location Rate"
-                          disabled={queueGenerated}
-                        />
+                        <input type="text" value={row.locationRate || ""} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="Location Rate" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          value={row.priceList || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'priceList', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                          placeholder="Price List"
-                          disabled={queueGenerated}
-                        />
+                        <input type="text" value={row.priceList || ""} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="Price List" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="number"
-                          value={row.weight || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'weight', e.target.value)}
-                          className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                          placeholder="0"
-                          disabled={queueGenerated}
-                        />
+                        <input type="number" value={row.weight || ""} readOnly className="w-20 rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="0" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="number"
-                          value={row.rate || ""}
-                          onChange={(e) => updateOrderRow(row._id, 'rate', e.target.value)}
-                          className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
-                          placeholder="0"
-                          disabled={queueGenerated}
-                        />
+                        <input type="number" value={row.rate || ""} readOnly className="w-20 rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="0" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="number"
-                          value={row.totalAmount || (num(row.weight) * num(row.rate)).toString()}
-                          readOnly
-                          className="w-24 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm font-bold text-emerald-700"
-                          disabled={queueGenerated}
-                        />
+                        <input type="number" value={row.totalAmount || ""} readOnly className="w-24 rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm font-bold text-emerald-700 cursor-not-allowed" placeholder="Auto" />
                       </td>
                       <td className="border border-yellow-300 px-2 py-2">
-                        {!queueGenerated && (
-                          <div className="flex gap-1">
-                            <button
-                              onClick={() => duplicateOrderRow(row._id)}
-                              className="rounded-lg border border-yellow-500 bg-yellow-100 px-2 py-1.5 text-xs font-bold text-yellow-800 hover:bg-yellow-200"
-                              title="Duplicate"
-                            >
-                              Dup
-                            </button>
-                            <button
-                              onClick={() => removeOrderRow(row._id)}
-                              className="rounded-lg bg-red-500 px-2 py-1.5 text-xs font-bold text-white hover:bg-red-600"
-                              title="Remove"
-                            >
-                              Del
-                            </button>
-                          </div>
-                        )}
+                        <input type="number" value={row.collectionCharges || "0"} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="Collection Charges" />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input type="text" value={row.cancellationCharges || "Nil"} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="Cancellation Charges" />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input type="text" value={row.loadingCharges || "Nil"} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="Loading Charges" />
+                      </td>
+                      <td className="border border-yellow-300 px-2 py-2">
+                        <input type="number" value={row.otherCharges || "0"} readOnly className="w-full rounded-lg border border-slate-200 bg-gray-100 px-2 py-1.5 text-sm cursor-not-allowed" placeholder="Other Charges" />
                       </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot className="bg-yellow-100">
                   <tr>
-                    <td colSpan="13" className="border border-yellow-300 px-3 py-2 text-right font-bold">
-                      Total Order Amount:
-                    </td>
-                    <td className="border border-yellow-300 px-3 py-2 font-bold text-emerald-800">
-                      ₹{calculateTotalOrderAmount().toLocaleString()}
-                    </td>
-                    <td className="border border-yellow-300 px-3 py-2"></td>
+                    <td colSpan="13" className="border border-yellow-300 px-3 py-2 text-right font-bold">Total Order Amount:</td>
+                    <td className="border border-yellow-300 px-3 py-2 font-bold text-emerald-800" colSpan="5">₹{calculateTotalOrderAmount().toLocaleString()}</td>
                   </tr>
                 </tfoot>
               </table>
+            </div>
+          </Card>
+        </div>
+
+        {/* Purchase Terms - READ ONLY */}
+        <div className="mt-4">
+          <Card title="Purchase Terms (Read Only)">
+            <div className="grid grid-cols-12 gap-4">
+              <div className="col-span-12 md:col-span-4">
+                <label className="text-xs font-bold text-slate-600">Purchase - Type</label>
+                <input type="text" value={purchaseTerms.purchaseType} readOnly className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed" />
+              </div>
+              <div className="col-span-12 md:col-span-4">
+                <label className="text-xs font-bold text-slate-600">Rate - Type</label>
+                <input type="text" value={purchaseTerms.rateType} readOnly className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed" />
+              </div>
+              <div className="col-span-12 md:col-span-4">
+                <label className="text-xs font-bold text-slate-600">Payment Terms</label>
+                <input type="text" value={purchaseTerms.paymentTerms} readOnly className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed" />
+              </div>
             </div>
           </Card>
         </div>
@@ -1022,7 +935,7 @@ export default function EditAdvancePayment() {
         <div className="mt-4">
           <Card title="Advance Payment - Panel">
             <div className="grid grid-cols-12 gap-4">
-              {/* Vendor Information */}
+              {/* Vendor Information - READ ONLY */}
               <div className="col-span-12 md:col-span-4">
                 <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200 h-full">
                   <h3 className="text-sm font-bold text-slate-800 mb-3">Vendor Information</h3>
@@ -1030,229 +943,123 @@ export default function EditAdvancePayment() {
                   <div className="space-y-3">
                     <div>
                       <label className="text-xs font-bold text-slate-600">Vendor Status</label>
-                      <select
-                        value={vendorDetails.vendorStatus}
-                        onChange={(e) => setVendorDetails({ ...vendorDetails, vendorStatus: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none"
-                        disabled={queueGenerated}
-                      >
-                        {VENDOR_STATUS_OPTIONS.map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
+                      <input type="text" value={vendorDetails.vendorStatus} readOnly className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed" />
                     </div>
 
                     <div>
                       <label className="text-xs font-bold text-slate-600">Vendor Code</label>
-                      <input
-                        type="text"
-                        value={vendorDetails.vendorCode}
-                        onChange={(e) => setVendorDetails({ ...vendorDetails, vendorCode: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none"
-                        readOnly
-                        disabled={queueGenerated}
-                      />
+                      <input type="text" value={vendorDetails.vendorCode} readOnly className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed" />
                     </div>
 
                     <div>
                       <label className="text-xs font-bold text-slate-600">Vendor Name *</label>
-                      <SearchableDropdown
-                        items={vendors}
-                        selectedId={vendorDetails.vendorName}
-                        onSelect={handleVendorSelect}
-                        placeholder="Search vendor..."
-                        displayField="supplierName"
-                        codeField="supplierCode"
-                        disabled={queueGenerated}
-                      />
+                      <input type="text" value={vendorDetails.vendorName} readOnly className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed" />
                     </div>
 
                     <div>
                       <label className="text-xs font-bold text-slate-600">Vehicle No</label>
-                      <input
-                        type="text"
-                        value={vendorDetails.vehicleNo}
-                        onChange={(e) => setVendorDetails({ ...vendorDetails, vehicleNo: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none"
-                        placeholder="HR38X8960"
-                        disabled={queueGenerated}
-                      />
+                      <input type="text" value={vendorDetails.vehicleNo} readOnly className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed" />
                     </div>
 
-                    <div>
-                      <label className="text-xs font-bold text-slate-600">Purchase - Type</label>
-                      <select
-                        value={vendorDetails.purchaseType}
-                        onChange={(e) => setVendorDetails({ ...vendorDetails, purchaseType: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none"
-                        disabled={queueGenerated}
-                      >
-                        {PURCHASE_TYPE_OPTIONS.map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Payment Calculation */}
-              <div className="col-span-12 md:col-span-4">
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 h-full">
-                  <h3 className="text-sm font-bold text-slate-800 mb-3">Payment Calculation</h3>
-                  
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-2 mt-2">
                       <div>
                         <label className="text-xs font-bold text-slate-600">Rate (₹)</label>
-                        <input
-                          type="number"
-                          value={vendorDetails.rate}
-                          onChange={(e) => {
-                            const rate = e.target.value;
-                            const amount = num(rate) * num(vendorDetails.weight);
-                            setVendorDetails({ 
-                              ...vendorDetails, 
-                              rate,
-                              amount: amount.toString()
-                            });
-                          }}
-                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none"
-                          disabled={queueGenerated}
-                        />
+                        <input type="number" value={vendorDetails.rate} readOnly className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed" placeholder="0" />
                       </div>
                       <div>
                         <label className="text-xs font-bold text-slate-600">Weight (MT)</label>
-                        <input
-                          type="number"
-                          value={vendorDetails.weight}
-                          onChange={(e) => {
-                            const weight = e.target.value;
-                            const amount = num(vendorDetails.rate) * num(weight);
-                            setVendorDetails({ 
-                              ...vendorDetails, 
-                              weight,
-                              amount: amount.toString()
-                            });
-                          }}
-                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none"
-                          disabled={queueGenerated}
-                        />
+                        <input type="number" value={vendorDetails.weight} readOnly className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed" placeholder="0" />
                       </div>
                     </div>
 
                     <div>
                       <label className="text-xs font-bold text-slate-600">Amount (₹)</label>
-                      <input
-                        type="number"
-                        value={vendorDetails.amount}
-                        readOnly
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-bold text-emerald-700"
-                        disabled={queueGenerated}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-bold text-slate-600">Rate - Type</label>
-                      <select
-                        value={vendorDetails.rateType}
-                        onChange={(e) => setVendorDetails({ ...vendorDetails, rateType: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none"
-                        disabled={queueGenerated}
-                      >
-                        {RATE_TYPE_OPTIONS.map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-bold text-slate-600">Payment Terms</label>
-                      <select
-                        value={vendorDetails.paymentTerms}
-                        onChange={(e) => setVendorDetails({ ...vendorDetails, paymentTerms: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none"
-                        disabled={queueGenerated}
-                      >
-                        {PAYMENT_TERMS_OPTIONS.map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
+                      <input type="number" value={purchaseAmountFromVNN} readOnly className="mt-1 w-full rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-sm font-bold text-purple-700 cursor-not-allowed" />
+                      <p className="text-xs text-purple-600 mt-1">Auto-filled from Purchase (A x B)</p>
                     </div>
 
                     <div>
                       <label className="text-xs font-bold text-slate-600">Advance (₹)</label>
-                      <input
-                        type="number"
-                        value={vendorDetails.advance}
-                        onChange={(e) => {
-                          const advance = e.target.value;
-                          setVendorDetails({ ...vendorDetails, advance });
-                          setPaymentDetails(prev => ({
-                            ...prev,
-                            finalAmount: advance
-                          }));
-                        }}
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none"
-                        disabled={queueGenerated}
-                      />
+                      <input type="number" value={vendorDetails.advance} readOnly className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed" />
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Bank Details */}
+              {/* MEMO from Vehicle Negotiation */}
+              <div className="col-span-12 md:col-span-4">
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200 h-full">
+                  <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    MEMO from Vehicle Negotiation
+                  </h3>
+                  {memoFileInfo ? (
+                    <div 
+                      className="relative group cursor-pointer overflow-hidden rounded-xl border-2 border-green-300 bg-white shadow-lg hover:shadow-xl transition-all duration-300"
+                      onClick={() => { if (memoFileInfo.filePath) window.open(memoFileInfo.filePath, '_blank'); }}
+                    >
+                      <div className="relative w-full min-h-[200px] bg-gray-100">
+                        {memoFileInfo.mimeType?.includes('image') ? (
+                          <img src={memoFileInfo.filePath} alt={memoFileInfo.originalName} className="w-full h-full min-h-[200px] object-contain" />
+                        ) : memoFileInfo.mimeType?.includes('pdf') ? (
+                          <div className="flex flex-col items-center justify-center min-h-[200px] bg-red-50">
+                            <svg className="w-16 h-16 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                            <span className="text-sm font-medium text-gray-600 mt-2">{memoFileInfo.originalName}</span>
+                            <span className="text-xs text-gray-500 mt-1">Click to view PDF</span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center min-h-[200px] bg-gray-100">
+                            <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <span className="text-sm font-medium text-gray-600 mt-2">{memoFileInfo.originalName}</span>
+                            <span className="text-xs text-gray-500 mt-1">Click to download</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-2 bg-white border-t border-green-100">
+                        <p className="text-xs font-medium text-slate-700 truncate">{memoFileInfo.originalName}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center min-h-[200px] bg-white rounded-xl border-2 border-dashed border-green-300">
+                      <svg className="w-12 h-12 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <p className="text-sm text-slate-500">No MEMO available</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Bank Details - READ ONLY */}
               <div className="col-span-12 md:col-span-4">
                 <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200 h-full">
                   <h3 className="text-sm font-bold text-slate-800 mb-3">Bank Details</h3>
                   
                   <div className="space-y-3">
                     <div>
-                      <label className="text-xs font-bold text-slate-600">Account No (Credit)</label>
-                      <input
-                        type="text"
-                        value={vendorDetails.accountNo}
-                        onChange={(e) => setVendorDetails({ ...vendorDetails, accountNo: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none"
-                        placeholder="ICICI3642"
-                        disabled={queueGenerated}
-                      />
+                      <label className="text-xs font-bold text-slate-600">Account Number</label>
+                      <input type="text" value={vendorDetails.accountNo} readOnly className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed" />
                     </div>
 
                     <div>
                       <label className="text-xs font-bold text-slate-600">Bank Name</label>
-                      <input
-                        type="text"
-                        value={vendorDetails.bankName}
-                        onChange={(e) => setVendorDetails({ ...vendorDetails, bankName: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none"
-                        placeholder="ICICI Bank"
-                        disabled={queueGenerated}
-                      />
+                      <input type="text" value={vendorDetails.bankName} readOnly className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed" />
                     </div>
 
                     <div>
                       <label className="text-xs font-bold text-slate-600">IFSC Code</label>
-                      <input
-                        type="text"
-                        value={vendorDetails.ifsc}
-                        onChange={(e) => setVendorDetails({ ...vendorDetails, ifsc: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none"
-                        placeholder="ICIC0003642"
-                        disabled={queueGenerated}
-                      />
+                      <input type="text" value={vendorDetails.ifsc} readOnly className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed" />
                     </div>
 
                     <div>
                       <label className="text-xs font-bold text-slate-600">Transaction ID</label>
-                      <input
-                        type="text"
-                        value={vendorDetails.transactionId}
-                        onChange={(e) => setVendorDetails({ ...vendorDetails, transactionId: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none"
-                        placeholder="6412878541272"
-                        disabled={queueGenerated}
-                      />
+                      <input type="text" value={vendorDetails.transactionId} readOnly className="mt-1 w-full rounded-lg border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed" />
                     </div>
                   </div>
                 </div>
@@ -1261,7 +1068,7 @@ export default function EditAdvancePayment() {
           </Card>
         </div>
 
-        {/* Additions Section */}
+        {/* Additions Section - EDITABLE */}
         <div className="mt-4">
           <Card 
             title="Additions (+) - Extra Charges"
@@ -1337,7 +1144,7 @@ export default function EditAdvancePayment() {
           </Card>
         </div>
 
-        {/* Deductions Section */}
+        {/* Deductions Section - EDITABLE */}
         <div className="mt-4">
           <Card 
             title="Deductions (-) - Adjustments"
@@ -1413,17 +1220,16 @@ export default function EditAdvancePayment() {
           </Card>
         </div>
 
-        {/* ===== Balance & Final Amount ===== */}
+        {/* Balance & Final Amount */}
         <div className="mt-4">
           <div className="grid grid-cols-12 gap-4">
-            {/* Balance Calculation Details */}
             <div className="col-span-12 md:col-span-6">
               <div className="bg-purple-50 p-6 rounded-xl border border-purple-200">
                 <h3 className="text-sm font-bold text-purple-800 mb-3">Balance Calculation</h3>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">Total Amount:</span>
-                    <span className="font-bold">₹{num(vendorDetails.amount).toLocaleString()}</span>
+                    <span className="text-slate-600">Purchase Amount (A x B):</span>
+                    <span className="font-bold text-purple-800">₹{purchaseAmountFromVNN.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-600">Advance Payment:</span>
@@ -1447,7 +1253,6 @@ export default function EditAdvancePayment() {
               </div>
             </div>
 
-            {/* Final Payment Amount - Shows Balance */}
             <div className="col-span-12 md:col-span-6">
               <div className="bg-blue-50 p-6 rounded-xl border border-blue-200 h-full flex items-center justify-center">
                 <div className="text-center w-full">
@@ -1457,7 +1262,7 @@ export default function EditAdvancePayment() {
                   </div>
                   <p className="text-xs text-blue-600 mt-2">Balance amount to be paid after adjustments</p>
                   <p className="text-xs text-slate-500 mt-1">
-                    (Amount - Advance - Deductions + Additions)
+                    (Purchase Amount - Advance + Additions - Deductions)
                   </p>
                   {queueGenerated && (
                     <p className="text-xs text-green-600 mt-2 font-bold">
@@ -1470,121 +1275,118 @@ export default function EditAdvancePayment() {
           </div>
         </div>
 
-        {/* Payment Transaction Details */}
-        <div className="mt-4">
-          <Card title="Payment Transaction Details">
-            <div className="grid grid-cols-12 gap-4">
-              <div className="col-span-12 md:col-span-3">
-                <label className="text-xs font-bold text-slate-600">Vendor Name (Debit)</label>
-                <input
-                  type="text"
-                  value={paymentDetails.vendorNameDebit || vendorDetails.vendorName}
-                  onChange={(e) => setPaymentDetails({ ...paymentDetails, vendorNameDebit: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                  disabled={queueGenerated}
-                />
-              </div>
+        {/* Payment Transaction Details - EDITABLE (except Payment Status & Remarks) */}
+<div className="mt-4">
+  <Card title="Payment Transaction Details">
+    <div className="grid grid-cols-12 gap-4">
+      <div className="col-span-12 md:col-span-3">
+        <label className="text-xs font-bold text-slate-600">Vendor Name (Debit)</label>
+        <input
+          type="text"
+          value={paymentDetails.vendorNameDebit || vendorDetails.vendorName}
+          onChange={(e) => setPaymentDetails({ ...paymentDetails, vendorNameDebit: e.target.value })}
+          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+          disabled={queueGenerated}
+        />
+      </div>
 
-              <div className="col-span-12 md:col-span-3">
-                <label className="text-xs font-bold text-slate-600">Account No (Credit)</label>
-                <input
-                  type="text"
-                  value={paymentDetails.accountNoCredit || vendorDetails.accountNo}
-                  onChange={(e) => setPaymentDetails({ ...paymentDetails, accountNoCredit: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                  disabled={queueGenerated}
-                />
-              </div>
+      <div className="col-span-12 md:col-span-3">
+        <label className="text-xs font-bold text-slate-600">Account No (Credit)</label>
+        <input
+          type="text"
+          value={paymentDetails.accountNoCredit || vendorDetails.accountNo}
+          onChange={(e) => setPaymentDetails({ ...paymentDetails, accountNoCredit: e.target.value })}
+          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+          disabled={queueGenerated}
+        />
+      </div>
 
-              <div className="col-span-12 md:col-span-2">
-                <label className="text-xs font-bold text-slate-600">Final Amount</label>
-                <input
-                  type="number"
-                  value={calculateBalance()}
-                  readOnly
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700 outline-none cursor-not-allowed"
-                  disabled={queueGenerated}
-                />
-              </div>
+      <div className="col-span-12 md:col-span-2">
+        <label className="text-xs font-bold text-slate-600">Final Amount</label>
+        <input
+          type="number"
+          value={calculateBalance()}
+          readOnly
+          className="mt-1 w-full rounded-xl border border-slate-200 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700 outline-none cursor-not-allowed"
+        />
+      </div>
 
-              <div className="col-span-12 md:col-span-2">
-                <label className="text-xs font-bold text-slate-600">Payment Date</label>
-                <input
-                  type="date"
-                  value={paymentDetails.paymentDate}
-                  onChange={(e) => setPaymentDetails({ ...paymentDetails, paymentDate: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                  disabled={queueGenerated}
-                />
-              </div>
+      <div className="col-span-12 md:col-span-2">
+        <label className="text-xs font-bold text-slate-600">Payment Date</label>
+        <input
+          type="date"
+          value={paymentDetails.paymentDate}
+          onChange={(e) => setPaymentDetails({ ...paymentDetails, paymentDate: e.target.value })}
+          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+          disabled={queueGenerated}
+        />
+      </div>
 
-              <div className="col-span-12 md:col-span-2">
-                <label className="text-xs font-bold text-slate-600">Payment Status</label>
-                <select
-                  value={paymentDetails.paymentStatus}
-                  onChange={(e) => setPaymentDetails({ ...paymentDetails, paymentStatus: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                  disabled={queueGenerated}
-                >
-                  {ADVANCE_STATUS_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
+      <div className="col-span-12 md:col-span-2">
+        <label className="text-xs font-bold text-slate-600">Payment Status</label>
+        <select
+          value={paymentDetails.paymentStatus}
+          className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
+          disabled
+        >
+          {ADVANCE_STATUS_OPTIONS.map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+      </div>
 
-              <div className="col-span-12 md:col-span-3">
-                <label className="text-xs font-bold text-slate-600">Remarks</label>
-                <input
-                  type="text"
-                  value={paymentDetails.remarks}
-                  onChange={(e) => setPaymentDetails({ ...paymentDetails, remarks: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                  placeholder="ADV Payment"
-                  disabled={queueGenerated}
-                />
-              </div>
+      <div className="col-span-12 md:col-span-3">
+        <label className="text-xs font-bold text-slate-600">Remarks</label>
+        <input
+          type="text"
+          value={paymentDetails.remarks}
+          readOnly
+          className="mt-1 w-full rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm outline-none cursor-not-allowed"
+          placeholder="ADV Payment"
+        />
+      </div>
 
-              <div className="col-span-12 md:col-span-3">
-                <label className="text-xs font-bold text-slate-600">Transaction ID</label>
-                <input
-                  type="text"
-                  value={paymentDetails.transactionId || vendorDetails.transactionId}
-                  onChange={(e) => setPaymentDetails({ ...paymentDetails, transactionId: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                  placeholder="6412878541272"
-                  disabled={queueGenerated}
-                />
-              </div>
+      <div className="col-span-12 md:col-span-3">
+        <label className="text-xs font-bold text-slate-600">Transaction ID</label>
+        <input
+          type="text"
+          value={paymentDetails.transactionId || vendorDetails.transactionId}
+          onChange={(e) => setPaymentDetails({ ...paymentDetails, transactionId: e.target.value })}
+          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+          placeholder="Transaction ID"
+          disabled={queueGenerated}
+        />
+      </div>
 
-              <div className="col-span-12 md:col-span-3">
-                <label className="text-xs font-bold text-slate-600">Bank Vendor Code</label>
-                <input
-                  type="text"
-                  value={paymentDetails.bankVendorCode || vendorDetails.vendorCode}
-                  onChange={(e) => setPaymentDetails({ ...paymentDetails, bankVendorCode: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                  placeholder="Bank vendor code"
-                  disabled={queueGenerated}
-                />
-              </div>
+      <div className="col-span-12 md:col-span-3">
+        <label className="text-xs font-bold text-slate-600">Bank Vendor Code</label>
+        <input
+          type="text"
+          value={paymentDetails.bankVendorCode || vendorDetails.vendorCode}
+          onChange={(e) => setPaymentDetails({ ...paymentDetails, bankVendorCode: e.target.value })}
+          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+          placeholder="Bank vendor code"
+          disabled={queueGenerated}
+        />
+      </div>
 
-              <div className="col-span-12 md:col-span-2">
-                <label className="text-xs font-bold text-slate-600">Generate Queue</label>
-                <button
-                  onClick={handleGenerateQueue}
-                  disabled={queueGenerated}
-                  className={`mt-1 w-full rounded-xl px-4 py-2 text-sm font-bold text-white transition ${
-                    queueGenerated 
-                      ? 'bg-gray-400 cursor-not-allowed' 
-                      : 'bg-blue-600 hover:bg-blue-700'
-                  }`}
-                >
-                  {queueGenerated ? 'Queue Generated' : 'Generate Queue'}
-                </button>
-              </div>
-            </div>
-          </Card>
-        </div>
+      <div className="col-span-12 md:col-span-2">
+        <label className="text-xs font-bold text-slate-600">Generate Queue</label>
+        <button
+          onClick={handleGenerateQueue}
+          disabled={queueGenerated}
+          className={`mt-1 w-full rounded-xl px-4 py-2 text-sm font-bold text-white transition ${
+            queueGenerated 
+              ? 'bg-gray-400 cursor-not-allowed' 
+              : 'bg-blue-600 hover:bg-blue-700'
+          }`}
+        >
+          {queueGenerated ? 'Queue Generated' : 'Generate Queue'}
+        </button>
+      </div>
+    </div>
+  </Card>
+</div>
       </div>
     </div>
   );
@@ -1599,112 +1401,6 @@ function Card({ title, right, children }) {
         {right || null}
       </div>
       <div className="p-4">{children}</div>
-    </div>
-  );
-}
-
-function Select({ label, value, onChange, options = [], col = "", disabled = false }) {
-  return (
-    <div className={col}>
-      <label className="text-xs font-bold text-slate-600">{label}</label>
-      <select
-        value={value || ""}
-        onChange={(e) => onChange?.(e.target.value)}
-        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-        disabled={disabled}
-      >
-        <option value="">Select {label}</option>
-        {options.map((o) => (
-          <option key={o} value={o}>{o}</option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-function SearchableDropdown({ 
-  items, 
-  selectedId, 
-  onSelect, 
-  placeholder = "Search...",
-  displayField = 'name',
-  codeField = 'code',
-  disabled = false
-}) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filteredItems, setFilteredItems] = useState([]);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    setFilteredItems(items || []);
-    if (selectedId && items?.length > 0) {
-      const item = items.find(i => i[displayField] === selectedId || i._id === selectedId);
-      if (item) {
-        setSearchQuery(getDisplayValue(item));
-      }
-    }
-  }, [items, selectedId]);
-
-  const getDisplayValue = (item) => {
-    if (!item) return "";
-    const display = item[displayField] || "";
-    const code = item[codeField] ? `(${item[codeField]})` : "";
-    return `${display} ${code}`.trim();
-  };
-
-  const handleSearch = (query) => {
-    setSearchQuery(query);
-    if (!query.trim()) {
-      setFilteredItems(items || []);
-    } else {
-      const filtered = (items || []).filter(item =>
-        (item[displayField]?.toLowerCase().includes(query.toLowerCase())) ||
-        (item[codeField]?.toLowerCase().includes(query.toLowerCase()))
-      );
-      setFilteredItems(filtered);
-    }
-  };
-
-  return (
-    <div className="relative" ref={dropdownRef}>
-      <input
-        type="text"
-        value={searchQuery}
-        onChange={(e) => handleSearch(e.target.value)}
-        onFocus={() => !disabled && setShowDropdown(true)}
-        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
-        placeholder={placeholder}
-        disabled={disabled}
-        autoComplete="off"
-      />
-      {showDropdown && !disabled && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-          {filteredItems?.length > 0 ? (
-            filteredItems.map((item) => (
-              <div
-                key={item._id}
-                onMouseDown={() => {
-                  onSelect?.(item);
-                  setSearchQuery(getDisplayValue(item));
-                  setShowDropdown(false);
-                }}
-                className="p-2 hover:bg-emerald-50 cursor-pointer border-b border-slate-100"
-              >
-                <div className="font-medium text-slate-800 text-sm">
-                  {item[displayField]}
-                </div>
-                {item[codeField] && (
-                  <div className="text-xs text-slate-500">Code: {item[codeField]}</div>
-                )}
-              </div>
-            ))
-          ) : (
-            <div className="p-2 text-center text-sm text-slate-500">No items found</div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
