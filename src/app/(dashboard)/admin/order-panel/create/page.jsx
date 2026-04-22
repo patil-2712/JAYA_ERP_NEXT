@@ -667,72 +667,76 @@ export default function CreateOrderPanel() {
    * PACK DATA FUNCTIONS - Single array
    ========================= */
   
-  const recalculatePalletizationWeights = (row) => {
-    const updatedRow = { ...row };
-    
-    const noOfPallets = num(updatedRow.noOfPallets);
-    const unitPerPallets = num(updatedRow.unitPerPallets);
-    const packWeight = num(updatedRow.packWeight);
-    const uom = (updatedRow.uom || "").toUpperCase().trim();
-    
-    let totalPkgs = num(updatedRow.totalPkgs);
-    
-    if (noOfPallets > 0 && unitPerPallets > 0) {
-      const calculatedTotalPkgs = noOfPallets * unitPerPallets;
-      totalPkgs = calculatedTotalPkgs;
-      updatedRow.totalPkgs = String(calculatedTotalPkgs);
-    }
-    
-    if (totalPkgs > 0 && packWeight > 0) {
-      if (uom === "LTR" || uom === "L" || uom === "LITRE" || uom === "LITRES") {
-        const wtLtr = totalPkgs * packWeight;
-        updatedRow.wtLtr = wtLtr.toFixed(2);
-        const actualWt = wtLtr / 1000 * 2;
-        updatedRow.actualWt = actualWt.toFixed(3);
-      } else if (uom === "KG" || uom === "KGS" || uom === "KILOGRAM" || uom === "KILOGRAMS") {
-        const actualWt = totalPkgs * packWeight;
-        updatedRow.actualWt = actualWt.toFixed(3);
-        updatedRow.wtLtr = "";
-      } else {
-        updatedRow.wtLtr = "";
-        updatedRow.actualWt = "";
-      }
-    } else {
-      if (!updatedRow.wtLtr) updatedRow.wtLtr = "";
-      if (!updatedRow.actualWt) updatedRow.actualWt = "";
-    }
-    
-    return updatedRow;
-  };
+ const recalculatePalletizationWeights = (row) => {
+  const updatedRow = { ...row };
   
-  const recalculateUniformWeights = (row) => {
-    const updatedRow = { ...row };
+  const noOfPallets = num(updatedRow.noOfPallets);
+  const unitPerPallets = num(updatedRow.unitPerPallets);
+  const packWeight = num(updatedRow.packWeight);
+  const uom = (updatedRow.uom || "").toUpperCase().trim();
+  
+  let totalPkgs = num(updatedRow.totalPkgs);
+  
+  if (noOfPallets > 0 && unitPerPallets > 0) {
+    const calculatedTotalPkgs = noOfPallets * unitPerPallets;
+    totalPkgs = calculatedTotalPkgs;
+    updatedRow.totalPkgs = String(calculatedTotalPkgs);
+  }
+  
+  if (totalPkgs > 0 && packWeight > 0) {
+    // Check if UOM is LTR related
+    const isLTR = uom === "LTR" || uom === "L" || uom === "LITRE" || uom === "LITRES";
     
-    const totalPkgs = num(updatedRow.totalPkgs);
-    const packWeight = num(updatedRow.packWeight);
-    const uom = (updatedRow.uom || "").toUpperCase().trim();
-    
-    if (totalPkgs > 0 && packWeight > 0) {
-      if (uom === "LTR" || uom === "L" || uom === "LITRE" || uom === "LITRES") {
-        const wtLtr = totalPkgs * packWeight;
-        updatedRow.wtLtr = wtLtr.toFixed(2);
-        const actualWt = (wtLtr / 1000) * 2;
-        updatedRow.actualWt = actualWt.toFixed(3);
-      } else if (uom === "KG" || uom === "KGS" || uom === "KILOGRAM" || uom === "KILOGRAMS") {
-        const actualWt = totalPkgs * packWeight;
-        updatedRow.actualWt = actualWt.toFixed(3);
-        updatedRow.wtLtr = "";
-      } else {
-        updatedRow.wtLtr = "";
-        updatedRow.actualWt = "";
-      }
+    if (isLTR) {
+      // LTR FORMULA
+      const wtLtr = totalPkgs * packWeight;
+      updatedRow.wtLtr = wtLtr.toFixed(2);
+      const actualWt = (wtLtr / 1000) * 2;
+      updatedRow.actualWt = actualWt.toFixed(3);
     } else {
-      if (!updatedRow.wtLtr) updatedRow.wtLtr = "";
-      if (!updatedRow.actualWt) updatedRow.actualWt = "";
+      // KG FORMULA - Use for ALL other UOMs (KG, KGS, MG, GM, TON, M3, PCS, etc.)
+      const actualWt = totalPkgs * packWeight;
+      updatedRow.actualWt = actualWt.toFixed(3);
+      updatedRow.wtLtr = "";
     }
+  } else {
+    updatedRow.wtLtr = "";
+    updatedRow.actualWt = "";
+  }
+  
+  return updatedRow;
+};
+  
+ const recalculateUniformWeights = (row) => {
+  const updatedRow = { ...row };
+  
+  const totalPkgs = num(updatedRow.totalPkgs);
+  const packWeight = num(updatedRow.packWeight);
+  const uom = (updatedRow.uom || "").toUpperCase().trim();
+  
+  if (totalPkgs > 0 && packWeight > 0) {
+    // Check if UOM is LTR related
+    const isLTR = uom === "LTR" || uom === "L" || uom === "LITRE" || uom === "LITRES";
     
-    return updatedRow;
-  };
+    if (isLTR) {
+      // LTR FORMULA
+      const wtLtr = totalPkgs * packWeight;
+      updatedRow.wtLtr = wtLtr.toFixed(2);
+      const actualWt = (wtLtr / 1000) * 2;
+      updatedRow.actualWt = actualWt.toFixed(3);
+    } else {
+      // KG FORMULA - Use for ALL other UOMs (KG, KGS, MG, GM, TON, M3, PCS, etc.)
+      const actualWt = totalPkgs * packWeight;
+      updatedRow.actualWt = actualWt.toFixed(3);
+      updatedRow.wtLtr = "";
+    }
+  } else {
+    updatedRow.wtLtr = "";
+    updatedRow.actualWt = "";
+  }
+  
+  return updatedRow;
+};
 
   const updatePackRow = (rowId, key, value) => {
     setPackRows((prev) =>
@@ -1192,50 +1196,50 @@ const handleSave = async () => {
             />
           </Card>
           
-          {/* PACK TYPE SECTIONS - Single table with all rows */}
-          <div className="mt-4 space-y-6">
-            <Card title="Pack Type">
-              {/* Pack Type Selector for adding new rows */}
-              <div className="mb-4 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <div className="text-sm font-bold text-slate-700">Select Pack Type to Add:</div>
-                  <select
-                    value={activePack}
-                    onChange={(e) => setActivePack(e.target.value)}
-                    className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                  >
-                    {PACK_TYPES.map((p) => (
-                      <option key={p.key} value={p.key}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <button
-                  onClick={addRow}
-                  className="rounded-xl bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-700 transition"
-                >
-                  + Add Row
-                </button>
-              </div>
-              
-              {/* Single Table showing ALL rows with Pack Type column */}
-              <PackTypeTable
-                rows={packRows}
-                onChange={updatePackRow}
-                onRemove={removeRow}
-                onDuplicate={duplicateRow}
-                pkgTypes={pkgTypes}
-                uoms={uoms}
-                skuSizes={skuSizes}
-                items={items}
-                onNavigateToCreate={() => router.push('/admin/pkg-type?returnUrl=/admin/order-panel/create')}
-                onNavigateToCreateUOM={() => router.push('/admin/uoms?returnUrl=/admin/order-panel/create')}
-                onNavigateToCreateSKUSize={() => router.push('/admin/sku-sizes?returnUrl=/admin/order-panel/create')}
-                onNavigateToCreateItem={() => router.push('/admin/items?returnUrl=/admin/order-panel/create')}
-              />
-            </Card>
-          </div>
+        {/* PACK TYPE SECTIONS - Single table with all rows */}
+<div className="mt-4">
+  <Card title="Pack Type">
+    {/* Pack Type Selector for adding new rows */}
+    <div className="mb-4 flex justify-between items-center">
+      <div className="flex items-center gap-3">
+        <div className="text-sm font-bold text-slate-700">Select Pack Type to Add:</div>
+        <select
+          value={activePack}
+          onChange={(e) => setActivePack(e.target.value)}
+          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+        >
+          {PACK_TYPES.map((p) => (
+            <option key={p.key} value={p.key}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <button
+        onClick={addRow}
+        className="rounded-xl bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-700 transition"
+      >
+        + Add Row
+      </button>
+    </div>
+    
+    {/* Single Table showing ALL rows with Pack Type column */}
+    <PackTypeTable
+      rows={packRows}
+      onChange={updatePackRow}
+      onRemove={removeRow}
+      onDuplicate={duplicateRow}
+      pkgTypes={pkgTypes}
+      uoms={uoms}
+      skuSizes={skuSizes}
+      items={items}
+      onNavigateToCreate={() => router.push('/admin/pkg-type?returnUrl=/admin/order-panel/create')}
+      onNavigateToCreateUOM={() => router.push('/admin/uoms?returnUrl=/admin/order-panel/create')}
+      onNavigateToCreateSKUSize={() => router.push('/admin/sku-sizes?returnUrl=/admin/order-panel/create')}
+      onNavigateToCreateItem={() => router.push('/admin/items?returnUrl=/admin/order-panel/create')}
+    />
+  </Card>
+</div>
         </div>
       </div>
     </div>

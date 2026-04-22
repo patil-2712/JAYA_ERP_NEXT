@@ -2599,6 +2599,7 @@ function defaultRow(packType) {
   if (packType === "PALLETIZATION") {
     return {
       _id: uid(),
+      packType: "PALLETIZATION",
       noOfPallets: "",
       unitPerPallets: "",
       totalPkgs: "",
@@ -2618,6 +2619,7 @@ function defaultRow(packType) {
   if (packType === "UNIFORM - BAGS/BOXES") {
     return {
       _id: uid(),
+      packType: "UNIFORM - BAGS/BOXES",
       totalPkgs: "",
       pkgsType: "",
       uom: "MT",
@@ -2634,6 +2636,7 @@ function defaultRow(packType) {
   if (packType === "LOOSE - CARGO") {
     return {
       _id: uid(),
+      packType: "LOOSE - CARGO",
       uom: "MT",
       productName: "",
       actualWt: "",
@@ -2644,6 +2647,7 @@ function defaultRow(packType) {
   // NON-UNIFORM - GENERAL CARGO
   return {
     _id: uid(),
+    packType: "NON-UNIFORM - GENERAL CARGO",
     nos: "",
     productName: "",
     uom: "MT",
@@ -2881,14 +2885,10 @@ export default function EditOrderPanel() {
   const [plantRows, setPlantRows] = useState([defaultPlantRow()]);
 
   /** =========================
-   * PACK DATA - Separate arrays for each pack type
+   * PACK DATA - Single array for all pack types (like create page)
    ========================= */
-  const [packData, setPackData] = useState({
-    PALLETIZATION: [],
-    "UNIFORM - BAGS/BOXES": [],
-    "LOOSE - CARGO": [],
-    "NON-UNIFORM - GENERAL CARGO": [],
-  });
+  const [activePack, setActivePack] = useState("PALLETIZATION");
+  const [packRows, setPackRows] = useState([]);
 
   /** =========================
    * FETCH MASTER DATA
@@ -3014,6 +3014,74 @@ export default function EditOrderPanel() {
   };
 
   /** =========================
+   * RECALCULATION FUNCTIONS
+   ========================= */
+  const recalculatePalletizationWeights = (row) => {
+    const updatedRow = { ...row };
+    
+    const noOfPallets = num(updatedRow.noOfPallets);
+    const unitPerPallets = num(updatedRow.unitPerPallets);
+    const packWeight = num(updatedRow.packWeight);
+    const uom = (updatedRow.uom || "").toUpperCase().trim();
+    
+    let totalPkgs = num(updatedRow.totalPkgs);
+    
+    if (noOfPallets > 0 && unitPerPallets > 0) {
+      const calculatedTotalPkgs = noOfPallets * unitPerPallets;
+      totalPkgs = calculatedTotalPkgs;
+      updatedRow.totalPkgs = String(calculatedTotalPkgs);
+    }
+    
+    if (totalPkgs > 0 && packWeight > 0) {
+      const isLTR = uom === "LTR" || uom === "L" || uom === "LITRE" || uom === "LITRES";
+      
+      if (isLTR) {
+        const wtLtr = totalPkgs * packWeight;
+        updatedRow.wtLtr = wtLtr.toFixed(2);
+        const actualWt = (wtLtr / 1000) * 2;
+        updatedRow.actualWt = actualWt.toFixed(3);
+      } else {
+        const actualWt = totalPkgs * packWeight;
+        updatedRow.actualWt = actualWt.toFixed(3);
+        updatedRow.wtLtr = "";
+      }
+    } else {
+      updatedRow.wtLtr = "";
+      updatedRow.actualWt = "";
+    }
+    
+    return updatedRow;
+  };
+
+  const recalculateUniformWeights = (row) => {
+    const updatedRow = { ...row };
+    
+    const totalPkgs = num(updatedRow.totalPkgs);
+    const packWeight = num(updatedRow.packWeight);
+    const uom = (updatedRow.uom || "").toUpperCase().trim();
+    
+    if (totalPkgs > 0 && packWeight > 0) {
+      const isLTR = uom === "LTR" || uom === "L" || uom === "LITRE" || uom === "LITRES";
+      
+      if (isLTR) {
+        const wtLtr = totalPkgs * packWeight;
+        updatedRow.wtLtr = wtLtr.toFixed(2);
+        const actualWt = (wtLtr / 1000) * 2;
+        updatedRow.actualWt = actualWt.toFixed(3);
+      } else {
+        const actualWt = totalPkgs * packWeight;
+        updatedRow.actualWt = actualWt.toFixed(3);
+        updatedRow.wtLtr = "";
+      }
+    } else {
+      updatedRow.wtLtr = "";
+      updatedRow.actualWt = "";
+    }
+    
+    return updatedRow;
+  };
+
+  /** =========================
    * FETCH ORDER DATA
    ========================= */
   useEffect(() => {
@@ -3103,62 +3171,77 @@ export default function EditOrderPanel() {
         setPlantRows(processedPlantRows);
       }
 
-      // Load pack data for all pack types
+      // Convert packData to packRows (single array like create page)
       if (order.packData) {
-        const processedPackData = {
-          PALLETIZATION: (order.packData.PALLETIZATION || []).map(row => ({
-            ...row,
-            _id: row._id || uid(),
-            noOfPallets: row.noOfPallets?.toString() || "",
-            unitPerPallets: row.unitPerPallets?.toString() || "",
-            totalPkgs: row.totalPkgs?.toString() || "",
-            pkgsType: row.pkgsType || "",
-            uom: row.uom || "MT",
-            skuSize: row.skuSize || "",
-            packWeight: row.packWeight?.toString() || "",
-            productName: row.productName || "",
-            wtLtr: row.wtLtr?.toString() || "",
-            actualWt: row.actualWt?.toString() || "",
-            chargedWt: row.chargedWt?.toString() || "",
-            wtUom: row.wtUom || "MT",
-            isUniform: row.isUniform || false,
-          })),
-          "UNIFORM - BAGS/BOXES": (order.packData["UNIFORM - BAGS/BOXES"] || []).map(row => ({
-            ...row,
-            _id: row._id || uid(),
-            totalPkgs: row.totalPkgs?.toString() || "",
-            pkgsType: row.pkgsType || "",
-            uom: row.uom || "MT",
-            skuSize: row.skuSize || "",
-            packWeight: row.packWeight?.toString() || "",
-            productName: row.productName || "",
-            wtLtr: row.wtLtr?.toString() || "",
-            actualWt: row.actualWt?.toString() || "",
-            chargedWt: row.chargedWt?.toString() || "",
-            wtUom: row.wtUom || "MT",
-          })),
-          "LOOSE - CARGO": (order.packData["LOOSE - CARGO"] || []).map(row => ({
-            ...row,
-            _id: row._id || uid(),
-            uom: row.uom || "MT",
-            productName: row.productName || "",
-            actualWt: row.actualWt?.toString() || "",
-            chargedWt: row.chargedWt?.toString() || "",
-          })),
-          "NON-UNIFORM - GENERAL CARGO": (order.packData["NON-UNIFORM - GENERAL CARGO"] || []).map(row => ({
-            ...row,
-            _id: row._id || uid(),
-            nos: row.nos?.toString() || "",
-            productName: row.productName || "",
-            uom: row.uom || "MT",
-            length: row.length?.toString() || "",
-            width: row.width?.toString() || "",
-            height: row.height?.toString() || "",
-            actualWt: row.actualWt?.toString() || "",
-            chargedWt: row.chargedWt?.toString() || "",
-          })),
-        };
-        setPackData(processedPackData);
+        const allRows = [];
+        
+        if (order.packData.PALLETIZATION) {
+          order.packData.PALLETIZATION.forEach(row => {
+            allRows.push({
+              ...row,
+              packType: "PALLETIZATION",
+              _id: row._id || uid(),
+              noOfPallets: row.noOfPallets?.toString() || "",
+              unitPerPallets: row.unitPerPallets?.toString() || "",
+              totalPkgs: row.totalPkgs?.toString() || "",
+              packWeight: row.packWeight?.toString() || "",
+              wtLtr: row.wtLtr?.toString() || "",
+              actualWt: row.actualWt?.toString() || "",
+              chargedWt: row.chargedWt?.toString() || "",
+            });
+          });
+        }
+        
+        if (order.packData["UNIFORM - BAGS/BOXES"]) {
+          order.packData["UNIFORM - BAGS/BOXES"].forEach(row => {
+            allRows.push({
+              ...row,
+              packType: "UNIFORM - BAGS/BOXES",
+              _id: row._id || uid(),
+              totalPkgs: row.totalPkgs?.toString() || "",
+              packWeight: row.packWeight?.toString() || "",
+              wtLtr: row.wtLtr?.toString() || "",
+              actualWt: row.actualWt?.toString() || "",
+              chargedWt: row.chargedWt?.toString() || "",
+            });
+          });
+        }
+        
+        if (order.packData["LOOSE - CARGO"]) {
+          order.packData["LOOSE - CARGO"].forEach(row => {
+            allRows.push({
+              ...row,
+              packType: "LOOSE - CARGO",
+              _id: row._id || uid(),
+              actualWt: row.actualWt?.toString() || "",
+              chargedWt: row.chargedWt?.toString() || "",
+            });
+          });
+        }
+        
+        if (order.packData["NON-UNIFORM - GENERAL CARGO"]) {
+          order.packData["NON-UNIFORM - GENERAL CARGO"].forEach(row => {
+            allRows.push({
+              ...row,
+              packType: "NON-UNIFORM - GENERAL CARGO",
+              _id: row._id || uid(),
+              nos: row.nos?.toString() || "",
+              length: row.length?.toString() || "",
+              width: row.width?.toString() || "",
+              height: row.height?.toString() || "",
+              actualWt: row.actualWt?.toString() || "",
+              chargedWt: row.chargedWt?.toString() || "",
+            });
+          });
+        }
+        
+        if (allRows.length > 0) {
+          setPackRows(allRows);
+        } else {
+          setPackRows([{ ...defaultRow("PALLETIZATION"), packType: "PALLETIZATION" }]);
+        }
+      } else {
+        setPackRows([{ ...defaultRow("PALLETIZATION"), packType: "PALLETIZATION" }]);
       }
 
     } catch (error) {
@@ -3342,125 +3425,49 @@ export default function EditOrderPanel() {
   };
 
   /** =========================
-   * PACK DATA FUNCTIONS
+   * PACK ROW FUNCTIONS (like create page)
    ========================= */
-  const recalculatePalletizationWeights = (row) => {
-    const updatedRow = { ...row };
-    
-    const noOfPallets = num(updatedRow.noOfPallets);
-    const unitPerPallets = num(updatedRow.unitPerPallets);
-    const packWeight = num(updatedRow.packWeight);
-    const uom = (updatedRow.uom || "").toUpperCase().trim();
-    
-    let totalPkgs = num(updatedRow.totalPkgs);
-    
-    if (noOfPallets > 0 && unitPerPallets > 0) {
-      const calculatedTotalPkgs = noOfPallets * unitPerPallets;
-      totalPkgs = calculatedTotalPkgs;
-      updatedRow.totalPkgs = String(calculatedTotalPkgs);
-    }
-    
-    if (totalPkgs > 0 && packWeight > 0) {
-      if (uom === "LTR" || uom === "L") {
-        const wtLtr = totalPkgs * packWeight;
-        updatedRow.wtLtr = wtLtr.toFixed(2);
-        const actualWt = wtLtr / 1000;
-        updatedRow.actualWt = actualWt.toFixed(3);
-      } else if (uom === "KG" || uom === "KGS") {
-        const actualWt = totalPkgs * packWeight;
-        updatedRow.actualWt = actualWt.toFixed(3);
-        updatedRow.wtLtr = "";
-      } else {
-        updatedRow.wtLtr = "";
-        updatedRow.actualWt = "";
-      }
-    } else {
-      if (!updatedRow.wtLtr) updatedRow.wtLtr = "";
-      if (!updatedRow.actualWt) updatedRow.actualWt = "";
-    }
-    
-    return updatedRow;
-  };
-
-  const recalculateUniformWeights = (row) => {
-    const updatedRow = { ...row };
-    
-    const totalPkgs = num(updatedRow.totalPkgs);
-    const packWeight = num(updatedRow.packWeight);
-    const uom = (updatedRow.uom || "").toUpperCase().trim();
-    
-    if (totalPkgs > 0 && packWeight > 0) {
-      if (uom === "LTR" || uom === "L") {
-        const wtLtr = totalPkgs * packWeight;
-        updatedRow.wtLtr = wtLtr.toFixed(2);
-        const actualWt = (wtLtr / 1000) * 2;
-        updatedRow.actualWt = actualWt.toFixed(3);
-      } else if (uom === "KG" || uom === "KGS") {
-        const actualWt = totalPkgs * packWeight;
-        updatedRow.actualWt = actualWt.toFixed(3);
-        updatedRow.wtLtr = "";
-      } else {
-        updatedRow.wtLtr = "";
-        updatedRow.actualWt = "";
-      }
-    } else {
-      if (!updatedRow.wtLtr) updatedRow.wtLtr = "";
-      if (!updatedRow.actualWt) updatedRow.actualWt = "";
-    }
-    
-    return updatedRow;
-  };
-
-  const updatePackRow = (rowId, key, value, packType) => {
-    setPackData((prev) => {
-      const updatedPack = prev[packType].map((r) => {
+  const updatePackRow = (rowId, key, value) => {
+    setPackRows((prev) =>
+      prev.map((r) => {
         if (r._id === rowId) {
           let updatedRow = { ...r, [key]: value };
           
-          if (packType === "PALLETIZATION") {
+          if (r.packType === "PALLETIZATION") {
             updatedRow = recalculatePalletizationWeights(updatedRow);
-          } else if (packType === "UNIFORM - BAGS/BOXES") {
+          } else if (r.packType === "UNIFORM - BAGS/BOXES") {
             updatedRow = recalculateUniformWeights(updatedRow);
           }
           
           return updatedRow;
         }
         return r;
-      });
-      
-      return {
-        ...prev,
-        [packType]: updatedPack,
-      };
-    });
+      })
+    );
   };
 
-  const addRow = (packType) => {
-    setPackData((prev) => ({
+  const addRow = () => {
+    setPackRows((prev) => [
       ...prev,
-      [packType]: [...prev[packType], defaultRow(packType)],
-    }));
+      { ...defaultRow(activePack), packType: activePack }
+    ]);
   };
 
-  const removeRow = (packType, id) => {
-    const currentRows = packData[packType] || [];
-    if (currentRows.length > 1) {
-      setPackData((prev) => ({
-        ...prev,
-        [packType]: prev[packType].filter((r) => r._id !== id),
-      }));
+  const removeRow = (id) => {
+    if (packRows.length > 1) {
+      setPackRows((prev) => prev.filter((r) => r._id !== id));
     } else {
       alert("At least one row is required");
     }
   };
 
-  const duplicateRow = (packType, id) => {
-    const row = (packData[packType] || []).find((r) => r._id === id);
+  const duplicateRow = (id) => {
+    const row = packRows.find((r) => r._id === id);
     if (!row) return;
-    setPackData((prev) => ({
+    setPackRows((prev) => [
       ...prev,
-      [packType]: [...prev[packType], { ...row, _id: uid() }],
-    }));
+      { ...row, _id: uid() }
+    ]);
   };
 
   /** =========================
@@ -3523,14 +3530,13 @@ export default function EditOrderPanel() {
           status: row.status || "Open",
           rate: 0,
           locationRate: 0,
-          // ✅ Charges are here - per plant row (per order)
           collectionCharges: num(row.collectionCharges) || 0,
           cancellationCharges: row.cancellationCharges || 'Nil',
           loadingCharges: row.loadingCharges || 'Nil',
           otherCharges: num(row.otherCharges) || 0
         })),
         packData: {
-          PALLETIZATION: packData.PALLETIZATION.map(row => ({
+          PALLETIZATION: packRows.filter(row => row.packType === "PALLETIZATION").map(row => ({
             _id: row._id,
             noOfPallets: num(row.noOfPallets),
             unitPerPallets: num(row.unitPerPallets),
@@ -3546,7 +3552,7 @@ export default function EditOrderPanel() {
             wtUom: row.wtUom || "MT",
             isUniform: row.isUniform || false
           })),
-          "UNIFORM - BAGS/BOXES": packData["UNIFORM - BAGS/BOXES"].map(row => ({
+          "UNIFORM - BAGS/BOXES": packRows.filter(row => row.packType === "UNIFORM - BAGS/BOXES").map(row => ({
             _id: row._id,
             totalPkgs: num(row.totalPkgs),
             pkgsType: row.pkgsType || "",
@@ -3559,14 +3565,14 @@ export default function EditOrderPanel() {
             chargedWt: num(row.chargedWt),
             wtUom: row.wtUom || "MT"
           })),
-          "LOOSE - CARGO": packData["LOOSE - CARGO"].map(row => ({
+          "LOOSE - CARGO": packRows.filter(row => row.packType === "LOOSE - CARGO").map(row => ({
             _id: row._id,
             uom: row.uom || "MT",
             productName: row.productName || "",
             actualWt: num(row.actualWt),
             chargedWt: num(row.chargedWt)
           })),
-          "NON-UNIFORM - GENERAL CARGO": packData["NON-UNIFORM - GENERAL CARGO"].map(row => ({
+          "NON-UNIFORM - GENERAL CARGO": packRows.filter(row => row.packType === "NON-UNIFORM - GENERAL CARGO").map(row => ({
             _id: row._id,
             nos: num(row.nos),
             productName: row.productName || "",
@@ -3680,7 +3686,7 @@ export default function EditOrderPanel() {
 
       {/* ===== Main Layout ===== */}
       <div className="mx-auto max-w-full p-4">
-        {/* Header info - NO CHARGES HERE */}
+        {/* Header info */}
         <Card title="Order Details">
           <div className="grid grid-cols-12 gap-3">
             <div className="col-span-12 md:col-span-4">
@@ -3784,7 +3790,7 @@ export default function EditOrderPanel() {
         </Card>
 
         <div className="mt-4">
-          {/* Plant Code / Route Section - CHARGES ARE HERE (per plant row) */}
+          {/* Plant Code / Route Section */}
           <Card title="Plant Code / Route">
             <div className="mb-4 flex justify-between items-center">
               <div className="text-sm text-slate-600">
@@ -3818,7 +3824,7 @@ export default function EditOrderPanel() {
               onSelectCity={handleSelectCity}
               plants={plants}
               branches={branches}
-              locations={locations} 
+              locations={locations}
               pincodeAPI={pincodeAPI}
               pincodeInput={pincodeInput}
               showCityDropdown={showCityDropdown}
@@ -3828,36 +3834,49 @@ export default function EditOrderPanel() {
             />
           </Card>
 
-          {/* PACK TYPE SECTIONS - Show ALL sections at once */}
-          <div className="mt-4 space-y-6">
-            {PACK_TYPES.map((pack) => (
-              <Card key={pack.key} title={`${pack.label} (${packData[pack.key]?.length || 0} rows)`}>
-                <div className="mb-4 flex justify-end">
-                  <button
-                    onClick={() => addRow(pack.key)}
-                    className="rounded-xl bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-700 transition"
+          {/* PACK TYPE SECTIONS - Single table with all rows (like create page) */}
+          <div className="mt-4">
+            <Card title="Pack Type">
+              {/* Pack Type Selector for adding new rows */}
+              <div className="mb-4 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="text-sm font-bold text-slate-700">Select Pack Type to Add:</div>
+                  <select
+                    value={activePack}
+                    onChange={(e) => setActivePack(e.target.value)}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
                   >
-                    + Add Row
-                  </button>
+                    {PACK_TYPES.map((p) => (
+                      <option key={p.key} value={p.key}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                
-                <PackTypeTable
-                  packType={pack.key}
-                  rows={packData[pack.key] || []}
-                  onChange={(rowId, key, value) => updatePackRow(rowId, key, value, pack.key)}
-                  onRemove={(id) => removeRow(pack.key, id)}
-                  onDuplicate={(id) => duplicateRow(pack.key, id)}
-                  pkgTypes={pkgTypes}
-                  uoms={uoms}
-                  skuSizes={skuSizes}
-                  items={items}
-                  onNavigateToCreate={() => router.push('/admin/pkg-type?returnUrl=/admin/order-panel/create')}
-                  onNavigateToCreateUOM={() => router.push('/admin/uoms?returnUrl=/admin/order-panel/create')}
-                  onNavigateToCreateSKUSize={() => router.push('/admin/sku-sizes?returnUrl=/admin/order-panel/create')}
-                  onNavigateToCreateItem={() => router.push('/admin/items?returnUrl=/admin/order-panel/create')}
-                />
-              </Card>
-            ))}
+                <button
+                  onClick={addRow}
+                  className="rounded-xl bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-700 transition"
+                >
+                  + Add Row
+                </button>
+              </div>
+              
+              {/* Single Table showing ALL rows with Pack Type column */}
+              <PackTypeTable
+                rows={packRows}
+                onChange={updatePackRow}
+                onRemove={removeRow}
+                onDuplicate={duplicateRow}
+                pkgTypes={pkgTypes}
+                uoms={uoms}
+                skuSizes={skuSizes}
+                items={items}
+                onNavigateToCreate={() => router.push('/admin/pkg-type?returnUrl=/admin/order-panel/edit')}
+                onNavigateToCreateUOM={() => router.push('/admin/uoms?returnUrl=/admin/order-panel/edit')}
+                onNavigateToCreateSKUSize={() => router.push('/admin/sku-sizes?returnUrl=/admin/order-panel/edit')}
+                onNavigateToCreateItem={() => router.push('/admin/items?returnUrl=/admin/order-panel/edit')}
+              />
+            </Card>
           </div>
         </div>
       </div>
@@ -3866,7 +3885,7 @@ export default function EditOrderPanel() {
 }
 
 // ========================
-// COMPONENTS
+// COMPONENTS (same as create page)
 // ========================
 
 function Card({ title, right, children }) {
@@ -4111,24 +4130,6 @@ function PlantGridTable({
   const [activeCityRowId, setActiveCityRowId] = useState(null);
   const inputRefs = useRef({});
 
-  const handleBranchSelect = (rowId, field, branch) => {
-    if (branch) {
-      onChange(rowId, field, branch._id);
-      if (field === 'from') {
-        onChange(rowId, 'fromName', branch.name);
-      } else if (field === 'to') {
-        onChange(rowId, 'toName', branch.name);
-      }
-    } else {
-      onChange(rowId, field, null);
-      if (field === 'from') {
-        onChange(rowId, 'fromName', '');
-      } else if (field === 'to') {
-        onChange(rowId, 'toName', '');
-      }
-    }
-  };
-
   const handleLocationSelect = (rowId, field, location) => {
     if (location) {
       onChange(rowId, field, location._id);
@@ -4246,7 +4247,6 @@ function PlantGridTable({
             
             return (
               <tr key={r._id} className="hover:bg-yellow-50 even:bg-slate-50">
-                {/* Plant Code */}
                 <td className="border border-yellow-300 px-2 py-2">
                   <TableSearchableDropdown
                     items={plants}
@@ -4266,8 +4266,6 @@ function PlantGridTable({
                     codeField="code"
                   />
                 </td>
-
-                {/* Plant Name */}
                 <td className="border border-yellow-300 px-2 py-2">
                   <input
                     type="text"
@@ -4277,8 +4275,6 @@ function PlantGridTable({
                     placeholder="Auto-filled"
                   />
                 </td>
-
-                {/* Order Type */}
                 <td className="border border-yellow-300 px-2 py-2">
                   <select
                     value={r.orderType || ""}
@@ -4293,8 +4289,6 @@ function PlantGridTable({
                     ))}
                   </select>
                 </td>
-
-                {/* Pin Code */}
                 <td className="border border-yellow-300 px-2 py-2">
                   <div className="relative">
                     <input
@@ -4315,8 +4309,6 @@ function PlantGridTable({
                     <div className="text-xs text-red-500 mt-1">{pincodeAPI.error}</div>
                   )}
                 </td>
-
-                {/* From - Now shows Location Master data */}
                 <td className="border border-yellow-300 px-2 py-2">
                   <TableSearchableDropdown
                     items={locations}
@@ -4327,8 +4319,6 @@ function PlantGridTable({
                     codeField="code"
                   />
                 </td>
-
-                {/* To / City */}
                 <td className="border border-yellow-300 px-2 py-2">
                   <div className="relative city-dropdown-container">
                     <input
@@ -4361,8 +4351,6 @@ function PlantGridTable({
                     )}
                   </div>
                 </td>
-
-                {/* Taluka */}
                 <td className="border border-yellow-300 px-2 py-2">
                   <input
                     type="text"
@@ -4372,8 +4360,6 @@ function PlantGridTable({
                     placeholder="Auto-filled"
                   />
                 </td>
-
-                {/* District */}
                 <td className="border border-yellow-300 px-2 py-2">
                   <input
                     type="text"
@@ -4383,8 +4369,6 @@ function PlantGridTable({
                     placeholder="Auto-filled"
                   />
                 </td>
-
-                {/* State */}
                 <td className="border border-yellow-300 px-2 py-2">
                   <input
                     type="text"
@@ -4394,8 +4378,6 @@ function PlantGridTable({
                     placeholder="Auto-filled"
                   />
                 </td>
-
-                {/* Country */}
                 <td className="border border-yellow-300 px-2 py-2">
                   <input
                     type="text"
@@ -4405,8 +4387,6 @@ function PlantGridTable({
                     placeholder="Auto-filled"
                   />
                 </td>
-
-                {/* Weight */}
                 <td className="border border-yellow-300 px-2 py-2">
                   <input
                     type="number"
@@ -4416,8 +4396,6 @@ function PlantGridTable({
                     placeholder="Weight"
                   />
                 </td>
-
-                {/* Status */}
                 <td className="border border-yellow-300 px-2 py-2">
                   <select
                     value={r.status || ""}
@@ -4432,8 +4410,6 @@ function PlantGridTable({
                     ))}
                   </select>
                 </td>
-
-                {/* Charges Columns - PER PLANT ROW */}
                 {showCharges && (
                   <>
                     <td className="border border-yellow-300 px-2 py-2">
@@ -4474,8 +4450,6 @@ function PlantGridTable({
                     </td>
                   </>
                 )}
-
-                {/* Action */}
                 <td className="border border-yellow-300 px-2 py-2 text-center">
                   <button
                     onClick={() => onRemove(r._id)}
@@ -4498,7 +4472,6 @@ function PlantGridTable({
         </tbody>
       </table>
 
-      {/* City Dropdown - Portal style positioning */}
       {activeCityRowId && cityOptionsByRow[activeCityRowId] && cityOptionsByRow[activeCityRowId].length > 0 && (
         <div 
           className="fixed z-[99999] bg-white border border-slate-200 rounded-lg shadow-xl overflow-y-auto"
@@ -4709,9 +4682,7 @@ function TableSearchableDropdown({
   );
 }
 
-/** ===== Pack Type Table Component ===== */
 function PackTypeTable({ 
-  packType, 
   rows, 
   onChange, 
   onRemove, 
@@ -4733,36 +4704,36 @@ function PackTypeTable({
   const itemInputRefs = useRef({});
   const itemDropdownRef = useRef({});
 
-  const cols = useMemo(() => {
+  const getColumnsForRow = (packType) => {
     if (packType === "PALLETIZATION") {
       return [
-        { key: "noOfPallets", label: "NO OF PALLETS", type: "number", options: null },
-        { key: "unitPerPallets", label: "UNIT PER PALLETS", type: "number", options: null },
-        { key: "totalPkgs", label: "TOTAL PKGS", type: "number", options: null, readOnly: true },
+        { key: "noOfPallets", label: "NO OF PALLETS", type: "number" },
+        { key: "unitPerPallets", label: "UNIT PER PALLETS", type: "number" },
+        { key: "totalPkgs", label: "TOTAL PKGS", type: "number", readOnly: true },
         { key: "pkgsType", label: "PKG TYPE", type: "select", options: pkgTypes, isDynamic: true },
         { key: "uom", label: "UOM", type: "select", options: uoms, isUOM: true },
         { key: "skuSize", label: "SKU - SIZE", type: "select", options: skuSizes, isSKUSize: true },
-        { key: "packWeight", label: "PACK - WEIGHT", type: "number", options: null },
+        { key: "packWeight", label: "PACK - WEIGHT", type: "number" },
         { key: "productName", label: "PRODUCT NAME", type: "select", options: items, isItem: true },
-        { key: "wtLtr", label: "WT (LTR)", type: "number", options: null, readOnly: true },
-        { key: "actualWt", label: "ACTUAL - WT", type: "number", options: null, readOnly: true },
-        { key: "chargedWt", label: "CHARGED - WT", type: "number", options: null },
-        { key: "wtUom", label: "WT UOM", type: "text", options: null, readOnly: true, defaultValue: "MT" },
+        { key: "wtLtr", label: "WT (LTR)", type: "number", readOnly: true },
+        { key: "actualWt", label: "ACTUAL - WT", type: "number", readOnly: true },
+        { key: "chargedWt", label: "CHARGED - WT", type: "number" },
+        { key: "wtUom", label: "WT UOM", type: "text", readOnly: true, defaultValue: "MT" },
       ];
     }
 
     if (packType === "UNIFORM - BAGS/BOXES") {
       return [
-        { key: "totalPkgs", label: "TOTAL PKGS", type: "number", options: null },
+        { key: "totalPkgs", label: "TOTAL PKGS", type: "number" },
         { key: "pkgsType", label: "PKG TYPE", type: "select", options: pkgTypes, isDynamic: true },
         { key: "uom", label: "UOM", type: "select", options: uoms, isUOM: true },
         { key: "skuSize", label: "SKU - SIZE", type: "select", options: skuSizes, isSKUSize: true },
-        { key: "packWeight", label: "PACK - WEIGHT", type: "number", options: null },
+        { key: "packWeight", label: "PACK - WEIGHT", type: "number" },
         { key: "productName", label: "PRODUCT NAME", type: "select", options: items, isItem: true },
-        { key: "wtLtr", label: "WT (LTR)", type: "number", options: null, readOnly: true },
-        { key: "actualWt", label: "ACTUAL - WT", type: "number", options: null, readOnly: true },
-        { key: "chargedWt", label: "CHARGED - WT", type: "number", options: null },
-        { key: "wtUom", label: "WT UOM", type: "text", options: null, readOnly: true, defaultValue: "MT" },
+        { key: "wtLtr", label: "WT (LTR)", type: "number", readOnly: true },
+        { key: "actualWt", label: "ACTUAL - WT", type: "number", readOnly: true },
+        { key: "chargedWt", label: "CHARGED - WT", type: "number" },
+        { key: "wtUom", label: "WT UOM", type: "text", readOnly: true, defaultValue: "MT" },
       ];
     }
 
@@ -4770,23 +4741,22 @@ function PackTypeTable({
       return [
         { key: "uom", label: "UOM", type: "select", options: uoms, isUOM: true },
         { key: "productName", label: "PRODUCT NAME", type: "select", options: items, isItem: true },
-        { key: "actualWt", label: "ACTUAL - WT", type: "number", options: null },
-        { key: "chargedWt", label: "CHARGED - WT", type: "number", options: null },
+        { key: "actualWt", label: "ACTUAL - WT", type: "number" },
+        { key: "chargedWt", label: "CHARGED - WT", type: "number" },
       ];
     }
 
-    // NON-UNIFORM - GENERAL CARGO
     return [
-      { key: "nos", label: "NOS", type: "number", options: null },
+      { key: "nos", label: "NOS", type: "number" },
       { key: "productName", label: "PRODUCT NAME", type: "select", options: items, isItem: true },
       { key: "uom", label: "UOM", type: "select", options: uoms, isUOM: true },
-      { key: "length", label: "LENGTH", type: "number", options: null },
-      { key: "width", label: "WIDTH", type: "number", options: null },
-      { key: "height", label: "HEIGHT", type: "number", options: null },
-      { key: "actualWt", label: "ACTUAL - WT", type: "number", options: null },
-      { key: "chargedWt", label: "CHARGED - WT", type: "number", options: null },
+      { key: "length", label: "LENGTH", type: "number" },
+      { key: "width", label: "WIDTH", type: "number" },
+      { key: "height", label: "HEIGHT", type: "number" },
+      { key: "actualWt", label: "ACTUAL - WT", type: "number" },
+      { key: "chargedWt", label: "CHARGED - WT", type: "number" },
     ];
-  }, [packType, pkgTypes, uoms, skuSizes, items]);
+  };
 
   const handleChange = (rowId, key, value) => {
     onChange(rowId, key, value);
@@ -4872,9 +4842,12 @@ function PackTypeTable({
   return (
     <div className="overflow-auto rounded-xl border border-yellow-300">
       <table className="min-w-max w-full text-sm">
-        <thead className="sticky top-0 bg-yellow-400">
+        <thead className="sticky top-0 bg-yellow-400 z-10">
           <tr>
-            {cols.map((c) => (
+            <th className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center bg-yellow-400">
+              Pack Type
+            </th>
+            {rows.length > 0 && getColumnsForRow(rows[0].packType).map((c) => (
               <th
                 key={c.key}
                 className="border border-yellow-500 px-3 py-3 text-xs font-extrabold text-slate-900 text-center"
@@ -4891,189 +4864,210 @@ function PackTypeTable({
 
         <tbody>
           {rows.length > 0 ? (
-            rows.map((r) => (
-              <tr key={r._id} className="hover:bg-yellow-50 even:bg-slate-50">
-                {cols.map((c) => {
-                  if (c.key === "wtUom") {
+            rows.map((r) => {
+              const cols = getColumnsForRow(r.packType);
+              
+              return (
+                <tr key={r._id} className="hover:bg-yellow-50 even:bg-slate-50">
+                  <td className="border border-yellow-300 px-2 py-2 text-center font-semibold bg-yellow-50">
+                    {r.packType === "PALLETIZATION" ? "Palletization" :
+                     r.packType === "UNIFORM - BAGS/BOXES" ? "Uniform - Bags/Boxes" :
+                     r.packType === "LOOSE - CARGO" ? "Loose - Cargo" :
+                     "Non-uniform - General Cargo"}
+                  </td>
+                  
+                  {cols.map((c) => {
+                    if (c.key === "wtUom") {
+                      return (
+                        <td key={c.key} className="border border-yellow-300 px-2 py-2">
+                          <input
+                            type="text"
+                            value="MT"
+                            readOnly
+                            className="w-full rounded-lg border border-slate-200 bg-slate-100 px-2 py-1.5 text-sm text-slate-700 font-medium"
+                          />
+                        </td>
+                      );
+                    }
+                    
+                    if (c.readOnly && (c.key === "wtLtr" || c.key === "actualWt" || c.key === "totalPkgs")) {
+                      return (
+                        <td key={c.key} className="border border-yellow-300 px-2 py-2">
+                          <input
+                            type="text"
+                            value={r[c.key] || ""}
+                            readOnly
+                            className="w-full rounded-lg border border-slate-200 bg-slate-100 px-2 py-1.5 text-sm text-slate-700 font-medium"
+                            placeholder="Auto-calculated"
+                          />
+                        </td>
+                      );
+                    }
+                    
                     return (
                       <td key={c.key} className="border border-yellow-300 px-2 py-2">
-                        <input
-                          type="text"
-                          value="MT"
-                          readOnly
-                          className="w-full rounded-lg border border-slate-200 bg-slate-100 px-2 py-1.5 text-sm text-slate-700 font-medium"
-                        />
-                      </td>
-                    );
-                  }
-                  
-                  return (
-                    <td key={c.key} className="border border-yellow-300 px-2 py-2">
-                      {c.isDynamic ? (
-                        <div className="flex gap-2 items-center">
-                          <select
-                            value={r[c.key] || ""}
-                            onChange={(e) => handleChange(r._id, c.key, e.target.value)}
-                            className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                          >
-                            <option value="">Select {c.label}</option>
-                            {c.options.map((opt) => (
-                              <option key={opt._id} value={opt.name}>
-                                {opt.name}
-                              </option>
-                            ))}
-                          </select>
-                         
-                        </div>
-                      ) : c.isUOM ? (
-                        <div className="flex gap-2 items-center">
-                          <select
-                            value={r[c.key] || "MT"}
-                            onChange={(e) => handleChange(r._id, c.key, e.target.value)}
-                            className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                          >
-                            {c.options.length > 0 ? (
-                              c.options.map((opt) => (
+                        {c.isDynamic ? (
+                          <div className="flex gap-2 items-center">
+                            <select
+                              value={r[c.key] || ""}
+                              onChange={(e) => handleChange(r._id, c.key, e.target.value)}
+                              className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                            >
+                              <option value="">Select {c.label}</option>
+                              {c.options && c.options.map((opt) => (
                                 <option key={opt._id} value={opt.name}>
                                   {opt.name}
                                 </option>
-                              ))
-                            ) : (
-                              <option value="MT">MT</option>
-                            )}
-                          </select>
-                          
-                        </div>
-                      ) : c.isSKUSize ? (
-                        <div className="flex gap-2 items-center">
+                              ))}
+                            </select>
+                          </div>
+                        ) : c.isUOM ? (
+                          <div className="flex gap-2 items-center">
+                            <select
+                              value={r[c.key] || "MT"}
+                              onChange={(e) => handleChange(r._id, c.key, e.target.value)}
+                              className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                            >
+                              {c.options.length > 0 ? (
+                                c.options.map((opt) => (
+                                  <option key={opt._id} value={opt.name}>
+                                    {opt.name}
+                                  </option>
+                                ))
+                              ) : (
+                                <option value="MT">MT</option>
+                              )}
+                            </select>
+                          </div>
+                        ) : c.isSKUSize ? (
+                          <div className="flex gap-2 items-center">
+                            <select
+                              value={r[c.key] || ""}
+                              onChange={(e) => handleChange(r._id, c.key, e.target.value)}
+                              className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                            >
+                              <option value="">Select {c.label}</option>
+                              {c.options && c.options.map((opt) => (
+                                <option key={opt._id} value={opt.display}>
+                                  {opt.display}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        ) : c.isItem ? (
+                          <div className="relative w-full">
+                            <div className="flex gap-2 items-center">
+                              <div className="flex-1 relative">
+                                <input
+                                  ref={el => itemInputRefs.current[r._id] = el}
+                                  type="text"
+                                  value={itemSearchQuery[r._id] || r[c.key] || ""}
+                                  onChange={(e) => handleItemSearch(r._id, e.target.value)}
+                                  onFocus={(e) => handleItemInputFocus(r._id, e)}
+                                  onBlur={() => handleItemInputBlur(r._id)}
+                                  className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                                  placeholder={`Search ${c.label}...`}
+                                  autoComplete="off"
+                                />
+                                {showItemDropdown[r._id] && (
+                                  <div 
+                                    ref={el => itemDropdownRef.current[r._id] = el}
+                                    className="fixed z-[10000] bg-white border border-slate-200 rounded-lg shadow-xl overflow-y-auto"
+                                    style={{
+                                      top: `${itemDropdownPosition.top}px`,
+                                      left: `${itemDropdownPosition.left}px`,
+                                      width: `${itemDropdownPosition.width}px`,
+                                      maxHeight: '300px'
+                                    }}
+                                  >
+                                    <div className="sticky top-0 bg-gray-50 px-3 py-2 text-xs font-semibold text-slate-600 border-b">
+                                      Select Product
+                                    </div>
+                                    {(filteredItems[r._id] || items).length > 0 ? (
+                                      (filteredItems[r._id] || items).map((item) => (
+                                        <div
+                                          key={item._id}
+                                          onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            handleSelectItem(r._id, item);
+                                          }}
+                                          className="px-3 py-2 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors"
+                                        >
+                                          <div className="font-medium text-slate-800 text-sm">
+                                            {item.itemName}
+                                          </div>
+                                          <div className="text-xs text-slate-500 mt-0.5">
+                                            Code: {item.itemCode} | Price: ₹{item.unitPrice}
+                                          </div>
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <div className="p-3 text-center text-sm text-slate-500">
+                                        No items found
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ) : c.options && !c.isDynamic && !c.isUOM && !c.isSKUSize && !c.isItem ? (
                           <select
                             value={r[c.key] || ""}
                             onChange={(e) => handleChange(r._id, c.key, e.target.value)}
-                            className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
                           >
                             <option value="">Select {c.label}</option>
                             {c.options.map((opt) => (
-                              <option key={opt._id} value={opt.display}>
-                                {opt.display}
+                              <option key={opt} value={opt}>
+                                {opt}
                               </option>
                             ))}
                           </select>
-                         
-                        </div>
-                      ) : c.isItem ? (
-                        <div className="relative w-full">
-                          <div className="flex gap-2 items-center">
-                            <div className="flex-1 relative">
-                              <input
-                                ref={el => itemInputRefs.current[r._id] = el}
-                                type="text"
-                                value={itemSearchQuery[r._id] || r[c.key] || ""}
-                                onChange={(e) => handleItemSearch(r._id, e.target.value)}
-                                onFocus={(e) => handleItemInputFocus(r._id, e)}
-                                onBlur={() => handleItemInputBlur(r._id)}
-                                className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                                placeholder={`Search ${c.label}...`}
-                                autoComplete="off"
-                              />
-                              {showItemDropdown[r._id] && (
-                                <div 
-                                  ref={el => itemDropdownRef.current[r._id] = el}
-                                  className="fixed z-[10000] bg-white border border-slate-200 rounded-lg shadow-xl overflow-y-auto"
-                                  style={{
-                                    top: `${itemDropdownPosition.top}px`,
-                                    left: `${itemDropdownPosition.left}px`,
-                                    width: `${itemDropdownPosition.width}px`,
-                                    maxHeight: '300px'
-                                  }}
-                                >
-                                  <div className="sticky top-0 bg-gray-50 px-3 py-2 text-xs font-semibold text-slate-600 border-b">
-                                    Select Product
-                                  </div>
-                                  {(filteredItems[r._id] || items).length > 0 ? (
-                                    (filteredItems[r._id] || items).map((item) => (
-                                      <div
-                                        key={item._id}
-                                        onMouseDown={(e) => {
-                                          e.preventDefault();
-                                          handleSelectItem(r._id, item);
-                                        }}
-                                        className="px-3 py-2 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors"
-                                      >
-                                        <div className="font-medium text-slate-800 text-sm">
-                                          {item.itemName}
-                                        </div>
-                                        <div className="text-xs text-slate-500 mt-0.5">
-                                          Code: {item.itemCode} | Price: ₹{item.unitPrice}
-                                        </div>
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <div className="p-3 text-center text-sm text-slate-500">
-                                      No items found
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                           
-                          </div>
-                        </div>
-                      ) : c.options && !c.isDynamic && !c.isUOM && !c.isSKUSize && !c.isItem ? (
-                        <select
-                          value={r[c.key] || ""}
-                          onChange={(e) => handleChange(r._id, c.key, e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                        >
-                          <option value="">Select {c.label}</option>
-                          {c.options.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          type={c.type || "text"}
-                          value={r[c.key] || ""}
-                          readOnly={c.readOnly}
-                          onChange={(e) => handleChange(r._id, c.key, e.target.value)}
-                          className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
-                            c.readOnly 
-                              ? 'bg-slate-100 text-slate-700' 
-                              : 'bg-white'
-                          }`}
-                          placeholder={c.readOnly ? "Auto-calculated" : `Enter ${c.label}`}
-                          step={c.type === "number" ? "0.001" : undefined}
-                        />
-                      )}
-                    </td>
-                  );
-                })}
-                <td className="border border-yellow-300 px-2 py-2">
-                  <div className="flex gap-2 justify-center">
-                    <button
-                      onClick={() => onDuplicate(r._id)}
-                      className="rounded-lg border border-yellow-500 bg-yellow-100 px-3 py-1.5 text-xs font-bold text-yellow-800 hover:bg-yellow-200 transition"
-                    >
-                      Duplicate
-                    </button>
-                    <button
-                      onClick={() => onRemove(r._id)}
-                      className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-600 transition"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))
+                        ) : (
+                          <input
+                            type={c.type || "text"}
+                            value={r[c.key] || ""}
+                            readOnly={c.readOnly}
+                            onChange={(e) => handleChange(r._id, c.key, e.target.value)}
+                            className={`w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                              c.readOnly 
+                                ? 'bg-slate-100 text-slate-700' 
+                                : 'bg-white'
+                            }`}
+                            placeholder={c.readOnly ? "Auto-calculated" : `Enter ${c.label}`}
+                            step={c.type === "number" ? "0.001" : undefined}
+                          />
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className="border border-yellow-300 px-2 py-2">
+                    <div className="flex gap-2 justify-center">
+                      <button
+                        onClick={() => onDuplicate(r._id)}
+                        className="rounded-lg border border-yellow-500 bg-yellow-100 px-3 py-1.5 text-xs font-bold text-yellow-800 hover:bg-yellow-200 transition"
+                      >
+                        Duplicate
+                      </button>
+                      <button
+                        onClick={() => onRemove(r._id)}
+                        className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-600 transition"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })
           ) : (
             <tr>
               <td
-                colSpan={cols.length + 1}
+                colSpan={100}
                 className="border border-yellow-300 px-4 py-10 text-center text-slate-400 font-semibold"
               >
-                No rows yet. Click <b>Add Row</b> to add data.
+                No rows yet. Select a pack type and click <b>Add Row</b> to add data.
               </td>
             </tr>
           )}
