@@ -195,10 +195,10 @@ export async function POST(req) {
       }
     }
 
-    // Validate PAN Card document is uploaded
-    if (!body.documents?.panCard) {
-      return NextResponse.json({ success: false, message: "PAN Card document is required" }, { status: 400 });
-    }
+    //// Validate PAN Card document is uploaded
+    //if (!body.documents?.panCard) {
+    //  return NextResponse.json({ success: false, message: "PAN Card document is required" }, { status: 400 });
+    //}
 
     const existing = await Supplier.findOne({ supplierCode: body.supplierCode, companyId: user.companyId });
     if (existing) {

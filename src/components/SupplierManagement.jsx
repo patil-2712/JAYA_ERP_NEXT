@@ -8,11 +8,10 @@ import {
   FaFileUpload, FaDownload, FaShieldAlt, FaExclamationCircle,
   FaBuilding, FaUser, FaMapMarkerAlt, FaUniversity, FaClipboardCheck,
   FaBarcode, FaPhone, FaEnvelope, FaIdCard, FaMoneyBillWave, FaRegAddressCard,
-  FaEye, FaCloudUploadAlt, FaTrashAlt
+  FaEye, FaCloudUploadAlt, FaTrashAlt, FaChevronDown
 } from "react-icons/fa";
 import { HiOutlineDocumentText } from "react-icons/hi";
 import CountryStateSearch from "@/components/CountryStateSearch";
-import GroupSearch from "@/components/groupmaster";
 import AccountSearch from "@/components/AccountSearch";
 import { toast } from "react-toastify";
 
@@ -45,7 +44,9 @@ const EMPTY = {
   udyamNumber: "", incorporated: "", valid: null,
   billingAddresses:  [{ ...EMPTY_ADDR }],
   shippingAddresses: [{ ...EMPTY_ADDR }],
-  paymentTerms: "", gstNumber: "", gstCategory: "", pan: "",
+  paymentTerms: "", 
+  dueDays: "",
+  gstNumber: "", gstCategory: "", pan: "",
   bankName: "", branch: "", bankAccountNumber: "", ifscCode: "",
   leadTime: "", qualityRating: "B", glAccount: null,
   documents: { aadhaarCard: null, panCard: null, cancelledCheque: null, visitingCard: null, tdsDeclaration: null },
@@ -85,6 +86,7 @@ const VALIDATORS = {
     if (d.gstNumber && !/^\d{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(d.gstNumber))
       e.gstNumber = "Invalid GST (e.g. 22ABCDE1234F1Z5)";
     if (!d.glAccount?._id) e.glAccount = "GL Account is required";
+    if (d.dueDays && (isNaN(d.dueDays) || d.dueDays < 0)) e.dueDays = "Due days must be a positive number";
     return e;
   },
   5: (d) => {
@@ -145,6 +147,109 @@ const AddrBlock = ({ type, list, accent, onChange, onRemove, onAdd, onFetchPin, 
     </button>
   </div>
 );
+
+// Group Search Component that auto-fetches category into supplierCategory
+const GroupSearchWithCategory = ({ value, onSelectGroup, onCategoryChange }) => {
+  const [groups, setGroups] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState(value || "");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (showDropdown) {
+      fetchGroups();
+    }
+  }, [showDropdown, searchTerm]);
+
+  const fetchGroups = async (search = "") => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const url = search ? `/api/groupscreate?search=${search}` : "/api/groupscreate";
+      const res = await axios.get(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.data.success) {
+        setGroups(res.data.data || []);
+      }
+    } catch (error) {
+      console.error("Error fetching groups:", error);
+    }
+    setLoading(false);
+  };
+
+  const handleSelectGroup = (group) => {
+    setSelectedGroup(group.name);
+    setShowDropdown(false);
+    onSelectGroup(group.name);
+    // Set the supplierCategory to the group's category
+    if (onCategoryChange) {
+      onCategoryChange(group.category || "");
+    }
+  };
+
+  const filteredGroups = groups.filter(g =>
+    g.name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <input
+          type="text"
+          className="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm font-medium outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 placeholder:text-gray-300"
+          placeholder="Search or select group..."
+          value={selectedGroup}
+          onClick={() => setShowDropdown(!showDropdown)}
+          onChange={(e) => {
+            setSelectedGroup(e.target.value);
+            setSearchTerm(e.target.value);
+            setShowDropdown(true);
+            onSelectGroup(e.target.value);
+            if (onCategoryChange) onCategoryChange("");
+          }}
+        />
+        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          {loading ? (
+            <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <FaChevronDown className="text-gray-400 text-xs" />
+          )}
+        </div>
+      </div>
+      
+      {showDropdown && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setShowDropdown(false)} />
+          <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+            {filteredGroups.length === 0 ? (
+              <div className="px-3 py-2 text-sm text-gray-500">No groups found</div>
+            ) : (
+              filteredGroups.map((group) => (
+                <div
+                  key={group._id}
+                  className="px-3 py-2 hover:bg-indigo-50 cursor-pointer transition-colors"
+                  onClick={() => handleSelectGroup(group)}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-gray-800">{group.name}</span>
+                    {group.category && (
+                      <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                        {group.category}
+                      </span>
+                    )}
+                  </div>
+                  {group.description && (
+                    <p className="text-xs text-gray-400 mt-0.5 truncate">{group.description}</p>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 
 // Document Upload Component with Radio Button Selection
 const DocumentUploadSection = ({ documents, onDocumentChange }) => {
@@ -208,11 +313,6 @@ const DocumentUploadSection = ({ documents, onDocumentChange }) => {
 
   const viewDocument = (filePath) => {
     window.open(filePath, '_blank');
-  };
-
-  const getFileIcon = (docKey) => {
-    const doc = DOCUMENT_TYPES.find(d => d.key === docKey);
-    return doc ? <doc.icon className="text-2xl text-indigo-400" /> : <FaFileUpload className="text-2xl text-gray-400" />;
   };
 
   const uploadedCount = Object.values(documents).filter(doc => doc !== null).length;
@@ -520,6 +620,17 @@ export default function SupplierManagement() {
     }));
   };
 
+  // Handle group selection and auto-fetch category into supplierCategory
+  const handleGroupSelect = (groupName) => {
+    setSd(p => ({ ...p, supplierGroup: groupName }));
+    clearErr("supplierGroup");
+  };
+
+  // Handle category from group - this sets supplierCategory
+  const handleCategoryFromGroup = (category) => {
+    setSd(p => ({ ...p, supplierCategory: category }));
+  };
+
   const goNext = () => {
     const v = VALIDATORS[step];
     if (v) {
@@ -571,8 +682,8 @@ export default function SupplierManagement() {
   };
 
   const downloadTemplate = () => {
-    const h = ["supplierName","supplierGroup","supplierType","emailId","mobileNumber","gstNumber","gstCategory","pan","contactPersonName","paymentTerms","billingAddress1","billingAddress2","billingCity","billingState","billingPin","billingCountry","shippingAddress1","shippingAddress2","shippingCity","shippingState","shippingPin","shippingCountry","glAccount"];
-    const r = ["ABC Traders","Wholesale","Manufacturer","abc@traders.com","9876543210","22ABCDE1234F1Z5","Registered Regular","ABCDE1234F","Rahul Mgr","30","Line 1","Line 2","Mumbai","Maharashtra","400001","India","Line 1","Line 2","Mumbai","Maharashtra","400002","India","BANKHEAD_ID"];
+    const h = ["supplierName","supplierGroup","supplierType","emailId","mobileNumber","gstNumber","gstCategory","pan","contactPersonName","paymentTerms","dueDays","billingAddress1","billingAddress2","billingCity","billingState","billingPin","billingCountry","shippingAddress1","shippingAddress2","shippingCity","shippingState","shippingPin","shippingCountry","glAccount"];
+    const r = ["ABC Traders","Wholesale","Manufacturer","abc@traders.com","9876543210","22ABCDE1234F1Z5","Registered Regular","ABCDE1234F","Rahul Mgr","30","15","Line 1","Line 2","Mumbai","Maharashtra","400001","India","Line 1","Line 2","Mumbai","Maharashtra","400002","India","BANKHEAD_ID"];
     const blob = new Blob([[h, r].map(x => x.join(",")).join("\n")], { type: "text/csv" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "supplier_template.csv"; a.click();
   };
@@ -599,7 +710,7 @@ export default function SupplierManagement() {
 
   const filtered = suppliers.filter(s => {
     const q = searchTerm.toLowerCase();
-    const mQ = [s.supplierCode, s.supplierName, s.emailId, s.supplierType, s.supplierGroup].some(v => v?.toLowerCase().includes(q));
+    const mQ = [s.supplierCode, s.supplierName, s.emailId, s.supplierType, s.supplierGroup, s.supplierCategory].some(v => v?.toLowerCase().includes(q));
     const mT = filterType === "All" || s.supplierType === filterType;
     return mQ && mT;
   });
@@ -676,7 +787,11 @@ export default function SupplierManagement() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Lbl text="Supplier Group" req />
-              <GroupSearch value={sd.supplierGroup} onSelectGroup={name => { setSd(p => ({ ...p, supplierGroup: name })); clearErr("supplierGroup"); }} />
+              <GroupSearchWithCategory 
+                value={sd.supplierGroup} 
+                onSelectGroup={handleGroupSelect}
+                onCategoryChange={handleCategoryFromGroup}
+              />
               <Err k="supplierGroup" />
             </div>
             <div>
@@ -695,7 +810,17 @@ export default function SupplierManagement() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Lbl text="Supplier Category" />
-              <input className={fi("")} name="supplierCategory" value={sd.supplierCategory || ""} onChange={handleChange} placeholder="e.g. Electronics, Raw Materials" />
+              <input 
+                className={fi("supplierCategory")} 
+                name="supplierCategory" 
+                value={sd.supplierCategory || ""} 
+                onChange={handleChange}
+                placeholder="Auto-filled from group category"
+                readOnly={!!sd.supplierGroup}
+              />
+              <p className="text-[11px] text-gray-400 mt-1">
+                {sd.supplierGroup ? "Auto-filled from selected group's category" : "Select a group to auto-fill category"}
+              </p>
             </div>
             <div>
               <Lbl text="Incorporated Date" />
@@ -796,6 +921,19 @@ export default function SupplierManagement() {
               <Lbl text="Payment Terms (Days)" />
               <input className={fi("")} name="paymentTerms" type="number" placeholder="e.g. 30" value={sd.paymentTerms || ""} onChange={handleChange} />
             </div>
+            <div>
+              <Lbl text="Due Days" />
+              <input 
+                className={fi("dueDays")} 
+                name="dueDays" 
+                type="number" 
+                placeholder="e.g. 15" 
+                value={sd.dueDays || ""} 
+                onChange={handleChange}
+              />
+              <p className="text-[11px] text-gray-400 mt-1">Number of days for payment due</p>
+              <Err k="dueDays" />
+            </div>
           </div>
           <div className="border-t border-gray-100 pt-4">
             <Lbl text="GL Account" req />
@@ -875,6 +1013,7 @@ export default function SupplierManagement() {
             <RRow l="GST Category" v={sd.gstCategory} />
             <RRow l="PAN" v={sd.pan} />
             <RRow l="Payment Terms" v={sd.paymentTerms ? `${sd.paymentTerms} days` : ""} />
+            <RRow l="Due Days" v={sd.dueDays ? `${sd.dueDays} days` : ""} />
             <RRow l="GL Account" v={sd.glAccount?.accountName} />
           </div>
 
@@ -975,7 +1114,7 @@ export default function SupplierManagement() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  {["Code","Supplier","Email","Type","Group","Valid","Documents","Actions"].map(h => (
+                  {["Code","Supplier","Email","Type","Group","Category","Due Days","Valid","Documents","Actions"].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-[10.5px] font-bold uppercase tracking-wider text-gray-400 whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -984,7 +1123,7 @@ export default function SupplierManagement() {
                 {loading ? (
                   Array(4).fill(0).map((_, i) => (
                     <tr key={i} className="border-b border-gray-50">
-                      {Array(8).fill(0).map((__, j) => (
+                      {Array(10).fill(0).map((__, j) => (
                         <td key={j} className="px-4 py-3">
                           <div className="h-3.5 rounded bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 bg-[length:400%_100%] animate-[shimmer_1.4s_infinite]" />
                         </td>
@@ -993,7 +1132,7 @@ export default function SupplierManagement() {
                   ))
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-16">
+                    <td colSpan={10} className="text-center py-16">
                       <div className="text-4xl mb-2 opacity-20">🏭</div>
                       <p className="text-sm font-medium text-gray-300">No suppliers found</p>
                     </td>
@@ -1020,6 +1159,16 @@ export default function SupplierManagement() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-gray-600 text-xs font-medium">{s.supplierGroup || <span className="text-gray-200">—</span>}</td>
+                      <td className="px-4 py-3">
+                        {s.supplierCategory ? (
+                          <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">
+                            {s.supplierCategory}
+                          </span>
+                        ) : (
+                          <span className="text-gray-200 text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 text-xs font-medium">{s.dueDays ? `${s.dueDays} days` : <span className="text-gray-200">—</span>}</td>
                       <td className="px-4 py-3">
                         {s.valid === true ? <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">✓ Valid</span>
                          : s.valid === false ? <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-500">✗ Invalid</span>
@@ -1208,6 +1357,7 @@ function SupplierViewModal({ open, onClose, supplier: s, onEdit }) {
               <Row l="GST Category" v={s.gstCategory} />
               <Row l="PAN" v={s.pan} />
               <Row l="Payment Terms" v={s.paymentTerms ? `${s.paymentTerms} days` : ""} />
+              <Row l="Due Days" v={s.dueDays ? `${s.dueDays} days` : ""} />
               <Row l="GL Account" v={s.glAccount?.accountName} />
             </div>
           </div>
@@ -1273,7 +1423,6 @@ function SupplierViewModal({ open, onClose, supplier: s, onEdit }) {
     </div>
   );
 }
-
 //"use client";
 //
 //import React, { useState, useEffect } from "react";

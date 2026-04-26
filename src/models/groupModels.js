@@ -9,10 +9,15 @@ const groupSchema = new mongoose.Schema(
       ref: "Company",
       required: true,
     },
-     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "companyUser" },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "companyUser" },
     name: {
       type: String,
       required: true,
+      trim: true,
+    },
+    category: {  // NEW: Category field
+      type: String,
+      default: "",
       trim: true,
     },
     description: {
@@ -20,8 +25,6 @@ const groupSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-
-
     createdAt: {
       type: Date,
       default: Date.now,

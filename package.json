@@ -52,7 +52,7 @@
     "mongoose": "^8.8.3",
     "mssql": "^11.0.1",
     "next": "^15.2.6",
-    "nodemailer": "^7.0.4",
+    "nodemailer": "^7.0.13",
     "openai": "^6.9.0",
     "or": "^0.2.0",
     "otp-generator": "^4.0.1",

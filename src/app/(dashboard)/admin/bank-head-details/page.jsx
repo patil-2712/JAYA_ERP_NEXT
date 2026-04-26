@@ -281,14 +281,14 @@ export default function BankHeadPage() {
 
         {/* Back */}
         <button onClick={reset} className="flex items-center gap-1.5 text-indigo-600 font-semibold text-sm mb-4 hover:text-indigo-800 transition-colors">
-          <FaArrowLeft className="text-xs" /> Back to Bank Heads
+          <FaArrowLeft className="text-xs" /> Back to General Ledger
         </button>
 
         <h2 className="text-xl font-extrabold tracking-tight text-gray-900 mb-0.5">
-          {editId ? "Edit Bank Head" : "New Bank Head"}
+          {editId ? "Edit General Ledger" : "New General Ledger"}
         </h2>
         <p className="text-sm text-gray-400 mb-6">
-          {editId ? "Update the bank head details below" : "Fill in the details to add a new bank head"}
+          {editId ? "Update the General Ledger details below" : "Fill in the details to add a new bank head"}
         </p>
 
         {/* Form card */}
@@ -300,7 +300,7 @@ export default function BankHeadPage() {
               <FaUniversity className="text-base" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-gray-900">Bank Head Details</h3>
+              <h3 className="text-base font-bold text-gray-900">General Ledger Details</h3>
               <p className="text-xs text-gray-400">Fill in the details below</p>
             </div>
           </div>

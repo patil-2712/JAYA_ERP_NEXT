@@ -812,18 +812,24 @@ export async function GET(req) {
     }
 
     // CASE 3: GET BY PURCHASE NUMBER
-    if (purchaseNo) {
-      const payment = await AdvancePayment.findOne({
-        purchaseNo: purchaseNo,
-        companyId: user.companyId
-      }).lean();
+if (purchaseNo) {
+  console.log(`🔍 Searching for Advance Payment with purchaseNo: "${purchaseNo}"`);
+  console.log(`Company ID: ${user.companyId}`);
+  
+  const payment = await AdvancePayment.findOne({
+    purchaseNo: purchaseNo,
+    companyId: user.companyId
+  }).lean();
+  
+  console.log("✅ Found payment:", payment ? payment.paymentNo : "NOT FOUND");
+  console.log("Payment data:", payment);
 
-      return NextResponse.json({ 
-        success: true, 
-        data: payment || null,
-        exists: !!payment
-      }, { status: 200 });
-    }
+  return NextResponse.json({ 
+    success: true, 
+    data: payment || null,
+    exists: !!payment
+  }, { status: 200 });
+}
 
     // CASE 4: TABLE FORMAT FOR LIST VIEW
     if (format === 'table') {

@@ -14,15 +14,17 @@ export default function UnifiedRateMasterPage() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   
-  // Add Rate State
+  // Track which master's rates are being viewed/added
   const [expandedMasterId, setExpandedMasterId] = useState(null);
+  
+  // Add Rate State for each master
   const [locations, setLocations] = useState([]);
   const [sortedLocations, setSortedLocations] = useState([]);
   const [locationRows, setLocationRows] = useState({});
   const [addingRates, setAddingRates] = useState(false);
-  const [editingRate, setEditingRate] = useState(null);
+  const [editingRate, setEditingRate] = useState({}); // Store editing state per master
 
-  // Fetch all Rate Masters with their location rates
+  // Fetch all Rate Masters
   const fetchAllRateMasters = async () => {
     setLoading(true);
     try {
@@ -88,6 +90,30 @@ export default function UnifiedRateMasterPage() {
     fetchAllRateMasters();
     fetchLocations();
   }, []);
+
+  // Delete Rate Master
+  const deleteRateMaster = async (id) => {
+    if (!confirm('Are you sure you want to delete this rate master?')) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/rate-master?id=${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to delete rate master');
+      }
+      fetchAllRateMasters();
+      setSuccess('Rate master deleted successfully!');
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (error) {
+      console.error('Error deleting rate master:', error);
+      setError(error.message);
+      setTimeout(() => setError(null), 3000);
+    }
+  };
 
   // Function to check for overlaps
   const checkOverlaps = (existingRates, newRates) => {
@@ -167,7 +193,7 @@ export default function UnifiedRateMasterPage() {
     return { valid: true };
   };
 
-  // Submit New Location Rates
+  // Submit New Location Rates for a specific master
   const handleAddRates = async (master) => {
     const rows = locationRows[master._id] || [];
     const validRows = rows.filter(row => row.locationId && row.fromQty && row.toQty && row.rate);
@@ -271,12 +297,13 @@ export default function UnifiedRateMasterPage() {
       setSuccess('Location rates added successfully!');
       setTimeout(() => setSuccess(null), 3000);
       
-      // Clear rows for this master and collapse
+      // Clear rows for this master
       setLocationRows({
         ...locationRows,
         [master._id]: []
       });
-      setExpandedMasterId(null);
+      
+      // Refresh data
       await fetchAllRateMasters();
       
     } catch (error) {
@@ -346,7 +373,9 @@ export default function UnifiedRateMasterPage() {
       
       setSuccess('Location rate updated successfully!');
       setTimeout(() => setSuccess(null), 3000);
-      setEditingRate(null);
+      
+      // Clear editing state for this master
+      setEditingRate({ ...editingRate, [masterId]: null });
       await fetchAllRateMasters();
       
     } catch (error) {
@@ -422,8 +451,8 @@ export default function UnifiedRateMasterPage() {
     return option === 'contract_rate' ? 'Contract Rate' : 'Mail Approval';
   };
 
-  // Open add rates form for a specific master
-  const openAddRatesForm = (masterId) => {
+  // Toggle add rates form for a specific master
+  const toggleAddRatesForm = (masterId) => {
     if (expandedMasterId === masterId) {
       setExpandedMasterId(null);
       setLocationRows({ ...locationRows, [masterId]: [] });
@@ -436,7 +465,7 @@ export default function UnifiedRateMasterPage() {
         });
       }
     }
-    setEditingRate(null);
+    setEditingRate({ ...editingRate, [masterId]: null });
   };
 
   return (
@@ -492,14 +521,19 @@ export default function UnifiedRateMasterPage() {
             {searchTerm ? 'No rate masters found matching your search' : 'No rate masters found. Create your first rate master!'}
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-6">
             {filteredMasters.map((master) => (
               <div key={master._id} className="border rounded-lg overflow-hidden shadow-sm">
                 {/* Rate Master Header */}
                 <div className="bg-gradient-to-r from-gray-800 to-gray-900 text-white px-6 py-4">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h2 className="text-xl font-bold">{master.title}</h2>
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-xl font-bold">{master.title}</h2>
+                        <span className="px-2 py-1 rounded text-xs bg-yellow-600 text-white">
+                          {master.locationRates?.length || 0} Locations Added
+                        </span>
+                      </div>
                       <p className="text-sm text-gray-300 mt-1">
                         Customer: {master.customerName} | Branch: {master.branchName}
                       </p>
@@ -518,9 +552,6 @@ export default function UnifiedRateMasterPage() {
                         }`}>
                           {getApprovalLabel(master.approvalOption)}
                         </span>
-                        <span className="px-2 py-1 rounded text-xs bg-yellow-600 text-white">
-                          {master.locationRates?.length || 0} Rates Added
-                        </span>
                       </div>
                       {master.weightRule === 'above_25' && (
                         <div className="mt-2 p-2 bg-blue-900/30 rounded text-xs text-blue-200">
@@ -530,10 +561,10 @@ export default function UnifiedRateMasterPage() {
                     </div>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => openAddRatesForm(master._id)}
+                        onClick={() => toggleAddRatesForm(master._id)}
                         className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm font-medium"
                       >
-                        {expandedMasterId === master._id ? 'Cancel' : '+ Add Rates'}
+                        {expandedMasterId === master._id ? 'Cancel' : '+ Add/View Rates'}
                       </button>
                       <button
                         onClick={() => router.push(`/admin/rate-master/edit/${master._id}`)}
@@ -541,106 +572,106 @@ export default function UnifiedRateMasterPage() {
                       >
                         Edit
                       </button>
+                      <button
+                        onClick={() => deleteRateMaster(master._id)}
+                        className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm"
+                      >
+                        Delete
+                      </button>
                     </div>
                   </div>
                 </div>
 
-                {/* Add Rates Form - Shown only when expanded */}
+                {/* Show rates only for this specific master when expanded */}
                 {expandedMasterId === master._id && (
-                  <div className="p-4 border-b bg-gray-50">
-                    <h3 className="text-md font-semibold mb-3 text-gray-800">Add New Location Rates</h3>
-                    
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full border border-gray-200 bg-white">
-                        <thead className="bg-gray-100">
-                          <tr>
-                            <th className="px-4 py-2 border text-left text-sm font-semibold">Location *</th>
-                            <th className="px-4 py-2 border text-left text-sm font-semibold">From Weight (kg) *</th>
-                            <th className="px-4 py-2 border text-left text-sm font-semibold">To Weight (kg) *</th>
-                            <th className="px-4 py-2 border text-left text-sm font-semibold">Rate (₹) *</th>
-                            <th className="px-4 py-2 border text-left text-sm font-semibold">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(locationRows[master._id] || []).map((row) => (
-                            <tr key={row.id}>
-                              <td className="px-4 py-2 border">
-                                <select
-                                  value={row.locationId}
-                                  onChange={(e) => updateLocationRow(master._id, row.id, 'locationId', e.target.value)}
-                                  className="w-full px-2 py-1 border border-gray-300 rounded"
-                                >
-                                  <option value="">Select Location</option>
-                                  {sortedLocations.map((location) => (
-                                    <option key={location._id} value={location._id}>
-                                      {location.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </td>
-                              <td className="px-4 py-2 border">
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  value={row.fromQty}
-                                  onChange={(e) => updateLocationRow(master._id, row.id, 'fromQty', e.target.value)}
-                                  className="w-full px-2 py-1 border border-gray-300 rounded"
-                                  placeholder={master.weightRule === 'above_25' ? "25.00" : "0.00"}
-                                  min={master.weightRule === 'above_25' ? 25 : 0}
-                                />
-                              </td>
-                              <td className="px-4 py-2 border">
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  value={row.toQty}
-                                  onChange={(e) => updateLocationRow(master._id, row.id, 'toQty', e.target.value)}
-                                  className="w-full px-2 py-1 border border-gray-300 rounded"
-                                  placeholder="100.00"
-                                  min={master.weightRule === 'above_25' ? 26 : 0}
-                                />
-                              </td>
-                              <td className="px-4 py-2 border">
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  value={row.rate}
-                                  onChange={(e) => updateLocationRow(master._id, row.id, 'rate', e.target.value)}
-                                  className="w-full px-2 py-1 border border-gray-300 rounded"
-                                  placeholder="0.00"
-                                  min="0"
-                                />
-                              </td>
-                              <td className="px-4 py-2 border text-center">
-                                <button
-                                  type="button"
-                                  onClick={() => removeLocationRow(master._id, row.id)}
-                                  className="bg-red-500 text-white px-2 py-1 rounded text-sm hover:bg-red-600"
-                                >
-                                  Remove
-                                </button>
-                              </td>
+                  <div className="p-4">
+                    {/* Add Rates Form */}
+                    <div className="mb-6 p-4 border rounded-lg bg-gray-50">
+                      <h3 className="text-md font-semibold mb-3 text-gray-800">Add New Location Rates</h3>
+                      
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full border border-gray-200 bg-white">
+                          <thead className="bg-gray-100">
+                            <tr>
+                              <th className="px-4 py-2 border text-left text-sm font-semibold">Location *</th>
+                              <th className="px-4 py-2 border text-left text-sm font-semibold">From Weight (kg) *</th>
+                              <th className="px-4 py-2 border text-left text-sm font-semibold">To Weight (kg) *</th>
+                              <th className="px-4 py-2 border text-left text-sm font-semibold">Rate (₹) *</th>
+                              <th className="px-4 py-2 border text-left text-sm font-semibold">Action</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    
-                    <div className="flex justify-between mt-4">
-                      <button
-                        type="button"
-                        onClick={() => addLocationRow(master._id)}
-                        className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700"
-                      >
-                        + Add Another Location
-                      </button>
-                      <div className="flex gap-2">
+                          </thead>
+                          <tbody>
+                            {(locationRows[master._id] || []).map((row) => (
+                              <tr key={row.id}>
+                                <td className="px-4 py-2 border">
+                                  <select
+                                    value={row.locationId}
+                                    onChange={(e) => updateLocationRow(master._id, row.id, 'locationId', e.target.value)}
+                                    className="w-full px-2 py-1 border border-gray-300 rounded"
+                                  >
+                                    <option value="">Select Location</option>
+                                    {sortedLocations.map((location) => (
+                                      <option key={location._id} value={location._id}>
+                                        {location.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </td>
+                                <td className="px-4 py-2 border">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={row.fromQty}
+                                    onChange={(e) => updateLocationRow(master._id, row.id, 'fromQty', e.target.value)}
+                                    className="w-full px-2 py-1 border border-gray-300 rounded"
+                                    placeholder={master.weightRule === 'above_25' ? "25.00" : "0.00"}
+                                    min={master.weightRule === 'above_25' ? 25 : 0}
+                                  />
+                                </td>
+                                <td className="px-4 py-2 border">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={row.toQty}
+                                    onChange={(e) => updateLocationRow(master._id, row.id, 'toQty', e.target.value)}
+                                    className="w-full px-2 py-1 border border-gray-300 rounded"
+                                    placeholder="100.00"
+                                    min={master.weightRule === 'above_25' ? 26 : 0}
+                                  />
+                                </td>
+                                <td className="px-4 py-2 border">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={row.rate}
+                                    onChange={(e) => updateLocationRow(master._id, row.id, 'rate', e.target.value)}
+                                    className="w-full px-2 py-1 border border-gray-300 rounded"
+                                    placeholder="0.00"
+                                    min="0"
+                                  />
+                                </td>
+                                <td className="px-4 py-2 border text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => removeLocationRow(master._id, row.id)}
+                                    className="bg-red-500 text-white px-2 py-1 rounded text-sm hover:bg-red-600"
+                                  >
+                                    Remove
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      
+                      <div className="flex justify-between mt-4">
                         <button
                           type="button"
-                          onClick={() => openAddRatesForm(master._id)}
-                          className="px-4 py-2 rounded text-gray-700 bg-gray-200 hover:bg-gray-300"
+                          onClick={() => addLocationRow(master._id)}
+                          className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700"
                         >
-                          Cancel
+                          + Add Another Location
                         </button>
                         <button
                           type="button"
@@ -654,148 +685,142 @@ export default function UnifiedRateMasterPage() {
                         </button>
                       </div>
                     </div>
-                  </div>
-                )}
 
-                {/* Location Rates Table */}
-                {master.locationRates && master.locationRates.length > 0 ? (
-                  <div className="p-4">
-                    <h3 className="text-lg font-semibold mb-3 text-gray-800">Location-wise Price List</h3>
-                    
-                    {/* Group rates by location */}
-                    {(() => {
-                      const ratesByLocation = {};
-                      master.locationRates.forEach(rate => {
-                        if (!ratesByLocation[rate.locationId]) {
-                          ratesByLocation[rate.locationId] = {
-                            locationName: rate.locationName,
-                            locationId: rate.locationId,
-                            rates: []
-                          };
-                        }
-                        ratesByLocation[rate.locationId].rates.push(rate);
-                      });
-                      
-                      const sortedLocationGroups = Object.values(ratesByLocation).sort((a, b) => 
-                        (a.locationName || '').toLowerCase().localeCompare((b.locationName || '').toLowerCase())
-                      );
-                      
-                      return (
-                        <div className="space-y-4">
-                          {sortedLocationGroups.map((locationGroup) => (
-                            <div key={locationGroup.locationId} className="border rounded-lg overflow-hidden">
-                              {/* Location Header */}
-                              <div className="bg-gray-100 px-4 py-2 border-b">
-                                <h4 className="font-semibold text-gray-800">
-                                  📍 {locationGroup.locationName}
-                                </h4>
-                              </div>
-                              
-                              {/* Rates Table for this Location */}
-                              <div className="overflow-x-auto">
-                                <table className="min-w-full">
-                                  <thead className="bg-gray-50">
-                                    <tr>
-                                      <th className="px-4 py-2 border text-left text-sm font-semibold">#</th>
-                                      <th className="px-4 py-2 border text-left text-sm font-semibold">From Weight (kg)</th>
-                                      <th className="px-4 py-2 border text-left text-sm font-semibold">To Weight (kg)</th>
-                                      <th className="px-4 py-2 border text-left text-sm font-semibold">Rate (₹)</th>
-                                      <th className="px-4 py-2 border text-left text-sm font-semibold">Actions</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {locationGroup.rates
-                                      .sort((a, b) => a.fromQty - b.fromQty)
-                                      .map((rate, idx) => (
-                                        <tr key={rate._id || idx} className="hover:bg-gray-50">
-                                          <td className="px-4 py-2 border text-sm">{idx + 1}</td>
-                                          <td className="px-4 py-2 border text-sm">
-                                            {editingRate === rate._id ? (
-                                              <input
-                                                type="number"
-                                                step="0.01"
-                                                defaultValue={rate.fromQty}
-                                                onBlur={(e) => handleUpdateRate(master._id, rate._id, 'fromQty', e.target.value)}
-                                                className="w-24 px-2 py-1 border rounded"
-                                                min={master.weightRule === 'above_25' ? 25 : 0}
-                                                autoFocus
-                                              />
-                                            ) : (
-                                              rate.fromQty
-                                            )}
-                                          </td>
-                                          <td className="px-4 py-2 border text-sm">
-                                            {editingRate === rate._id ? (
-                                              <input
-                                                type="number"
-                                                step="0.01"
-                                                defaultValue={rate.toQty}
-                                                onBlur={(e) => handleUpdateRate(master._id, rate._id, 'toQty', e.target.value)}
-                                                className="w-24 px-2 py-1 border rounded"
-                                              />
-                                            ) : (
-                                              rate.toQty
-                                            )}
-                                          </td>
-                                          <td className="px-4 py-2 border text-sm">
-                                            {editingRate === rate._id ? (
-                                              <input
-                                                type="number"
-                                                step="0.01"
-                                                defaultValue={rate.rate}
-                                                onBlur={(e) => handleUpdateRate(master._id, rate._id, 'rate', e.target.value)}
-                                                className="w-24 px-2 py-1 border rounded"
-                                                min="0"
-                                              />
-                                            ) : (
-                                              <span className="font-medium text-green-600">₹ {rate.rate}</span>
-                                            )}
-                                           </td>
-                                          <td className="px-4 py-2 border text-sm">
-                                            {editingRate === rate._id ? (
-                                              <button
-                                                onClick={() => setEditingRate(null)}
-                                                className="bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700"
-                                              >
-                                                Done
-                                              </button>
-                                            ) : (
-                                              <div className="flex gap-1">
-                                                <button
-                                                  onClick={() => setEditingRate(rate._id)}
-                                                  className="bg-yellow-600 text-white px-2 py-1 rounded text-xs hover:bg-yellow-700"
-                                                >
-                                                  Edit
-                                                </button>
-                                                <button
-                                                  onClick={() => handleDeleteRate(master._id, rate._id)}
-                                                  className="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700"
-                                                >
-                                                  Delete
-                                                </button>
-                                              </div>
-                                            )}
-                                           </td>
+                    {/* Existing Location Rates Table for this master only */}
+                    {master.locationRates && master.locationRates.length > 0 ? (
+                      <div>
+                        <h3 className="text-lg font-semibold mb-3 text-gray-800">Location-wise Price List</h3>
+                        
+                        {/* Group rates by location for this master */}
+                        {(() => {
+                          const ratesByLocation = {};
+                          master.locationRates.forEach(rate => {
+                            if (!ratesByLocation[rate.locationId]) {
+                              ratesByLocation[rate.locationId] = {
+                                locationName: rate.locationName,
+                                locationId: rate.locationId,
+                                rates: []
+                              };
+                            }
+                            ratesByLocation[rate.locationId].rates.push(rate);
+                          });
+                          
+                          const sortedLocationGroups = Object.values(ratesByLocation).sort((a, b) => 
+                            (a.locationName || '').toLowerCase().localeCompare((b.locationName || '').toLowerCase())
+                          );
+                          
+                          return (
+                            <div className="space-y-4">
+                              {sortedLocationGroups.map((locationGroup) => (
+                                <div key={locationGroup.locationId} className="border rounded-lg overflow-hidden">
+                                  {/* Location Header */}
+                                  <div className="bg-gray-100 px-4 py-2 border-b">
+                                    <h4 className="font-semibold text-gray-800">
+                                      📍 {locationGroup.locationName}
+                                    </h4>
+                                  </div>
+                                  
+                                  {/* Rates Table for this Location */}
+                                  <div className="overflow-x-auto">
+                                    <table className="min-w-full">
+                                      <thead className="bg-gray-50">
+                                        <tr>
+                                          <th className="px-4 py-2 border text-left text-sm font-semibold">#</th>
+                                          <th className="px-4 py-2 border text-left text-sm font-semibold">From Weight (kg)</th>
+                                          <th className="px-4 py-2 border text-left text-sm font-semibold">To Weight (kg)</th>
+                                          <th className="px-4 py-2 border text-left text-sm font-semibold">Rate (₹)</th>
+                                          <th className="px-4 py-2 border text-left text-sm font-semibold">Actions</th>
                                         </tr>
-                                      ))}
-                                  </tbody>
-                                </table>
-                              </div>
+                                      </thead>
+                                      <tbody>
+                                        {locationGroup.rates
+                                          .sort((a, b) => a.fromQty - b.fromQty)
+                                          .map((rate, idx) => (
+                                            <tr key={rate._id || idx} className="hover:bg-gray-50">
+                                              <td className="px-4 py-2 border text-sm">{idx + 1}</td>
+                                              <td className="px-4 py-2 border text-sm">
+                                                {editingRate[master._id] === rate._id ? (
+                                                  <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    defaultValue={rate.fromQty}
+                                                    onBlur={(e) => handleUpdateRate(master._id, rate._id, 'fromQty', e.target.value)}
+                                                    className="w-24 px-2 py-1 border rounded"
+                                                    min={master.weightRule === 'above_25' ? 25 : 0}
+                                                    autoFocus
+                                                  />
+                                                ) : (
+                                                  rate.fromQty
+                                                )}
+                                              </td>
+                                              <td className="px-4 py-2 border text-sm">
+                                                {editingRate[master._id] === rate._id ? (
+                                                  <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    defaultValue={rate.toQty}
+                                                    onBlur={(e) => handleUpdateRate(master._id, rate._id, 'toQty', e.target.value)}
+                                                    className="w-24 px-2 py-1 border rounded"
+                                                  />
+                                                ) : (
+                                                  rate.toQty
+                                                )}
+                                              </td>
+                                              <td className="px-4 py-2 border text-sm">
+                                                {editingRate[master._id] === rate._id ? (
+                                                  <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    defaultValue={rate.rate}
+                                                    onBlur={(e) => handleUpdateRate(master._id, rate._id, 'rate', e.target.value)}
+                                                    className="w-24 px-2 py-1 border rounded"
+                                                    min="0"
+                                                  />
+                                                ) : (
+                                                  <span className="font-medium text-green-600">₹ {rate.rate}</span>
+                                                )}
+                                              </td>
+                                              <td className="px-4 py-2 border text-sm">
+                                                {editingRate[master._id] === rate._id ? (
+                                                  <button
+                                                    onClick={() => setEditingRate({ ...editingRate, [master._id]: null })}
+                                                    className="bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700"
+                                                  >
+                                                    Done
+                                                  </button>
+                                                ) : (
+                                                  <div className="flex gap-1">
+                                                    <button
+                                                      onClick={() => setEditingRate({ ...editingRate, [master._id]: rate._id })}
+                                                      className="bg-yellow-600 text-white px-2 py-1 rounded text-xs hover:bg-yellow-700"
+                                                    >
+                                                      Edit
+                                                    </button>
+                                                    <button
+                                                      onClick={() => handleDeleteRate(master._id, rate._id)}
+                                                      className="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700"
+                                                    >
+                                                      Delete
+                                                    </button>
+                                                  </div>
+                                                )}
+                                              </td>
+                                            </tr>
+                                          ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                ) : (
-                  <div className="p-6 text-center text-gray-500">
-                    No location rates added for this rate master yet.
-                    <button
-                      onClick={() => openAddRatesForm(master._id)}
-                      className="ml-2 text-blue-600 hover:text-blue-800 font-medium"
-                    >
-                      Click here to add rates →
-                    </button>
+                          );
+                        })()}
+                      </div>
+                    ) : (
+                      <div className="p-6 text-center text-gray-500">
+                        No location rates added for this rate master yet.
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

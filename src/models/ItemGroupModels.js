@@ -7,6 +7,7 @@ const ItemGroupSchema = new mongoose.Schema({
   
   name: { type: String, required: true },
   code: { type: String, required: true, unique: true },
+  category: { type: String, default: '' }, // NEW: Item Category field
 }, { timestamps: true });
 
 // Create a model for the schema

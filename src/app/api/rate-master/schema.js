@@ -1,4 +1,3 @@
-// schema.js - Make sure you have this complete schema
 import mongoose from 'mongoose';
 
 const locationRateSchema = new mongoose.Schema({
@@ -18,6 +17,18 @@ const locationRateSchema = new mongoose.Schema({
   rate: {
     type: Number,
     required: true
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  version: {
+    type: Number,
+    default: 1
   }
 });
 
@@ -38,7 +49,6 @@ const rateMasterSchema = new mongoose.Schema({
     required: true
   },
   locationRates: [locationRateSchema],
-  // THESE FIELDS ARE MISSING IN YOUR SAVE
   weightRule: {
     type: String,
     enum: ['above_25', 'all_weights'],

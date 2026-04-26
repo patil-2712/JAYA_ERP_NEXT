@@ -36,7 +36,20 @@ export async function GET(req) {
   }
 
   try {
-    const groups = await Group.find({ companyId: user.companyId }).sort({ createdAt: -1 });
+    const { searchParams } = new URL(req.url);
+    const search = searchParams.get("search") || "";
+    
+    let filter = { companyId: user.companyId };
+    
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+        { category: { $regex: search, $options: "i" } }
+      ];
+    }
+    
+    const groups = await Group.find(filter).sort({ createdAt: -1 });
 
     return NextResponse.json(
       { success: true, data: groups },
@@ -51,6 +64,9 @@ export async function GET(req) {
   }
 }
 
+/* =========================================
+   📤 POST Create Group
+========================================= */
 export async function POST(req) {
   await dbConnect();
 
@@ -61,7 +77,7 @@ export async function POST(req) {
 
   try {
     const body = await req.json();
-    const { name, description } = body;
+    const { name, description, category } = body;
 
     if (!name) {
       return NextResponse.json(
@@ -73,13 +89,14 @@ export async function POST(req) {
     const newGroup = new Group({
       name,
       description,
-      companyId: user.companyId, // associate with user's company
+      category: category || "",
+      companyId: user.companyId,
     });
 
     await newGroup.save();
 
     return NextResponse.json(
-      { success:"true", message: "Group created successfully", data: newGroup },
+      { success: true, message: "Group created successfully", data: newGroup },
       { status: 201 }
     );
   } catch (err) {
@@ -91,50 +108,85 @@ export async function POST(req) {
   }
 }
 
+/* =========================================
+   📝 PUT Update Group
+========================================= */
+export async function PUT(req, { params }) {
+  await dbConnect();
 
+  const { user, error, status } = await authenticate(req);
+  if (error) {
+    return NextResponse.json({ success: false, message: error }, { status });
+  }
 
+  try {
+    const { id } = await params;  // ✅ AWAIT HERE
+    
+    if (!id) {
+      return NextResponse.json({ success: false, message: "Group ID is required" }, { status: 400 });
+    }
 
+    const body = await req.json();
+    const { name, description, category } = body;
 
-// import Group from "@/models/groupModels";
+    const existingGroup = await Group.findOne({ _id: id, companyId: user.companyId });
+    if (!existingGroup) {
+      return NextResponse.json({ success: false, message: "Group not found" }, { status: 404 });
+    }
 
-// import dbConnect from "@/lib/db";
-// import { NextResponse } from "next/server";
+    const updatedGroup = await Group.findByIdAndUpdate(
+      id,
+      { name, description, category: category || "" },
+      { new: true, runValidators: true }
+    );
 
-// // Handle GET request to fetch all groups
-// export async function GET() {
-//   await dbConnect(); // Ensure connection is established
+    return NextResponse.json(
+      { success: true, data: updatedGroup, message: "Group updated successfully" },
+      { status: 200 }
+    );
+  } catch (err) {
+    console.error("PUT Error:", err.message);
+    return NextResponse.json(
+      { success: false, message: "Error updating group" },
+      { status: 500 }
+    );
+  }
+}
 
-//   try {
-//     const groups = await Group.find(); // Get all groups from the database
-//     return NextResponse.json(groups, { status: 200 });
-//   } catch (error) {
-//     console.error("Error fetching groups:", error);
-//     return NextResponse.json({ message: "Error fetching groups" }, { status: 500 });
-//   }
-// }
+/* =========================================
+   🗑️ DELETE Group
+========================================= */
+export async function DELETE(req, { params }) {
+  await dbConnect();
 
-// // Handle POST request to create a new group
-// export async function POST(req) {
-//   await dbConnect(); // Ensure connection is established
+  const { user, error, status } = await authenticate(req);
+  if (error) {
+    return NextResponse.json({ success: false, message: error }, { status });
+  }
 
-//   try {
-//     const body = await req.json();
-//     const { name, description, masterId } = body;
+  try {
+    const { id } = await params;  // ✅ AWAIT HERE
+    
+    if (!id) {
+      return NextResponse.json({ success: false, message: "Group ID is required" }, { status: 400 });
+    }
 
-//     // Create a new group document
-//     const newGroup = new Group({
-//       name,
-//       description,
-//       //masterId,
-//       //members: [masterId], // Add the master as the first member
-//     });
+    const group = await Group.findOne({ _id: id, companyId: user.companyId });
+    if (!group) {
+      return NextResponse.json({ success: false, message: "Group not found" }, { status: 404 });
+    }
 
-//     // Save the new group to the database
-//     await newGroup.save();
+    await Group.deleteOne({ _id: id });
 
-//     return NextResponse.json(newGroup, { status: 201 });
-//   } catch (error) {
-//     console.error("Error creating group:", error);
-//     return NextResponse.json({ message: "Error creating group" }, { status: 500 });
-//   }
-// }
+    return NextResponse.json(
+      { success: true, message: "Group deleted successfully" },
+      { status: 200 }
+    );
+  } catch (err) {
+    console.error("DELETE Error:", err.message);
+    return NextResponse.json(
+      { success: false, message: "Error deleting group" },
+      { status: 500 }
+    );
+  }
+}

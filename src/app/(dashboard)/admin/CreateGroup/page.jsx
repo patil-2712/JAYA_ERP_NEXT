@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import {
   FaEdit, FaTrash, FaPlus, FaSearch, FaCheck,
-  FaLayerGroup, FaExclamationCircle, FaArrowLeft
+  FaLayerGroup, FaExclamationCircle, FaArrowLeft, FaTag
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 
@@ -17,6 +17,7 @@ export default function GroupsPage() {
   const [editId,     setEditId]     = useState(null);
   const [name,       setName]       = useState("");
   const [description,setDesc]       = useState("");
+  const [category,   setCategory]   = useState(""); // NEW: Category field
   const [errs,       setErrs]       = useState({});
 
   useEffect(() => { fetchGroups(); }, []);
@@ -36,6 +37,7 @@ export default function GroupsPage() {
     const e = {};
     if (!name.trim())        e.name = "Group name is required";
     if (!description.trim()) e.desc = "Description is required";
+    // Category is optional - no validation
     setErrs(e);
     if (Object.keys(e).length) { toast.error(Object.values(e)[0]); return false; }
     return true;
@@ -47,10 +49,10 @@ export default function GroupsPage() {
     const token = localStorage.getItem("token");
     try {
       if (editId) {
-        const res = await axios.put(`/api/groupscreate/${editId}`, { name, description }, { headers: { Authorization: `Bearer ${token}` } });
+        const res = await axios.put(`/api/groupscreate/${editId}`, { name, description, category }, { headers: { Authorization: `Bearer ${token}` } });
         if (res.data.success) { setGroups(p => p.map(g => g._id === editId ? res.data.data : g)); toast.success("Group updated!"); }
       } else {
-        const res = await axios.post("/api/groupscreate", { name, description }, { headers: { Authorization: `Bearer ${token}` } });
+        const res = await axios.post("/api/groupscreate", { name, description, category }, { headers: { Authorization: `Bearer ${token}` } });
         if (res.data.success) { setGroups(p => [...p, res.data.data]); toast.success("Group created!"); }
       }
       reset();
@@ -61,6 +63,7 @@ export default function GroupsPage() {
   const handleEdit = (g) => {
     setName(g.name);
     setDesc(g.description);
+    setCategory(g.category || ""); // NEW: Set category on edit
     setEditId(g._id);
     setErrs({});
     setView("form");
@@ -75,13 +78,14 @@ export default function GroupsPage() {
     } catch { toast.error("Error deleting group"); }
   };
 
-  const reset = () => { setName(""); setDesc(""); setEditId(null); setErrs({}); setView("list"); };
+  const reset = () => { setName(""); setDesc(""); setCategory(""); setEditId(null); setErrs({}); setView("list"); };
 
   const clearErr = (k) => setErrs(p => { const n = { ...p }; delete n[k]; return n; });
 
   const filtered = groups.filter(g =>
     g.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    g.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    g.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    g.category?.toLowerCase().includes(searchTerm.toLowerCase()) // NEW: Search by category
   );
 
   // ── UI helpers ──
@@ -125,7 +129,7 @@ export default function GroupsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
           {[
             { label: "Total Groups",     value: groups.length,                                                                                                         emoji: "🗂️" },
-            { label: "With Description", value: groups.filter(g => g.description?.trim()).length,                                                                      emoji: "📝" },
+            { label: "With Category",    value: groups.filter(g => g.category?.trim()).length,                                                                         emoji: "🏷️" }, // NEW
             { label: "Added This Week",  value: groups.filter(g => g.createdAt && (Date.now() - new Date(g.createdAt)) < 7 * 24 * 60 * 60 * 1000).length,             emoji: "🆕" },
           ].map(s => (
             <div key={s.label} className="bg-white rounded-2xl p-4 flex items-center gap-3 border-2 border-transparent shadow-sm hover:-translate-y-0.5 hover:border-indigo-100 transition-all cursor-default">
@@ -149,7 +153,7 @@ export default function GroupsPage() {
                 className="w-full pl-8 pr-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all placeholder:text-gray-300"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                placeholder="Search groups…"
+                placeholder="Search groups by name, category or description…"
               />
             </div>
             <p className="ml-auto text-xs text-gray-400 font-semibold whitespace-nowrap">{filtered.length} result{filtered.length !== 1 ? "s" : ""}</p>
@@ -160,7 +164,7 @@ export default function GroupsPage() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  {["", "Group Name", "Description", "Created", "Actions"].map(h => (
+                  {["", "Group Name", "Category", "Description", "Created", "Actions"].map(h => ( // NEW: Added Category column
                     <th key={h} className="px-4 py-3 text-left text-[10.5px] font-bold uppercase tracking-wider text-gray-400 whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -169,7 +173,7 @@ export default function GroupsPage() {
                 {loading ? (
                   Array(4).fill(0).map((_, i) => (
                     <tr key={i} className="border-b border-gray-50">
-                      {Array(5).fill(0).map((__, j) => (
+                      {Array(6).fill(0).map((__, j) => (
                         <td key={j} className="px-4 py-3">
                           <div className="h-3.5 rounded bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 bg-[length:400%_100%] animate-[shimmer_1.4s_infinite]" />
                         </td>
@@ -177,7 +181,7 @@ export default function GroupsPage() {
                     </tr>
                   ))
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={5} className="text-center py-16">
+                  <tr><td colSpan={6} className="text-center py-16">
                     <div className="text-4xl mb-2 opacity-20">🗂️</div>
                     <p className="text-sm font-medium text-gray-300">
                       {searchTerm ? "No groups match your search" : "No groups yet — create your first one!"}
@@ -196,6 +200,18 @@ export default function GroupsPage() {
                     {/* Name */}
                     <td className="px-4 py-3">
                       <p className="font-bold text-gray-900 text-sm">{g.name}</p>
+                    </td>
+
+                    {/* Category - NEW */}
+                    <td className="px-4 py-3">
+                      {g.category ? (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                          <FaTag className="text-[9px]" />
+                          {g.category}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300 text-xs">—</span>
+                      )}
                     </td>
 
                     {/* Description */}
@@ -283,6 +299,19 @@ export default function GroupsPage() {
               <Err k="name" />
             </div>
 
+            {/* NEW: Category Field */}
+            <div>
+              <Lbl text="Category" />
+              <input
+                className={fi("category")}
+                type="text"
+                value={category}
+                onChange={e => { setCategory(e.target.value); clearErr("category"); }}
+                placeholder="e.g. Product Group, Supplier Type, etc."
+              />
+              <p className="text-[11px] text-gray-400 mt-1">Optional - used for grouping similar groups</p>
+            </div>
+
             <div>
               <Lbl text="Description" req />
               <textarea
@@ -297,7 +326,7 @@ export default function GroupsPage() {
           </div>
         </div>
 
-        {/* Footer navigation — exact same as Supplier/Item */}
+        {/* Footer navigation */}
         <div className="flex items-center justify-between">
           <button type="button" onClick={reset}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-100 text-gray-600 font-semibold text-sm hover:bg-gray-200 transition-all border border-gray-200">

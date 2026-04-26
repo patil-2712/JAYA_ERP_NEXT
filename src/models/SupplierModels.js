@@ -217,6 +217,12 @@ const SupplierSchema = new mongoose.Schema({
     trim: true
   },
 
+dueDays: {
+  type: Number,
+  default: 0,
+  min: [0, "Due days must be non-negative"],
+  description: "Number of days for payment due"
+},
   emailId: {
     type: String,
     trim: true,
