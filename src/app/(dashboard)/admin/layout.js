@@ -457,6 +457,7 @@ export default function Layout({ children }) {
                   <Item href="/admin/Advance-Payment" icon={<HiCash />} label="Advance Payment" onClick={closeSidebar} isActive={isActive("/admin/Advance-Payment")} />
 				    <Item href="/admin/ProofOfDelivery" icon={<HiCash />} label="Proof Of Delivery" onClick={closeSidebar} isActive={isActive("/admin/ProofOfDelivery")} />
 					 <Item href="/admin/Balance-Payment" icon={<HiCash />} label="Balance-Payment" onClick={closeSidebar} isActive={isActive("/admin/Balance-Payment")} />
+					 {/*<Item href="/admin/Billing" icon={<HiCash />} label="Billing" onClick={closeSidebar} isActive={isActive("/admin/Billing")} />*/}
                 </Submenu>
 
                 <Submenu isOpen={!!openSubmenus["tvPurchase"]} onToggle={() => toggleSubmenu("tvPurchase")} icon={<GiStockpiles />} label="Purchase">

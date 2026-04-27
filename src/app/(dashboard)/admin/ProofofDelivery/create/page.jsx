@@ -164,7 +164,26 @@ const [vendorFinancial, setVendorFinancial] = useState({
       });
       const data = await res.json();
       if (data.success) {
-        setPurchases(data.data || []);
+        // Enhanced purchases with derived fields
+        const enhancedPurchases = (data.data || []).map(purchase => {
+          // Extract from/to from orderRows if available
+          let fromLocation = '';
+          let toLocation = '';
+          let lrCode = purchase.lrCode || purchase.consignmentNo || '';
+          
+          if (purchase.orderRows && purchase.orderRows.length > 0) {
+            fromLocation = purchase.orderRows[0]?.from || '';
+            toLocation = purchase.orderRows[0]?.to || '';
+          }
+          
+          return {
+            ...purchase,
+            fromLocation,
+            toLocation,
+            lrCode
+          };
+        });
+        setPurchases(enhancedPurchases);
       }
     } catch (error) {
       console.error('Error fetching purchases:', error);
@@ -396,11 +415,20 @@ const handlePurchaseSelect = async (purchaseNo) => {
     if (data.success && data.data) {
       const purchase = data.data;
       
-      // Extract additional fields from various possible locations
-      const vehicleNo = purchase.vehicleNo || purchase.header?.vehicleNo || '';
-      const fromLocation = purchase.fromLocation || purchase.header?.fromLocation || (purchase.orderRows?.[0]?.from) || '';
-      const toLocation = purchase.toLocation || purchase.header?.toLocation || (purchase.orderRows?.[0]?.to) || '';
-      const lrCode = purchase.lrCode || purchase.header?.lrCode || '';
+      // Extract from/to from orderRows
+      let fromLocation = '';
+      let toLocation = '';
+      let lrCode = purchase.lrCode || purchase.consignmentNo || '';
+      
+      if (purchase.orderRows && purchase.orderRows.length > 0) {
+        fromLocation = purchase.orderRows[0]?.from || '';
+        toLocation = purchase.orderRows[0]?.to || '';
+      }
+      
+      // Get vehicle number from various locations
+      const vehicleNo = purchase.purchaseDetails?.vehicleNo || 
+                        purchase.vehicleNo || 
+                        purchase.header?.vehicleNo || '';
       
       const enhancedPurchase = {
         ...purchase,
@@ -414,7 +442,7 @@ const handlePurchaseSelect = async (purchaseNo) => {
       
       console.log('🚛 Purchase Details:', {
         purchaseNo: purchase.purchaseNo,
-        vendorName: purchase.vendorName,
+        vendorName: purchase.purchaseDetails?.vendorName,
         vehicleNo,
         fromLocation,
         toLocation,
@@ -464,8 +492,8 @@ const handlePurchaseSelect = async (purchaseNo) => {
       });
       
       // Get vendor code from purchase
-      const vendorCode = purchase.purchaseDetails?.vendorCode || purchase.vendorCode || '';
-      const vendorName = purchase.purchaseDetails?.vendorName || purchase.vendorName || '';
+      const vendorCode = purchase.purchaseDetails?.vendorCode || '';
+      const vendorName = purchase.purchaseDetails?.vendorName || '';
       
       // Get due days from supplier
       const dueDays = getDueDaysFromSupplier(vendorCode);
@@ -504,7 +532,7 @@ const handlePurchaseSelect = async (purchaseNo) => {
           lrDate: "",
           orderNo: orderNo,
           delivery: "COURIER",
-          inPersonParsal: "", // New field for In Person / Parsal
+          inPersonParsal: "",
           docketNo: "",
           podDate: "",
           podUpload: "",
@@ -757,82 +785,82 @@ const handleSave = async () => {
         {/* ==================== PURCHASE SELECTION with Enhanced Dropdown ==================== */}
         <Card title="Select Purchase Order">
           <div className="grid grid-cols-12 gap-4">
-          <div className="col-span-12 md:col-span-4">
-  <label className="text-xs font-bold text-slate-600">Purchase No *</label>
-  <select
-    value={header.purchaseNo}
-    onChange={(e) => handlePurchaseSelect(e.target.value)}
-    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
-  >
-    <option value="">Select Purchase No</option>
-    {purchases.map(p => {
-      // Start with basic info
-      let displayText = `${p.purchaseNo} - ${p.vendorName || p.customerName || 'Unknown'}`;
-      
-      // Try to find vehicle number from various possible locations
-      const vehicleNo = p.vehicleNo || p.header?.vehicleNo || p.transportDetails?.vehicleNo || '';
-      if (vehicleNo) {
-        displayText += ` | 🚛 ${vehicleNo}`;
-      }
-      
-      // Try to find from/to locations
-      const fromLoc = p.fromLocation || p.header?.fromLocation || p.orderRows?.[0]?.from || '';
-      const toLoc = p.toLocation || p.header?.toLocation || p.orderRows?.[0]?.to || '';
-      if (fromLoc && toLoc) {
-        const shortFrom = fromLoc.length > 10 ? fromLoc.substring(0, 10) : fromLoc;
-        const shortTo = toLoc.length > 10 ? toLoc.substring(0, 10) : toLoc;
-        displayText += ` | 📍 ${shortFrom}→${shortTo}`;
-      }
-      
-      // Try to find LR code
-      const lrCode = p.lrCode || p.header?.lrCode || p.consignmentNo || '';
-      if (lrCode) {
-        displayText += ` | 📋 ${lrCode}`;
-      }
-      
-      return (
-        <option key={p._id} value={p.purchaseNo} title={displayText}>
-          {displayText}
-        </option>
-      );
-    })}
-  </select>
-  <p className="text-xs text-slate-400 mt-1">
-    Click the debug button above to see what data is available
-  </p>
-</div>
+            <div className="col-span-12 md:col-span-6">
+              <label className="text-xs font-bold text-slate-600">Purchase No *</label>
+              <select
+                value={header.purchaseNo}
+                onChange={(e) => handlePurchaseSelect(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
+                style={{ width: '100%', minWidth: '400px' }}
+              >
+                <option value="">Select Purchase No</option>
+                {purchases.map(p => {
+                  // Get vehicle number from purchase
+                  const vehicleNo = p.vehicleNo || p.purchaseDetails?.vehicleNo || '';
+                  
+                  // Get from/to locations from purchase (already enhanced in fetchPurchases)
+                  const fromLoc = p.fromLocation || p.orderRows?.[0]?.from || '';
+                  const toLoc = p.toLocation || p.orderRows?.[0]?.to || '';
+                  
+                  // Get LR code from purchase
+                  const lrCode = p.lrCode || p.consignmentNo || '';
+                  
+                  // Build display text with icons
+                  let displayText = `${p.purchaseNo} - ${p.vendorName || p.purchaseDetails?.vendorName || 'Unknown'}`;
+                  
+                  if (vehicleNo) {
+                    displayText += ` | 🚛 ${vehicleNo}`;
+                  }
+                  
+                  if (fromLoc && toLoc) {
+                    const shortFrom = fromLoc.length > 15 ? fromLoc.substring(0, 12) + '...' : fromLoc;
+                    const shortTo = toLoc.length > 15 ? toLoc.substring(0, 12) + '...' : toLoc;
+                    displayText += ` | 📍 ${shortFrom} → ${shortTo}`;
+                  }
+                  
+                  if (lrCode) {
+                    displayText += ` | 📋 ${lrCode}`;
+                  }
+                  
+                  return (
+                    <option key={p._id} value={p.purchaseNo} title={displayText}>
+                      {displayText}
+                    </option>
+                  );
+                })}
+              </select>
+              <p className="text-xs text-slate-400 mt-1">
+                Select a purchase to auto-fill order and LR details
+              </p>
+            </div>
             
             {/* Enhanced Selected Purchase Details Card */}
             {selectedPurchase && (
-              <div className="col-span-12 md:col-span-8">
+              <div className="col-span-12 md:col-span-6">
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-xl border border-blue-200">
                   <div className="text-xs font-bold text-blue-700 mb-2">📋 Selected Purchase Details</div>
                   <div className="grid grid-cols-12 gap-2 text-xs">
-                    <div className="col-span-12 md:col-span-3">
+                    <div className="col-span-12 md:col-span-4">
                       <span className="text-slate-500">Purchase No:</span>
                       <span className="font-medium text-slate-800 ml-1">{selectedPurchase.purchaseNo}</span>
                     </div>
-                    <div className="col-span-12 md:col-span-3">
+                    <div className="col-span-12 md:col-span-4">
                       <span className="text-slate-500">Customer:</span>
-                      <span className="font-medium text-slate-800 ml-1">{selectedPurchase.vendorName || selectedPurchase.customerName || '-'}</span>
+                      <span className="font-medium text-slate-800 ml-1">{selectedPurchase.purchaseDetails?.vendorName || selectedPurchase.vendorName || '-'}</span>
                     </div>
-                    <div className="col-span-12 md:col-span-3">
+                    <div className="col-span-12 md:col-span-4">
                       <span className="text-slate-500">Vehicle No:</span>
-                      <span className="font-medium text-slate-800 ml-1">🚛 {selectedPurchase.vehicleNo || '-'}</span>
-                    </div>
-                    <div className="col-span-12 md:col-span-3">
-                      <span className="text-slate-500">LR Code:</span>
-                      <span className="font-medium text-slate-800 ml-1">📋 {selectedPurchase.lrCode || '-'}</span>
+                      <span className="font-medium text-slate-800 ml-1">🚛 {selectedPurchase.vehicleNo || selectedPurchase.purchaseDetails?.vehicleNo || '-'}</span>
                     </div>
                     <div className="col-span-12 md:col-span-6">
                       <span className="text-slate-500">From → To:</span>
                       <span className="font-medium text-slate-800 ml-1">
-                        📍 {selectedPurchase.fromLocation || '-'} → {selectedPurchase.toLocation || '-'}
+                        📍 {selectedPurchase.fromLocation || selectedPurchase.orderRows?.[0]?.from || '-'} → {selectedPurchase.toLocation || selectedPurchase.orderRows?.[0]?.to || '-'}
                       </span>
                     </div>
                     <div className="col-span-12 md:col-span-3">
-                      <span className="text-slate-500">Total Amount:</span>
-                      <span className="font-medium text-green-700 ml-1">₹{(selectedPurchase.purchaseAmountFromVNN || selectedPurchase.purchaseDetails?.amount || 0).toLocaleString()}</span>
+                      <span className="text-slate-500">LR Code:</span>
+                      <span className="font-medium text-slate-800 ml-1">📋 {selectedPurchase.lrCode || selectedPurchase.consignmentNo || '-'}</span>
                     </div>
                     <div className="col-span-12 md:col-span-3">
                       <span className="text-slate-500">Order Count:</span>
