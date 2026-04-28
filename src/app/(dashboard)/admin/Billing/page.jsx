@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 function Card({ title, children, className = "" }) {
@@ -38,9 +38,8 @@ function FilterSection({ title, children, defaultOpen = true }) {
   );
 }
 
-function BranchSelector({ value, onChange, label = "Branch" }) {
-  const branches = ["Mumbai", "Delhi", "Kolkata", "Chennai", "Bangalore", "Hyderabad"];
-  
+// Branch Selector with API data
+function BranchSelector({ value, onChange, label = "Branch", branches = [], loading = false }) {
   return (
     <div>
       <label className="block text-xs font-bold text-slate-600 mb-1">{label}</label>
@@ -48,25 +47,22 @@ function BranchSelector({ value, onChange, label = "Branch" }) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+        disabled={loading}
       >
         <option value="">Select Branch</option>
         {branches.map(branch => (
-          <option key={branch} value={branch}>{branch}</option>
+          <option key={branch._id} value={branch._id}>
+            {branch.name} {branch.code ? `(${branch.code})` : ''}
+          </option>
         ))}
       </select>
+      {loading && <p className="text-xs text-slate-400 mt-1">Loading branches...</p>}
     </div>
   );
 }
 
-function ClientSelector({ value, onChange, label = "Client Name" }) {
-  const clients = [
-    "Yara Fertilizers India Pvt Ltd",
-    "ICL Management Pvt Ltd",
-    "Coromandel International Ltd",
-    "Deepak Fertilizers Ltd",
-    "Gujarat State Fertilizers & Chemicals"
-  ];
-  
+// Client Selector with API data
+function ClientSelector({ value, onChange, label = "Client Name", clients = [], loading = false }) {
   return (
     <div>
       <label className="block text-xs font-bold text-slate-600 mb-1">{label}</label>
@@ -74,12 +70,16 @@ function ClientSelector({ value, onChange, label = "Client Name" }) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+        disabled={loading}
       >
         <option value="">Select Client</option>
         {clients.map(client => (
-          <option key={client} value={client}>{client}</option>
+          <option key={client._id} value={client._id}>
+            {client.customerName} {client.customerCode ? `(${client.customerCode})` : ''}
+          </option>
         ))}
       </select>
+      {loading && <p className="text-xs text-slate-400 mt-1">Loading clients...</p>}
     </div>
   );
 }
@@ -153,9 +153,7 @@ function ProductCategorySelector({ value, onChange, label = "Product Categories"
   );
 }
 
-function PlantCodeSelector({ value, onChange, label = "Plant Code" }) {
-  const plantCodes = ["9009", "9010", "9011", "9012", "9013"];
-  
+function PlantCodeSelector({ value, onChange, label = "Plant Code", plants = [], loading = false }) {
   return (
     <div>
       <label className="block text-xs font-bold text-slate-600 mb-1">{label}</label>
@@ -163,42 +161,16 @@ function PlantCodeSelector({ value, onChange, label = "Plant Code" }) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+        disabled={loading}
       >
         <option value="">Select Plant Code</option>
-        {plantCodes.map(code => (
-          <option key={code} value={code}>{code}</option>
+        {plants.map(plant => (
+          <option key={plant._id} value={plant._id}>
+            {plant.code} - {plant.name}
+          </option>
         ))}
       </select>
-    </div>
-  );
-}
-
-function DateRangePicker({ startDate, endDate, onStartChange, onEndChange, label = "Date Range" }) {
-  return (
-    <div className="space-y-2">
-      <label className="block text-xs font-bold text-slate-600 mb-1">{label}</label>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => onStartChange(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
-            placeholder="Start Date"
-          />
-          <p className="text-xs text-slate-400 mt-1">Start Date</p>
-        </div>
-        <div>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => onEndChange(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
-            placeholder="End Date"
-          />
-          <p className="text-xs text-slate-400 mt-1">End Date</p>
-        </div>
-      </div>
+      {loading && <p className="text-xs text-slate-400 mt-1">Loading plants...</p>}
     </div>
   );
 }
@@ -234,56 +206,228 @@ function GenerateButton({ onClick, loading = false, label = "Generate Report" })
 export default function BillingPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [loadingBranches, setLoadingBranches] = useState(false);
+  const [loadingClients, setLoadingClients] = useState(false);
+  const [loadingPlants, setLoadingPlants] = useState(false);
+  
+  // API Data
+  const [branches, setBranches] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [plants, setPlants] = useState([]);
   
   // Common state
-  const [branch, setBranch] = useState("Mumbai");
+  const [branch, setBranch] = useState("");
   
   // Product-Wise Billing State
   const [productWise, setProductWise] = useState({
-    clientName: "Yara Fertilizers India Pvt Ltd",
+    clientId: "",
+    clientName: "",
     productCategories: "",
-    plantCode: "9009",
-    month: "April",
+    plantId: "",
+    plantCode: "",
+    month: "",
     orderType: "Sales",
-    startDate: "2026-04-01",
-    endDate: "2026-04-30"
+    startDate: "",
+    endDate: ""
   });
   
   // General Billing State
   const [generalBilling, setGeneralBilling] = useState({
-    clientName: "ICL Management Pvt Ltd",
-    month: "April",
+    clientId: "",
+    clientName: "",
+    month: "",
     orderType: "Sales",
-    startDate: "2026-04-01",
-    endDate: "2026-04-30"
+    startDate: "",
+    endDate: ""
   });
   
   // Detention Billing State
   const [detentionBilling, setDetentionBilling] = useState({
-    clientName: "ICL Management Pvt Ltd",
+    clientId: "",
+    clientName: "",
     detention: "",
-    month: "April",
-    startDate: "2026-04-01",
-    endDate: "2026-04-30"
+    month: "",
+    startDate: "",
+    endDate: ""
   });
   
   // Cancellation Billing State
   const [cancellationBilling, setCancellationBilling] = useState({
-    clientName: "ICL Management Pvt Ltd",
+    clientId: "",
+    clientName: "",
     cancellation: "",
-    month: "April",
-    startDate: "2026-04-01",
-    endDate: "2026-04-30"
+    month: "",
+    startDate: "",
+    endDate: ""
   });
   
   // Other Billing State
   const [otherBilling, setOtherBilling] = useState({
-    clientName: "ICL Management Pvt Ltd",
+    clientId: "",
+    clientName: "",
     type: "Cancellation",
-    month: "April",
-    startDate: "2026-04-01",
-    endDate: "2026-04-30"
+    month: "",
+    startDate: "",
+    endDate: ""
   });
+  
+  // Fetch Branches
+  const fetchBranches = async () => {
+    setLoadingBranches(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/branches', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setBranches(data.data);
+        // Set default branch if available
+        if (data.data.length > 0 && !branch) {
+          setBranch(data.data[0]._id);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching branches:', error);
+    } finally {
+      setLoadingBranches(false);
+    }
+  };
+  
+  // Fetch Clients (Customers)
+  const fetchClients = async () => {
+    setLoadingClients(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/customers', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setClients(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching clients:', error);
+    } finally {
+      setLoadingClients(false);
+    }
+  };
+  
+  // Fetch Plants
+  const fetchPlants = async () => {
+    setLoadingPlants(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/plants', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setPlants(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching plants:', error);
+    } finally {
+      setLoadingPlants(false);
+    }
+  };
+  
+  // Get client name by ID
+  const getClientName = (clientId) => {
+    const client = clients.find(c => c._id === clientId);
+    return client ? client.customerName : "";
+  };
+  
+  // Get plant code by ID
+  const getPlantCode = (plantId) => {
+    const plant = plants.find(p => p._id === plantId);
+    return plant ? plant.code : "";
+  };
+  
+  // Handle client selection for product wise
+  const handleProductWiseClientChange = (clientId) => {
+    const clientName = getClientName(clientId);
+    setProductWise({
+      ...productWise,
+      clientId: clientId,
+      clientName: clientName
+    });
+  };
+  
+  // Handle client selection for general
+  const handleGeneralClientChange = (clientId) => {
+    const clientName = getClientName(clientId);
+    setGeneralBilling({
+      ...generalBilling,
+      clientId: clientId,
+      clientName: clientName
+    });
+  };
+  
+  // Handle client selection for detention
+  const handleDetentionClientChange = (clientId) => {
+    const clientName = getClientName(clientId);
+    setDetentionBilling({
+      ...detentionBilling,
+      clientId: clientId,
+      clientName: clientName
+    });
+  };
+  
+  // Handle client selection for cancellation
+  const handleCancellationClientChange = (clientId) => {
+    const clientName = getClientName(clientId);
+    setCancellationBilling({
+      ...cancellationBilling,
+      clientId: clientId,
+      clientName: clientName
+    });
+  };
+  
+  // Handle client selection for other
+  const handleOtherClientChange = (clientId) => {
+    const clientName = getClientName(clientId);
+    setOtherBilling({
+      ...otherBilling,
+      clientId: clientId,
+      clientName: clientName
+    });
+  };
+  
+  // Handle plant selection for product wise
+  const handlePlantChange = (plantId) => {
+    const plantCode = getPlantCode(plantId);
+    setProductWise({
+      ...productWise,
+      plantId: plantId,
+      plantCode: plantCode
+    });
+  };
+  
+  // Fetch data on mount
+  useEffect(() => {
+    fetchBranches();
+    fetchClients();
+    fetchPlants();
+    
+    // Set default dates
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    
+    const formatDate = (date) => date.toISOString().split('T')[0];
+    
+    const defaultStartDate = formatDate(firstDayOfMonth);
+    const defaultEndDate = formatDate(lastDayOfMonth);
+    const defaultMonth = today.toLocaleString('default', { month: 'long' });
+    
+    // Set default values
+    setProductWise(prev => ({ ...prev, startDate: defaultStartDate, endDate: defaultEndDate, month: defaultMonth }));
+    setGeneralBilling(prev => ({ ...prev, startDate: defaultStartDate, endDate: defaultEndDate, month: defaultMonth }));
+    setDetentionBilling(prev => ({ ...prev, startDate: defaultStartDate, endDate: defaultEndDate, month: defaultMonth }));
+    setCancellationBilling(prev => ({ ...prev, startDate: defaultStartDate, endDate: defaultEndDate, month: defaultMonth }));
+    setOtherBilling(prev => ({ ...prev, startDate: defaultStartDate, endDate: defaultEndDate, month: defaultMonth }));
+  }, []);
   
   const formatDateForDisplay = (dateStr) => {
     if (!dateStr) return "";
@@ -292,13 +436,31 @@ export default function BillingPage() {
   };
   
   const handleGenerateProductWise = async () => {
+    if (!branch) {
+      alert("Please select a branch");
+      return;
+    }
+    if (!productWise.clientId) {
+      alert("Please select a client");
+      return;
+    }
+    
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
       const payload = {
         type: 'product-wise',
-        branch,
-        ...productWise
+        branchId: branch,
+        branchName: branches.find(b => b._id === branch)?.name || '',
+        clientId: productWise.clientId,
+        clientName: productWise.clientName,
+        productCategories: productWise.productCategories,
+        plantId: productWise.plantId,
+        plantCode: productWise.plantCode,
+        month: productWise.month,
+        orderType: productWise.orderType,
+        startDate: productWise.startDate,
+        endDate: productWise.endDate
       };
       
       const response = await fetch('/api/billing/product-wise', {
@@ -314,7 +476,6 @@ export default function BillingPage() {
       
       if (data.success) {
         alert(`✅ Product-Wise Billing Report Generated!\nClient: ${productWise.clientName}\nPeriod: ${formatDateForDisplay(productWise.startDate)} to ${formatDateForDisplay(productWise.endDate)}`);
-        // Open report in new tab or download
         if (data.reportUrl) {
           window.open(data.reportUrl, '_blank');
         }
@@ -330,13 +491,28 @@ export default function BillingPage() {
   };
   
   const handleGenerateGeneral = async () => {
+    if (!branch) {
+      alert("Please select a branch");
+      return;
+    }
+    if (!generalBilling.clientId) {
+      alert("Please select a client");
+      return;
+    }
+    
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
       const payload = {
         type: 'general',
-        branch,
-        ...generalBilling
+        branchId: branch,
+        branchName: branches.find(b => b._id === branch)?.name || '',
+        clientId: generalBilling.clientId,
+        clientName: generalBilling.clientName,
+        month: generalBilling.month,
+        orderType: generalBilling.orderType,
+        startDate: generalBilling.startDate,
+        endDate: generalBilling.endDate
       };
       
       const response = await fetch('/api/billing/general', {
@@ -367,13 +543,28 @@ export default function BillingPage() {
   };
   
   const handleGenerateDetention = async () => {
+    if (!branch) {
+      alert("Please select a branch");
+      return;
+    }
+    if (!detentionBilling.clientId) {
+      alert("Please select a client");
+      return;
+    }
+    
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
       const payload = {
         type: 'detention',
-        branch,
-        ...detentionBilling
+        branchId: branch,
+        branchName: branches.find(b => b._id === branch)?.name || '',
+        clientId: detentionBilling.clientId,
+        clientName: detentionBilling.clientName,
+        detention: detentionBilling.detention,
+        month: detentionBilling.month,
+        startDate: detentionBilling.startDate,
+        endDate: detentionBilling.endDate
       };
       
       const response = await fetch('/api/billing/detention', {
@@ -404,13 +595,28 @@ export default function BillingPage() {
   };
   
   const handleGenerateCancellation = async () => {
+    if (!branch) {
+      alert("Please select a branch");
+      return;
+    }
+    if (!cancellationBilling.clientId) {
+      alert("Please select a client");
+      return;
+    }
+    
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
       const payload = {
         type: 'cancellation',
-        branch,
-        ...cancellationBilling
+        branchId: branch,
+        branchName: branches.find(b => b._id === branch)?.name || '',
+        clientId: cancellationBilling.clientId,
+        clientName: cancellationBilling.clientName,
+        cancellation: cancellationBilling.cancellation,
+        month: cancellationBilling.month,
+        startDate: cancellationBilling.startDate,
+        endDate: cancellationBilling.endDate
       };
       
       const response = await fetch('/api/billing/cancellation', {
@@ -441,13 +647,28 @@ export default function BillingPage() {
   };
   
   const handleGenerateOther = async () => {
+    if (!branch) {
+      alert("Please select a branch");
+      return;
+    }
+    if (!otherBilling.clientId) {
+      alert("Please select a client");
+      return;
+    }
+    
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
       const payload = {
         type: 'other',
-        branch,
-        ...otherBilling
+        branchId: branch,
+        branchName: branches.find(b => b._id === branch)?.name || '',
+        clientId: otherBilling.clientId,
+        clientName: otherBilling.clientName,
+        billingType: otherBilling.type,
+        month: otherBilling.month,
+        startDate: otherBilling.startDate,
+        endDate: otherBilling.endDate
       };
       
       const response = await fetch('/api/billing/other', {
@@ -504,14 +725,18 @@ export default function BillingPage() {
           <div className="grid grid-cols-12 gap-5">
             <div className="col-span-12 md:col-span-3">
               <ClientSelector
-                value={productWise.clientName}
-                onChange={(val) => setProductWise({ ...productWise, clientName: val })}
+                value={productWise.clientId}
+                onChange={handleProductWiseClientChange}
+                clients={clients}
+                loading={loadingClients}
               />
             </div>
             <div className="col-span-12 md:col-span-3">
               <BranchSelector
                 value={branch}
                 onChange={setBranch}
+                branches={branches}
+                loading={loadingBranches}
               />
             </div>
             <div className="col-span-12 md:col-span-6"></div>
@@ -524,8 +749,10 @@ export default function BillingPage() {
             </div>
             <div className="col-span-12 md:col-span-2">
               <PlantCodeSelector
-                value={productWise.plantCode}
-                onChange={(val) => setProductWise({ ...productWise, plantCode: val })}
+                value={productWise.plantId}
+                onChange={handlePlantChange}
+                plants={plants}
+                loading={loadingPlants}
               />
             </div>
             <div className="col-span-12 md:col-span-2">
@@ -573,14 +800,18 @@ export default function BillingPage() {
           <div className="grid grid-cols-12 gap-5">
             <div className="col-span-12 md:col-span-3">
               <ClientSelector
-                value={generalBilling.clientName}
-                onChange={(val) => setGeneralBilling({ ...generalBilling, clientName: val })}
+                value={generalBilling.clientId}
+                onChange={handleGeneralClientChange}
+                clients={clients}
+                loading={loadingClients}
               />
             </div>
             <div className="col-span-12 md:col-span-3">
               <BranchSelector
                 value={branch}
                 onChange={setBranch}
+                branches={branches}
+                loading={loadingBranches}
               />
             </div>
             <div className="col-span-12 md:col-span-6"></div>
@@ -630,14 +861,18 @@ export default function BillingPage() {
           <div className="grid grid-cols-12 gap-5">
             <div className="col-span-12 md:col-span-3">
               <ClientSelector
-                value={detentionBilling.clientName}
-                onChange={(val) => setDetentionBilling({ ...detentionBilling, clientName: val })}
+                value={detentionBilling.clientId}
+                onChange={handleDetentionClientChange}
+                clients={clients}
+                loading={loadingClients}
               />
             </div>
             <div className="col-span-12 md:col-span-3">
               <BranchSelector
                 value={branch}
                 onChange={setBranch}
+                branches={branches}
+                loading={loadingBranches}
               />
             </div>
             <div className="col-span-12 md:col-span-6"></div>
@@ -691,14 +926,18 @@ export default function BillingPage() {
           <div className="grid grid-cols-12 gap-5">
             <div className="col-span-12 md:col-span-3">
               <ClientSelector
-                value={cancellationBilling.clientName}
-                onChange={(val) => setCancellationBilling({ ...cancellationBilling, clientName: val })}
+                value={cancellationBilling.clientId}
+                onChange={handleCancellationClientChange}
+                clients={clients}
+                loading={loadingClients}
               />
             </div>
             <div className="col-span-12 md:col-span-3">
               <BranchSelector
                 value={branch}
                 onChange={setBranch}
+                branches={branches}
+                loading={loadingBranches}
               />
             </div>
             <div className="col-span-12 md:col-span-6"></div>
@@ -752,14 +991,18 @@ export default function BillingPage() {
           <div className="grid grid-cols-12 gap-5">
             <div className="col-span-12 md:col-span-3">
               <ClientSelector
-                value={otherBilling.clientName}
-                onChange={(val) => setOtherBilling({ ...otherBilling, clientName: val })}
+                value={otherBilling.clientId}
+                onChange={handleOtherClientChange}
+                clients={clients}
+                loading={loadingClients}
               />
             </div>
             <div className="col-span-12 md:col-span-3">
               <BranchSelector
                 value={branch}
                 onChange={setBranch}
+                branches={branches}
+                loading={loadingBranches}
               />
             </div>
             <div className="col-span-12 md:col-span-6"></div>
@@ -811,27 +1054,6 @@ export default function BillingPage() {
           </div>
         </Card>
         
-        {/* Additional Information Section */}
-        {/*<Card title="Billing Instructions" className="bg-amber-50 border-amber-200">
-          <div className="text-sm text-slate-600 space-y-2">
-            <p className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
-              Select branch and client before generating any billing report
-            </p>
-            <p className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
-              Date range can be customized for all billing types
-            </p>
-            <p className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
-              Product-Wise billing includes additional filters for categories and plant codes
-            </p>
-            <p className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
-              Generated reports will open in a new tab as PDF/Excel format
-            </p>
-          </div>
-        </Card>*/}
       </div>
     </div>
   );

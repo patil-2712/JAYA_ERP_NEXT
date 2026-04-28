@@ -667,7 +667,7 @@ export default function CreateOrderPanel() {
    * PACK DATA FUNCTIONS - Single array
    ========================= */
   
- const recalculatePalletizationWeights = (row) => {
+const recalculatePalletizationWeights = (row) => {
   const updatedRow = { ...row };
   
   const noOfPallets = num(updatedRow.noOfPallets);
@@ -694,8 +694,8 @@ export default function CreateOrderPanel() {
       const actualWt = (wtLtr / 1000) * 2;
       updatedRow.actualWt = actualWt.toFixed(3);
     } else {
-      // KG FORMULA - Use for ALL other UOMs (KG, KGS, MG, GM, TON, M3, PCS, etc.)
-      const actualWt = totalPkgs * packWeight;
+      // KG FORMULA - DIVIDE BY 1000
+      const actualWt = (totalPkgs * packWeight) / 1000;
       updatedRow.actualWt = actualWt.toFixed(3);
       updatedRow.wtLtr = "";
     }
@@ -725,8 +725,8 @@ export default function CreateOrderPanel() {
       const actualWt = (wtLtr / 1000) * 2;
       updatedRow.actualWt = actualWt.toFixed(3);
     } else {
-      // KG FORMULA - Use for ALL other UOMs (KG, KGS, MG, GM, TON, M3, PCS, etc.)
-      const actualWt = totalPkgs * packWeight;
+      // KG FORMULA - DIVIDE BY 1000
+      const actualWt = (totalPkgs * packWeight) / 1000;
       updatedRow.actualWt = actualWt.toFixed(3);
       updatedRow.wtLtr = "";
     }
@@ -2169,7 +2169,7 @@ function PackTypeTable({
         { key: "skuSize", label: "SKU - SIZE", type: "select", options: skuSizes, isSKUSize: true },
         { key: "packWeight", label: "PACK - WEIGHT", type: "number" },
         { key: "productName", label: "PRODUCT NAME", type: "select", options: items, isItem: true },
-        { key: "wtLtr", label: "WT (LTR)", type: "number", readOnly: true },
+        { key: "wtLtr", label: "WT (LTR)", type: "number",readOnly: true },
         { key: "actualWt", label: "ACTUAL - WT", type: "number", readOnly: true },
         { key: "chargedWt", label: "CHARGED - WT", type: "number" },
         { key: "wtUom", label: "WT UOM", type: "text", readOnly: true, defaultValue: "MT" },
@@ -2323,19 +2323,19 @@ function PackTypeTable({
                     }
                     
                     // For read-only calculated fields
-                    if (c.readOnly && (c.key === "wtLtr" || c.key === "actualWt" || c.key === "totalPkgs")) {
-                      return (
-                        <td key={c.key} className="border border-yellow-300 px-2 py-2">
-                          <input
-                            type="text"
-                            value={r[c.key] || ""}
-                            readOnly
-                            className="w-full rounded-lg border border-slate-200 bg-slate-100 px-2 py-1.5 text-sm text-slate-700 font-medium"
-                            placeholder="Auto-calculated"
-                          />
-                        </td>
-                      );
-                    }
+if (c.readOnly && (c.key === "actualWt" || c.key === "totalPkgs")) {
+  return (
+    <td key={c.key} className="border border-yellow-300 px-2 py-2">
+      <input
+        type="text"
+        value={r[c.key] || ""}
+        readOnly
+        className="w-full rounded-lg border border-slate-200 bg-slate-100 px-2 py-1.5 text-sm text-slate-700 font-medium"
+        placeholder="Auto-calculated"
+      />
+    </td>
+  );
+}
                     
                     return (
                       <td key={c.key} className="border border-yellow-300 px-2 py-2">
