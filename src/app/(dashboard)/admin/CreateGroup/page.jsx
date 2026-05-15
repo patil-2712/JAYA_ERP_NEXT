@@ -36,7 +36,7 @@ export default function GroupsPage() {
   const validate = () => {
     const e = {};
     if (!name.trim())        e.name = "Group name is required";
-    if (!description.trim()) e.desc = "Description is required";
+    // description is now optional - removed validation
     // Category is optional - no validation
     setErrs(e);
     if (Object.keys(e).length) { toast.error(Object.values(e)[0]); return false; }
@@ -186,7 +186,7 @@ export default function GroupsPage() {
                     <p className="text-sm font-medium text-gray-300">
                       {searchTerm ? "No groups match your search" : "No groups yet — create your first one!"}
                     </p>
-                  </td></tr>
+                   </td></tr>
                 ) : filtered.map(g => (
                   <tr key={g._id} className="border-b border-gray-50 hover:bg-indigo-50/30 transition-colors">
 
@@ -313,7 +313,7 @@ export default function GroupsPage() {
             </div>
 
             <div>
-              <Lbl text="Description" req />
+              <Lbl text="Description" />
               <textarea
                 className={`${fi("desc")} resize-none`}
                 rows={4}

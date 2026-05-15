@@ -3,6 +3,19 @@ import connectDb from "@/lib/db";
 import Location from "./schema";
 import { getTokenFromHeader, verifyJWT } from "@/lib/auth";
 
+// Helper function to capitalize first letter of each word
+function capitalizeName(str) {
+  if (!str || typeof str !== 'string') return '';
+  
+  // Trim and convert to lowercase first, then capitalize first letter of each word
+  return str
+    .trim()
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 // Role-based access check
 function isAuthorized(user) {
   return (
@@ -56,7 +69,7 @@ export async function POST(req) {
   if (error) return NextResponse.json({ success: false, message: error }, { status });
 
   try {
-    const { name } = await req.json();
+    let { name } = await req.json();
 
     if (!name || !name.trim()) {
       return NextResponse.json({ 
@@ -65,9 +78,12 @@ export async function POST(req) {
       }, { status: 400 });
     }
 
+    // ✅ Capitalize first letter of each word
+    name = capitalizeName(name);
+
     // Check if location with same name already exists for this company
     const existingLocation = await Location.findOne({
-      name: name.trim(),
+      name: name,
       companyId: user.companyId,
     });
     
@@ -77,7 +93,7 @@ export async function POST(req) {
 
     // Create new location
     const newLocation = new Location({
-      name: name.trim(),
+      name: name,
       companyId: user.companyId,
       createdBy: user.id,
     });
@@ -101,7 +117,7 @@ export async function PUT(req) {
   try {
     const url = new URL(req.url);
     const locationId = url.searchParams.get("id");
-    const { name } = await req.json();
+    let { name } = await req.json();
 
     if (!locationId) {
       return NextResponse.json({ success: false, message: "Location ID is required" }, { status: 400 });
@@ -111,10 +127,13 @@ export async function PUT(req) {
       return NextResponse.json({ success: false, message: "Location name is required" }, { status: 400 });
     }
 
+    // ✅ Capitalize first letter of each word
+    name = capitalizeName(name);
+
     // Check if another location with same name exists
     const existingLocation = await Location.findOne({
       _id: { $ne: locationId },
-      name: name.trim(),
+      name: name,
       companyId: user.companyId,
     });
     
@@ -125,7 +144,7 @@ export async function PUT(req) {
     // Update location
     const updatedLocation = await Location.findOneAndUpdate(
       { _id: locationId, companyId: user.companyId },
-      { name: name.trim() },
+      { name: name },
       { new: true }
     );
 

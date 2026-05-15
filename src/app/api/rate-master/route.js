@@ -167,6 +167,168 @@ export async function GET(req) {
   }
 }
 
+//export async function POST(req) {
+//  await connectDb();
+//  const { user, error, status } = await validateUser(req);
+//  if (error) return NextResponse.json({ success: false, message: error }, { status });
+//
+//  try {
+//    const { title, customerId, branchId, locationRates, weightRule, approvalOption } = await req.json();
+//
+//    if (!title || !title.trim()) {
+//      return NextResponse.json({ success: false, message: "Title is required" }, { status: 400 });
+//    }
+//
+//    if (!customerId) {
+//      return NextResponse.json({ success: false, message: "Customer is required" }, { status: 400 });
+//    }
+//
+//    if (!branchId) {
+//      return NextResponse.json({ success: false, message: "Branch is required" }, { status: 400 });
+//    }
+//
+//    if (!approvalOption) {
+//      return NextResponse.json({ success: false, message: "Approval option is required" }, { status: 400 });
+//    }
+//
+//    let validatedLocationRates = [];
+//    
+//    if (locationRates && Array.isArray(locationRates) && locationRates.length > 0) {
+//      for (let locRate of locationRates) {
+//        if (!locRate.locationId) {
+//          return NextResponse.json({ success: false, message: "Location is required for all rows" }, { status: 400 });
+//        }
+//        
+//        const location = await Location.findOne({ _id: locRate.locationId, companyId: user.companyId });
+//        if (!location) {
+//          return NextResponse.json({ success: false, message: `Invalid location selected` }, { status: 400 });
+//        }
+//        
+//        const fromQty = parseFloat(locRate.fromQty);
+//        const toQty = parseFloat(locRate.toQty);
+//        const rate = parseFloat(locRate.rate);
+//        
+//        if (isNaN(fromQty) || isNaN(toQty) || isNaN(rate)) {
+//          return NextResponse.json({ 
+//            success: false, 
+//            message: `Invalid number format for location ${location.name}` 
+//          }, { status: 400 });
+//        }
+//        
+//        if (fromQty >= toQty) {
+//          return NextResponse.json({ 
+//            success: false, 
+//            message: `From quantity (${fromQty}) must be less than To quantity (${toQty}) for location ${location.name}` 
+//          }, { status: 400 });
+//        }
+//        
+//        if (fromQty < 0 || toQty < 0 || rate < 0) {
+//          return NextResponse.json({ 
+//            success: false, 
+//            message: "Quantities and rate cannot be negative" 
+//          }, { status: 400 });
+//        }
+//        
+//        validatedLocationRates.push({
+//          locationId: locRate.locationId,
+//          fromQty: fromQty,
+//          toQty: toQty,
+//          rate: rate,
+//          isActive: true,
+//          createdAt: new Date(),
+//          version: 1
+//        });
+//      }
+//    }
+//
+//    const existingRateMaster = await RateMaster.findOne({
+//      title: title.trim(),
+//      companyId: user.companyId,
+//    });
+//    
+//    if (existingRateMaster) {
+//      return NextResponse.json({ success: false, message: "Rate master with this title already exists" }, { status: 400 });
+//    }
+//
+//    const newRateMaster = new RateMaster({
+//      title: title.trim(),
+//      customerId,
+//      branchId,
+//      locationRates: validatedLocationRates,
+//      weightRule: weightRule || 'all_weights',
+//      approvalOption: approvalOption,
+//      companyId: user.companyId,
+//      createdBy: user.id,
+//      isActive: true
+//    });
+//
+//    const savedRateMaster = await newRateMaster.save();
+//
+//    for (let rate of validatedLocationRates) {
+//      const location = await Location.findById(rate.locationId);
+//      await RateHistory.create({
+//        rateMasterId: savedRateMaster._id,
+//        rateMasterTitle: savedRateMaster.title,
+//        locationId: rate.locationId,
+//        locationName: location?.name || 'Unknown',
+//        fromQty: rate.fromQty,
+//        toQty: rate.toQty,
+//        rate: rate.rate,
+//        version: 1,
+//        revisedBy: user.id,
+//        action: 'CREATED'
+//      });
+//    }
+//
+//    const customer = await Customer.findById(customerId);
+//    const branch = await Branch.findById(branchId);
+//
+//    let locationRatesWithNames = [];
+//    if (validatedLocationRates.length > 0) {
+//      locationRatesWithNames = await Promise.all(
+//        savedRateMaster.locationRates.map(async (locRate) => {
+//          const location = await Location.findById(locRate.locationId);
+//          return {
+//            _id: locRate._id,
+//            locationId: locRate.locationId,
+//            fromQty: locRate.fromQty,
+//            toQty: locRate.toQty,
+//            rate: locRate.rate,
+//            locationName: location?.name || 'Unknown Location',
+//            isActive: locRate.isActive,
+//            createdAt: locRate.createdAt,
+//            version: locRate.version
+//          };
+//        })
+//      );
+//    }
+//
+//    return NextResponse.json({ 
+//      success: true, 
+//      data: {
+//        _id: savedRateMaster._id,
+//        title: savedRateMaster.title,
+//        customerId: savedRateMaster.customerId,
+//        branchId: savedRateMaster.branchId,
+//        companyId: savedRateMaster.companyId,
+//        createdBy: savedRateMaster.createdBy,
+//        isActive: savedRateMaster.isActive,
+//        createdAt: savedRateMaster.createdAt,
+//        updatedAt: savedRateMaster.updatedAt,
+//        weightRule: savedRateMaster.weightRule,
+//        approvalOption: savedRateMaster.approvalOption,
+//        branchName: branch?.name || '',
+//        customerName: customer?.customerName || '',
+//        locationRates: locationRatesWithNames
+//      }
+//    }, { status: 201 });
+//  } catch (error) {
+//    console.error("POST /rate-master error:", error);
+//    return NextResponse.json({ success: false, message: "Failed to create rate master: " + error.message }, { status: 500 });
+//  }
+//}
+
+
 export async function POST(req) {
   await connectDb();
   const { user, error, status } = await validateUser(req);
@@ -229,13 +391,19 @@ export async function POST(req) {
           }, { status: 400 });
         }
         
+        // Use custom createdAt if provided, otherwise use current date
+        let customCreatedAt = new Date();
+        if (locRate.createdAt) {
+          customCreatedAt = new Date(locRate.createdAt);
+        }
+        
         validatedLocationRates.push({
           locationId: locRate.locationId,
           fromQty: fromQty,
           toQty: toQty,
           rate: rate,
           isActive: true,
-          createdAt: new Date(),
+          createdAt: customCreatedAt,
           version: 1
         });
       }
@@ -276,7 +444,8 @@ export async function POST(req) {
         rate: rate.rate,
         version: 1,
         revisedBy: user.id,
-        action: 'CREATED'
+        action: 'CREATED',
+        createdAt: rate.createdAt  // Store the custom createdAt in history
       });
     }
 
@@ -328,6 +497,197 @@ export async function POST(req) {
   }
 }
 
+
+
+//export async function PUT(req) {
+//  await connectDb();
+//  const { user, error, status } = await validateUser(req);
+//  if (error) return NextResponse.json({ success: false, message: error }, { status });
+//
+//  try {
+//    const url = new URL(req.url);
+//    const rateMasterId = url.searchParams.get("id");
+//    const { title, customerId, branchId, locationRates, weightRule, approvalOption, rateId } = await req.json();
+//
+//    if (!rateMasterId) {
+//      return NextResponse.json({ success: false, message: "Rate master ID is required" }, { status: 400 });
+//    }
+//
+//    const existingRateMaster = await RateMaster.findOne({ 
+//      _id: rateMasterId, 
+//      companyId: user.companyId 
+//    });
+//    
+//    if (!existingRateMaster) {
+//      return NextResponse.json({ success: false, message: "Rate master not found" }, { status: 404 });
+//    }
+//
+//    const finalTitle = title !== undefined ? title : existingRateMaster.title;
+//    const finalCustomerId = customerId !== undefined ? customerId : existingRateMaster.customerId;
+//    const finalBranchId = branchId !== undefined ? branchId : existingRateMaster.branchId;
+//    const finalWeightRule = weightRule !== undefined ? weightRule : existingRateMaster.weightRule;
+//    const finalApprovalOption = approvalOption !== undefined ? approvalOption : existingRateMaster.approvalOption;
+//    
+//    if (!finalTitle || !finalTitle.trim()) {
+//      return NextResponse.json({ success: false, message: "Title is required" }, { status: 400 });
+//    }
+//
+//    let validatedLocationRates = [];
+//    
+//    // If updating a single rate (revision)
+//    if (rateId && locationRates && locationRates.length === 1) {
+//      const oldRate = existingRateMaster.locationRates.find(r => r._id.toString() === rateId);
+//      
+//      if (!oldRate) {
+//        return NextResponse.json({ success: false, message: "Rate not found" }, { status: 404 });
+//      }
+//      
+//      const newRate = locationRates[0];
+//      const fromQty = parseFloat(newRate.fromQty);
+//      const toQty = parseFloat(newRate.toQty);
+//      const rate = parseFloat(newRate.rate);
+//      
+//      if (isNaN(fromQty) || isNaN(toQty) || isNaN(rate)) {
+//        return NextResponse.json({ success: false, message: "Invalid numbers" }, { status: 400 });
+//      }
+//      
+//      if (fromQty >= toQty) {
+//        return NextResponse.json({ success: false, message: "From quantity must be less than To quantity" }, { status: 400 });
+//      }
+//      
+//      // Check for overlaps with other active rates in same location
+//      const otherRates = existingRateMaster.locationRates.filter(
+//        r => r.locationId.toString() === oldRate.locationId.toString() && 
+//        r._id.toString() !== rateId && 
+//        r.isActive === true
+//      );
+//      
+//      for (let other of otherRates) {
+//        if ((fromQty >= other.fromQty && fromQty < other.toQty) ||
+//            (toQty > other.fromQty && toQty <= other.toQty) ||
+//            (fromQty <= other.fromQty && toQty >= other.toQty)) {
+//          const location = await Location.findById(oldRate.locationId);
+//          return NextResponse.json({ 
+//            success: false, 
+//            message: `Weight range ${fromQty}-${toQty} overlaps with existing range ${other.fromQty}-${other.toQty} for location ${location?.name}. Please fix the ranges.` 
+//          }, { status: 400 });
+//        }
+//      }
+//      
+//      // Save to history
+//      const location = await Location.findById(oldRate.locationId);
+//      await RateHistory.create({
+//        rateMasterId: existingRateMaster._id,
+//        rateMasterTitle: existingRateMaster.title,
+//        locationId: oldRate.locationId,
+//        locationName: location?.name || 'Unknown',
+//        fromQty: oldRate.fromQty,
+//        toQty: oldRate.toQty,
+//        rate: oldRate.rate,
+//        version: (oldRate.version || 1),
+//        revisedBy: user.id,
+//        action: 'REVISED',
+//        changes: {
+//          oldFromQty: oldRate.fromQty,
+//          oldToQty: oldRate.toQty,
+//          oldRate: oldRate.rate,
+//          newFromQty: fromQty,
+//          newToQty: toQty,
+//          newRate: rate
+//        }
+//      });
+//      
+//      // Mark old rate as inactive
+//      let updatedRates = existingRateMaster.locationRates.map(r => {
+//        if (r._id.toString() === rateId) {
+//          return {
+//            ...r.toObject(),
+//            isActive: false
+//          };
+//        }
+//        return r;
+//      });
+//      
+//      // Add new rate
+//      const maxVersion = Math.max(...existingRateMaster.locationRates
+//        .filter(r => r.locationId.toString() === oldRate.locationId.toString())
+//        .map(r => r.version || 1), 0) + 1;
+//      
+//      const newRateObj = {
+//        locationId: oldRate.locationId,
+//        fromQty: fromQty,
+//        toQty: toQty,
+//        rate: rate,
+//        isActive: true,
+//        createdAt: new Date(),
+//        version: maxVersion
+//      };
+//      
+//      validatedLocationRates = [...updatedRates, newRateObj];
+//      
+//    } else if (locationRates && Array.isArray(locationRates)) {
+//      validatedLocationRates = locationRates;
+//    } else {
+//      validatedLocationRates = existingRateMaster.locationRates;
+//    }
+//
+//    const updatedRateMaster = await RateMaster.findOneAndUpdate(
+//      { _id: rateMasterId, companyId: user.companyId },
+//      {
+//        title: finalTitle.trim(),
+//        customerId: finalCustomerId,
+//        branchId: finalBranchId,
+//        locationRates: validatedLocationRates,
+//        weightRule: finalWeightRule,
+//        approvalOption: finalApprovalOption
+//      },
+//      { new: true }
+//    );
+//
+//    const branch = await Branch.findById(updatedRateMaster.branchId);
+//    const customer = await Customer.findById(updatedRateMaster.customerId);
+//    
+//    const locationRatesWithNames = await Promise.all(
+//      updatedRateMaster.locationRates.map(async (locRate) => {
+//        const location = await Location.findById(locRate.locationId);
+//        return {
+//          _id: locRate._id,
+//          locationId: locRate.locationId,
+//          fromQty: locRate.fromQty,
+//          toQty: locRate.toQty,
+//          rate: locRate.rate,
+//          locationName: location?.name || 'Unknown Location',
+//          isActive: locRate.isActive,
+//          createdAt: locRate.createdAt,
+//          version: locRate.version
+//        };
+//      })
+//    );
+//
+//    return NextResponse.json({ 
+//      success: true, 
+//      data: {
+//        _id: updatedRateMaster._id,
+//        title: updatedRateMaster.title,
+//        customerId: updatedRateMaster.customerId,
+//        branchId: updatedRateMaster.branchId,
+//        companyId: updatedRateMaster.companyId,
+//        createdBy: updatedRateMaster.createdBy,
+//        isActive: updatedRateMaster.isActive,
+//        createdAt: updatedRateMaster.createdAt,
+//        updatedAt: updatedRateMaster.updatedAt,
+//        branchName: branch?.name || '',
+//        customerName: customer?.customerName || '',
+//        weightRule: updatedRateMaster.weightRule,
+//        approvalOption: updatedRateMaster.approvalOption,
+//        locationRates: locationRatesWithNames
+//      }
+//    }, { status: 200 });
+//  } catch (error) {
+//    console.error("PUT /rate-master error:", error);
+//    return NextResponse.json({ success: false, message: "Failed to update rate master: " + error.message }, { status: 500 });
+//  }
+//}
 export async function PUT(req) {
   await connectDb();
   const { user, error, status } = await validateUser(req);
@@ -403,7 +763,7 @@ export async function PUT(req) {
         }
       }
       
-      // Save to history
+      // Save to history with the new createdAt date
       const location = await Location.findById(oldRate.locationId);
       await RateHistory.create({
         rateMasterId: existingRateMaster._id,
@@ -422,7 +782,8 @@ export async function PUT(req) {
           oldRate: oldRate.rate,
           newFromQty: fromQty,
           newToQty: toQty,
-          newRate: rate
+          newRate: rate,
+          newCreatedAt: newRate.createdAt || null  // Track createdAt change
         }
       });
       
@@ -437,10 +798,16 @@ export async function PUT(req) {
         return r;
       });
       
-      // Add new rate
+      // Add new rate with custom createdAt date
       const maxVersion = Math.max(...existingRateMaster.locationRates
         .filter(r => r.locationId.toString() === oldRate.locationId.toString())
         .map(r => r.version || 1), 0) + 1;
+      
+      // Use the provided createdAt date or keep the old one or use current date
+      let newCreatedAt = new Date();
+      if (newRate.createdAt) {
+        newCreatedAt = new Date(newRate.createdAt);
+      }
       
       const newRateObj = {
         locationId: oldRate.locationId,
@@ -448,14 +815,24 @@ export async function PUT(req) {
         toQty: toQty,
         rate: rate,
         isActive: true,
-        createdAt: new Date(),
+        createdAt: newCreatedAt,  // Use the custom date
         version: maxVersion
       };
       
       validatedLocationRates = [...updatedRates, newRateObj];
       
     } else if (locationRates && Array.isArray(locationRates)) {
-      validatedLocationRates = locationRates;
+      // For bulk updates, preserve or update createdAt
+      validatedLocationRates = locationRates.map(rate => {
+        // If rate has createdAt, use it, otherwise keep existing or use current
+        if (rate.createdAt) {
+          return {
+            ...rate,
+            createdAt: new Date(rate.createdAt)
+          };
+        }
+        return rate;
+      });
     } else {
       validatedLocationRates = existingRateMaster.locationRates;
     }
@@ -517,6 +894,7 @@ export async function PUT(req) {
     return NextResponse.json({ success: false, message: "Failed to update rate master: " + error.message }, { status: 500 });
   }
 }
+
 
 export async function DELETE(req) {
   await connectDb();

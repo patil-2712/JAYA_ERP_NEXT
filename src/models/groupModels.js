@@ -22,7 +22,7 @@ const groupSchema = new mongoose.Schema(
     },
     description: {
       type: String,
-      required: true,
+      default: "", // Made optional with default empty string
       trim: true,
     },
     createdAt: {

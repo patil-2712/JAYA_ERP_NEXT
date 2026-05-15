@@ -3,6 +3,19 @@ import connectDb from "@/lib/db";
 import Location from "../schema";
 import { getTokenFromHeader, verifyJWT } from "@/lib/auth";
 
+// Helper function to capitalize first letter of each word
+function capitalizeName(str) {
+  if (!str || typeof str !== 'string') return '';
+  
+  // Trim and convert to lowercase first, then capitalize first letter of each word
+  return str
+    .trim()
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 // Role-based access check
 function isAuthorized(user) {
   return (
@@ -43,8 +56,12 @@ export async function POST(req) {
       }, { status: 400 });
     }
 
-    // Remove duplicates and empty strings
-    const uniqueNames = [...new Set(names.map(name => name.trim()).filter(name => name.length > 0))];
+    // ✅ Capitalize each name and remove duplicates/empty strings
+    const capitalizedNames = names
+      .map(name => capitalizeName(name))
+      .filter(name => name.length > 0);
+    
+    const uniqueNames = [...new Set(capitalizedNames)];
     
     if (uniqueNames.length === 0) {
       return NextResponse.json({ 

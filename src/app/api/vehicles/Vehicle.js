@@ -37,6 +37,12 @@ const vehicleSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
+  // Add to your vehicleSchema:
+ownerId: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: 'Owner',
+  default: null
+},
   chasisNumber: {
     type: String,
     uppercase: true,

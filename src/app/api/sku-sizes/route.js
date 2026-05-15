@@ -60,6 +60,9 @@ export async function GET(req) {
 /* ========================================
    POST /api/sku-sizes
 ======================================== */
+/* ========================================
+   POST /api/sku-sizes
+======================================== */
 export async function POST(req) {
   await connectDb();
   const { user, error, status } = await validateUser(req);
@@ -80,7 +83,7 @@ export async function POST(req) {
       return NextResponse.json({ success: false, message: "Invalid unit selected" }, { status: 400 });
     }
 
-    // ✅ Check if same size already exists
+    // ✅ Check if size exists (including inactive ones)
     const existingSize = await SKUSize.findOne({
       value: value,
       unit: unit,
@@ -88,6 +91,18 @@ export async function POST(req) {
     });
     
     if (existingSize) {
+      // ✅ If it exists but is inactive, reactivate it
+      if (!existingSize.isActive) {
+        existingSize.isActive = true;
+        await existingSize.save();
+        return NextResponse.json({ 
+          success: true, 
+          data: existingSize, 
+          message: "SKU size reactivated successfully" 
+        }, { status: 200 });
+      }
+      
+      // If it's active, return error
       return NextResponse.json({ success: false, message: "SKU size already exists" }, { status: 400 });
     }
 

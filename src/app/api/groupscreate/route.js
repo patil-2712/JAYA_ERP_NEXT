@@ -88,7 +88,7 @@ export async function POST(req) {
 
     const newGroup = new Group({
       name,
-      description,
+      description: description || "", // Allow empty description
       category: category || "",
       companyId: user.companyId,
     });
@@ -120,7 +120,7 @@ export async function PUT(req, { params }) {
   }
 
   try {
-    const { id } = await params;  // ✅ AWAIT HERE
+    const { id } = await params;
     
     if (!id) {
       return NextResponse.json({ success: false, message: "Group ID is required" }, { status: 400 });
@@ -136,7 +136,7 @@ export async function PUT(req, { params }) {
 
     const updatedGroup = await Group.findByIdAndUpdate(
       id,
-      { name, description, category: category || "" },
+      { name, description: description || "", category: category || "" },
       { new: true, runValidators: true }
     );
 
@@ -165,7 +165,7 @@ export async function DELETE(req, { params }) {
   }
 
   try {
-    const { id } = await params;  // ✅ AWAIT HERE
+    const { id } = await params;
     
     if (!id) {
       return NextResponse.json({ success: false, message: "Group ID is required" }, { status: 400 });
