@@ -91,15 +91,15 @@ export default function PODPanelList() {
   };
 
   const handleEdit = (podId) => {
-    router.push(`/admin/ProofOfDelivery/${podId}`);
+    router.push(`/admin/ProofofDelivery/${podId}`);
   };
 
   const handleCreateNew = () => {
-    router.push('/admin/ProofOfDelivery/create');
+    router.push('/admin/ProofofDelivery/create');
   };
 
   const handleApprove = (podId) => {
-    router.push(`/admin/ProofOfDelivery/approve/${podId}`);
+    router.push(`/admin/ProofofDelivery/approve/${podId}`);
   };
 
   const getStatusColor = (status) => {
